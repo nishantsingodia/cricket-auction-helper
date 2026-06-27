@@ -39,3 +39,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# databases — built locally by the Python ETL, never committed (incl. backups & stubs)
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+/db/
+!/db/.gitkeep
+
+# cricsheet raw data
+/data/raw/

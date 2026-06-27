@@ -1,0 +1,730 @@
+import { sqlite } from "@/db";
+import {
+  WOMENS_T20_WC_2026_NAME,
+  WC_TEAM_TIERS,
+  XI_SIZE,
+  type StrengthTier,
+} from "@/lib/squads/womens-t20-wc-2026";
+import { MLC_2026_NAME, mlcExpectedMatches } from "@/lib/squads/mlc-2026";
+
+/**
+ * IPL Auction Valuation Engine — 2-Score Model
+ *
+ * Score 1: Recency-weighted base EFPPM
+ *   A (40%): Last 10 quality T20 matches
+ *   B (30%): IPL 2025
+ *   C (10%): IPL 2024
+ *   D (20%): All quality T20 last 2.5yr
+ *   Missing sources redistributed proportionally. Baseline 20.
+ *
+ * Score 2: Venue conditions factor (schedule-based)
+ *   - Data-driven venue classification: bat_road / balanced / bowl_friendly
+ *   - Per-player weighted FP across actual 14-match IPL schedule
+ *   - Fallback: venue-specific → venue-type → overall (no adjustment)
+ *
+ * Expected matches (impact sub rule):
+ *   Squad 1-12: 14, Squad 13-15: 4, Squad 16+: 0
+ *
+ * Budget-balanced pricing: top N players' prices sum to total auction money
+ *   N = numFriends × playersPerFriend
+ */
+
+// Short code → full team name in match_performances
+const TEAM_FULL_NAMES: Record<string, string> = {
+  CSK: "Chennai Super Kings",
+  MI: "Mumbai Indians",
+  RCB: "Royal Challengers Bengaluru",
+  KKR: "Kolkata Knight Riders",
+  DC: "Delhi Capitals",
+  SRH: "Sunrisers Hyderabad",
+  RR: "Rajasthan Royals",
+  PBKS: "Punjab Kings",
+  GT: "Gujarat Titans",
+  LSG: "Lucknow Super Giants",
+};
+
+const TOP_8_NATIONS = [
+  "India", "Australia", "England", "South Africa",
+  "New Zealand", "West Indies", "Pakistan", "Sri Lanka",
+];
+
+interface PoolPlayer {
+  id: number;
+  player_id: number;
+  status: string;
+  role: string;
+  squad_number: number;
+  ipl_team: string;
+  price_manual: number;
+  efppm: number;
+  sold_price: number;
+}
+
+type VenueType = "bat_road" | "balanced" | "bowl_friendly";
+
+function getExpectedMatches(squadNumber: number): number {
+  if (squadNumber >= 1 && squadNumber <= 12) return 14;
+  if (squadNumber >= 13 && squadNumber <= 15) return 4;
+  return 0;
+}
+
+// Women's T20 World Cup: 5 group games for everyone in the XI, plus a
+// strength-weighted knockout expectation (SF = +1 game, final = +1).
+//   Tier A (title contenders): ~6.5  (likely semi, decent final shot)
+//   Tier B (mid):              ~5.3  (occasional semi)
+//   Tier C (group exit):       ~5.0  (group stage only)
+// Bench (squad 12–15): ~1 game — no Impact-sub rule in women's T20, XIs are
+// settled, so bench cover only features in dead rubbers / injuries.
+const WC_XI_MATCHES: Record<StrengthTier, number> = { A: 6.5, B: 5.3, C: 5.0 };
+const WC_BENCH_MATCHES = 1.0;
+
+function getWomensExpectedMatches(
+  squadNumber: number,
+  tier: StrengthTier
+): number {
+  if (squadNumber >= 1 && squadNumber <= XI_SIZE) return WC_XI_MATCHES[tier];
+  return WC_BENCH_MATCHES;
+}
+
+// ==================== SCORE 1: Recency-Weighted Base EFPPM ====================
+
+interface Score1Data {
+  last10Avg: number;
+  last10Count: number;
+  ipl2025Avg: number;
+  ipl2025Count: number;
+  ipl2024Avg: number;
+  ipl2024Count: number;
+  t20_2_5yrAvg: number;
+  t20_2_5yrCount: number;
+}
+
+function computeScore1(data: Score1Data): number {
+  const sources: Array<{ weight: number; avg: number; hasData: boolean }> = [
+    { weight: 0.40, avg: data.last10Avg, hasData: data.last10Count > 0 },
+    { weight: 0.30, avg: data.ipl2025Avg, hasData: data.ipl2025Count > 0 },
+    { weight: 0.10, avg: data.ipl2024Avg, hasData: data.ipl2024Count > 0 },
+    { weight: 0.20, avg: data.t20_2_5yrAvg, hasData: data.t20_2_5yrCount > 0 },
+  ];
+
+  const available = sources.filter((s) => s.hasData);
+  if (available.length === 0) return 20; // baseline for uncapped
+
+  const totalWeight = available.reduce((s, v) => s + v.weight, 0);
+  let score = 0;
+  for (const s of available) {
+    score += (s.weight / totalWeight) * s.avg;
+  }
+  return score;
+}
+
+// ==================== SCORE 2: Venue Conditions Factor ====================
+
+function classifyVenues(): Map<string, VenueType> {
+  const rows = sqlite
+    .prepare(
+      `SELECT mp.venue_name,
+        AVG(CASE WHEN p.role IN ('BAT','WK') THEN mp.fantasy_points END) as bat_fp,
+        AVG(CASE WHEN p.role = 'BOWL' THEN mp.fantasy_points END) as bowl_fp
+      FROM match_performances mp
+      JOIN players p ON mp.player_id = p.id
+      WHERE mp.match_date >= '2020-01-01'
+        AND mp.format IN ('IPL', 'T20')
+        AND p.gender = 'male'
+      GROUP BY mp.venue_name
+      HAVING COUNT(DISTINCT mp.match_id) >= 3`
+    )
+    .all() as Array<{ venue_name: string; bat_fp: number; bowl_fp: number }>;
+
+  const map = new Map<string, VenueType>();
+  for (const r of rows) {
+    if (!r.bat_fp || !r.bowl_fp) continue;
+    const ratio = r.bat_fp / r.bowl_fp;
+    if (ratio > 1.1) map.set(r.venue_name, "bat_road");
+    else if (ratio >= 0.95) map.set(r.venue_name, "balanced");
+    else map.set(r.venue_name, "bowl_friendly");
+  }
+  return map;
+}
+
+function getTeamSchedules(): Map<string, Array<{ venue: string; games: number }>> {
+  // IPL 2026 Full League Stage Schedule (70 matches, 28 Mar – 24 May 2026)
+  // Each entry: [team1, team2, venueDBName]
+  const BEN = "M Chinnaswamy Stadium, Bengaluru";
+  const MUM = "Wankhede Stadium, Mumbai";
+  const CHE = "MA Chidambaram Stadium, Chepauk, Chennai";
+  const KOL = "Eden Gardens, Kolkata";
+  const DEL = "Arun Jaitley Stadium, Delhi";
+  const AHM = "Narendra Modi Stadium, Ahmedabad";
+  const HYD = "Rajiv Gandhi International Stadium, Uppal, Hyderabad";
+  const LUC = "Bharat Ratna Shri Atal Bihari Vajpayee Ekana Cricket Stadium, Lucknow";
+  const JAI = "Sawai Mansingh Stadium, Jaipur";
+  const DHA = "Himachal Pradesh Cricket Association Stadium, Dharamsala";
+  const RAI = "Shaheed Veer Narayan Singh International Stadium, Raipur";
+  const GUW = "Barsapara Cricket Stadium, Guwahati";
+  const NCH = "Maharaja Yadavindra Singh International Cricket Stadium, Mullanpur";
+
+  const IPL_2026_SCHEDULE: Array<[string, string, string]> = [
+    // Phase 1 (matches 1-20, 28 Mar – 12 Apr)
+    ["RCB", "SRH", BEN],  ["MI",  "KKR", MUM],  ["RR",  "CSK", GUW],
+    ["PBKS","GT",  NCH],   ["LSG", "DC",  LUC],  ["KKR", "SRH", KOL],
+    ["CSK", "PBKS",CHE],   ["DC",  "MI",  DEL],  ["GT",  "RR",  AHM],
+    ["SRH", "LSG", HYD],   ["RCB", "CSK", BEN],  ["KKR", "PBKS",KOL],
+    ["RR",  "MI",  GUW],   ["DC",  "GT",  DEL],  ["KKR", "LSG", KOL],
+    ["RR",  "RCB", GUW],   ["PBKS","SRH", NCH],  ["CSK", "DC",  CHE],
+    ["LSG", "GT",  LUC],   ["MI",  "RCB", MUM],
+    // Phase 2 (matches 21-70, 13 Apr – 24 May)
+    ["SRH", "RR",  HYD],   ["MI",  "CSK", MUM],  ["SRH", "RCB", BEN],
+    ["MI",  "GT",  MUM],   ["CSK", "RCB", BEN],  ["RCB", "RR",  KOL],
+    ["SRH", "KKR", NCH],   ["GT",  "PBKS",AHM],  ["KKR", "LSG", HYD],
+    ["PBKS","MI",  NCH],   ["SRH", "MI",  HYD],  ["CSK", "RR",  CHE],
+    ["RCB", "KKR", BEN],   ["DC",  "PBKS",DEL],  ["GT",  "CSK", AHM],
+    ["LSG", "SRH", LUC],   ["MI",  "RCB", MUM],  ["RR",  "DC",  JAI],
+    ["KKR", "GT",  KOL],   ["PBKS","LSG", NCH],  ["SRH", "CSK", HYD],
+    ["RR",  "MI",  JAI],   ["RCB", "DC",  BEN],  ["GT",  "PBKS",AHM],
+    ["KKR", "LSG", KOL],   ["CSK", "MI",  CHE],  ["SRH", "RCB", HYD],
+    ["DC",  "RR",  DEL],   ["LSG", "KKR", LUC],  ["PBKS","GT",  DHA],
+    ["MI",  "SRH", MUM],   ["CSK", "DC",  CHE],  ["RR",  "PBKS",JAI],
+    ["RCB", "GT",  RAI],   ["LSG", "MI",  LUC],  ["KKR", "SRH", KOL],
+    ["DC",  "RCB", DEL],   ["GT",  "RR",  AHM],  ["PBKS","CSK", DHA],
+    ["MI",  "KKR", MUM],   ["SRH", "LSG", HYD],  ["RCB", "PBKS",RAI],
+    ["CSK", "GT",  CHE],   ["RR",  "KKR", JAI],  ["DC",  "LSG", DEL],
+    ["MI",  "GT",  MUM],   ["SRH", "PBKS",HYD],  ["SRH", "RCB", HYD],
+    ["LSG", "PBKS",LUC],   ["MI",  "RR",  MUM],  ["KKR", "DC",  KOL],
+  ];
+
+  // Build venue-grouped schedules per team
+  const teamVenueCount = new Map<string, Map<string, number>>();
+  for (const [t1, t2, venue] of IPL_2026_SCHEDULE) {
+    for (const team of [t1, t2]) {
+      if (!teamVenueCount.has(team)) teamVenueCount.set(team, new Map());
+      const vc = teamVenueCount.get(team)!;
+      vc.set(venue, (vc.get(venue) || 0) + 1);
+    }
+  }
+
+  const schedules = new Map<string, Array<{ venue: string; games: number }>>();
+  for (const [team, venueMap] of teamVenueCount) {
+    schedules.set(
+      team,
+      Array.from(venueMap.entries()).map(([venue, games]) => ({ venue, games }))
+    );
+  }
+  return schedules;
+}
+
+function batchPlayerVenueFP(
+  playerIds: number[]
+): Map<number, Map<string, { avg: number; cnt: number }>> {
+  if (playerIds.length === 0) return new Map();
+
+  const placeholders = playerIds.map(() => "?").join(",");
+  const rows = sqlite
+    .prepare(
+      `SELECT player_id, venue_name, AVG(fantasy_points) as avg_fp, COUNT(*) as cnt
+       FROM match_performances
+       WHERE player_id IN (${placeholders})
+         AND format IN ('IPL','T20')
+         AND match_date >= date('now', '-30 months')
+       GROUP BY player_id, venue_name`
+    )
+    .all(...playerIds) as Array<{
+    player_id: number;
+    venue_name: string;
+    avg_fp: number;
+    cnt: number;
+  }>;
+
+  const map = new Map<number, Map<string, { avg: number; cnt: number }>>();
+  for (const r of rows) {
+    if (!map.has(r.player_id)) map.set(r.player_id, new Map());
+    map.get(r.player_id)!.set(r.venue_name, { avg: r.avg_fp, cnt: r.cnt });
+  }
+  return map;
+}
+
+function batchPlayerVenueTypeFP(
+  playerIds: number[],
+  venueClassification: Map<string, VenueType>
+): Map<number, Map<VenueType, { avg: number; cnt: number }>> {
+  if (playerIds.length === 0) return new Map();
+
+  const placeholders = playerIds.map(() => "?").join(",");
+  const rows = sqlite
+    .prepare(
+      `SELECT player_id, venue_name, fantasy_points
+       FROM match_performances
+       WHERE player_id IN (${placeholders})
+         AND format IN ('IPL','T20')
+         AND match_date >= date('now', '-30 months')`
+    )
+    .all(...playerIds) as Array<{
+    player_id: number;
+    venue_name: string;
+    fantasy_points: number;
+  }>;
+
+  // Aggregate by player × venue_type
+  const accum = new Map<
+    number,
+    Map<VenueType, { total: number; cnt: number }>
+  >();
+  for (const r of rows) {
+    const vt = venueClassification.get(r.venue_name);
+    if (!vt) continue;
+
+    if (!accum.has(r.player_id)) accum.set(r.player_id, new Map());
+    const playerMap = accum.get(r.player_id)!;
+    if (!playerMap.has(vt)) playerMap.set(vt, { total: 0, cnt: 0 });
+    const entry = playerMap.get(vt)!;
+    entry.total += r.fantasy_points;
+    entry.cnt += 1;
+  }
+
+  const result = new Map<
+    number,
+    Map<VenueType, { avg: number; cnt: number }>
+  >();
+  for (const [pid, vtMap] of accum) {
+    const rMap = new Map<VenueType, { avg: number; cnt: number }>();
+    for (const [vt, data] of vtMap) {
+      rMap.set(vt, { avg: data.total / data.cnt, cnt: data.cnt });
+    }
+    result.set(pid, rMap);
+  }
+  return result;
+}
+
+function computeConditionsFactor(
+  playerId: number,
+  overallFP: number,
+  teamSchedule: Array<{ venue: string; games: number }>,
+  playerVenueFP: Map<string, { avg: number; cnt: number }> | undefined,
+  playerVenueTypeFP: Map<VenueType, { avg: number; cnt: number }> | undefined,
+  venueClassification: Map<string, VenueType>
+): number {
+  if (!teamSchedule || teamSchedule.length === 0 || overallFP <= 0) return 1.0;
+
+  let totalGames = 0;
+  let weightedFP = 0;
+
+  for (const { venue, games } of teamSchedule) {
+    totalGames += games;
+
+    // Try venue-specific FP (blended with overall — venue never fully overrides)
+    const venueStat = playerVenueFP?.get(venue);
+    if (venueStat && venueStat.cnt >= 5) {
+      const confidence = Math.min(venueStat.cnt / 10, 0.5);
+      const blended = confidence * venueStat.avg + (1 - confidence) * overallFP;
+      weightedFP += blended * games;
+      continue;
+    }
+
+    // Fallback: venue type FP (blended with overall)
+    const venueType = venueClassification.get(venue);
+    if (venueType) {
+      const vtStat = playerVenueTypeFP?.get(venueType);
+      if (vtStat && vtStat.cnt >= 5) {
+        const confidence = Math.min(vtStat.cnt / 10, 0.5);
+        const blended = confidence * vtStat.avg + (1 - confidence) * overallFP;
+        weightedFP += blended * games;
+        continue;
+      }
+    }
+
+    // Final fallback: overall FP (no adjustment for this venue)
+    weightedFP += overallFP * games;
+  }
+
+  if (totalGames === 0) return 1.0;
+  const scheduleFP = weightedFP / totalGames;
+  return scheduleFP / overallFP;
+}
+
+// ==================== MAIN VALUATION ====================
+
+export function recalculateValuations(
+  tournamentId: number | string,
+  auctionId?: number | string
+) {
+  // --- Auction config ---
+  const auctionQuery = auctionId
+    ? sqlite
+        .prepare(
+          "SELECT purse_per_friend, num_friends, players_per_friend, num_captains, num_vice_captains FROM auctions WHERE id = ?"
+        )
+        .get(auctionId)
+    : sqlite
+        .prepare(
+          "SELECT purse_per_friend, num_friends, players_per_friend, num_captains, num_vice_captains FROM auctions WHERE tournament_id = ? LIMIT 1"
+        )
+        .get(tournamentId);
+  const auctionConfig = auctionQuery as {
+    purse_per_friend: number;
+    num_friends: number;
+    players_per_friend: number;
+    num_captains: number;
+    num_vice_captains: number;
+  } | undefined;
+
+  if (!auctionConfig) return;
+
+  // Detect tournament type — the Women's T20 WC uses a different
+  // expected-matches model (WC fixtures, not the 14-game IPL league).
+  const tournamentRow = sqlite
+    .prepare("SELECT name FROM tournaments WHERE id = ?")
+    .get(tournamentId) as { name: string } | undefined;
+  const isWomensWC = tournamentRow?.name === WOMENS_T20_WC_2026_NAME;
+  const isMLC = tournamentRow?.name === MLC_2026_NAME;
+  // For MLC, the "primary league season" buckets are MLC (not IPL), and the
+  // quality pool is MLC + IPL + T20I (vs WPL for the women's path).
+  const leagueFmt = isMLC ? "MLC" : "IPL";
+  const qualityList = isMLC ? "'MLC','IPL'" : "'IPL','WPL'";
+
+  const purse = auctionConfig.purse_per_friend;
+  const numFriends = auctionConfig.num_friends || 1;
+  const playersPerFriend = auctionConfig.players_per_friend || 35;
+  const numCaptains = auctionConfig.num_captains || 1;
+  const numViceCaptains = auctionConfig.num_vice_captains || 1;
+  const totalMoney = purse * numFriends;
+  const topN = numFriends * playersPerFriend;
+
+  // --- Pool ---
+  const pool = sqlite
+    .prepare(
+      `SELECT ap.id, ap.player_id, ap.status, ap.squad_number, ap.ipl_team, p.role, COALESCE(ap.price_manual, 0) as price_manual, COALESCE(ap.efppm, 0) as efppm, COALESCE(ap.sold_price, 0) as sold_price
+       FROM auction_pool ap
+       JOIN players p ON ap.player_id = p.id
+       WHERE ap.tournament_id = ?`
+    )
+    .all(tournamentId) as PoolPlayer[];
+
+  const availPool = pool.filter((p) => p.status === "AVAILABLE");
+  if (availPool.length === 0) return;
+
+  const playerIds = availPool.map((p) => p.player_id);
+  const placeholders = playerIds.map(() => "?").join(",");
+
+  // Top-8 nations filter for T20I quality
+  const top8Placeholders = TOP_8_NATIONS.map(() => "?").join(",");
+
+  // --- Batch Query: Score 1 sources ---
+
+  // A: Last 10 quality T20 matches per player
+  const last10Rows = sqlite
+    .prepare(
+      `SELECT player_id, AVG(fantasy_points) as avg_fp, COUNT(*) as cnt
+       FROM (
+         SELECT player_id, fantasy_points,
+           ROW_NUMBER() OVER (PARTITION BY player_id ORDER BY match_date DESC) as rn
+         FROM match_performances
+         WHERE player_id IN (${placeholders})
+           AND (
+             format IN (${qualityList})
+             OR (format = 'T20' AND opposition IN (${top8Placeholders}))
+           )
+           AND match_date >= date('now', '-24 months')
+       )
+       WHERE rn <= 10
+       GROUP BY player_id`
+    )
+    .all(...playerIds, ...TOP_8_NATIONS) as Array<{
+    player_id: number;
+    avg_fp: number;
+    cnt: number;
+  }>;
+  const last10Map = new Map(last10Rows.map((r) => [r.player_id, r]));
+
+  // B: IPL 2025 avg FP
+  const ipl2025Rows = sqlite
+    .prepare(
+      `SELECT player_id, AVG(fantasy_points) as avg_fp, COUNT(*) as cnt
+       FROM match_performances
+       WHERE player_id IN (${placeholders})
+         AND format = '${leagueFmt}' AND match_date >= '2025-01-01' AND match_date < '2026-01-01'
+       GROUP BY player_id`
+    )
+    .all(...playerIds) as Array<{
+    player_id: number;
+    avg_fp: number;
+    cnt: number;
+  }>;
+  const ipl2025Map = new Map(ipl2025Rows.map((r) => [r.player_id, r]));
+
+  // C: IPL 2024 avg FP
+  const ipl2024Rows = sqlite
+    .prepare(
+      `SELECT player_id, AVG(fantasy_points) as avg_fp, COUNT(*) as cnt
+       FROM match_performances
+       WHERE player_id IN (${placeholders})
+         AND format = '${leagueFmt}' AND match_date >= '2024-01-01' AND match_date < '2025-01-01'
+       GROUP BY player_id`
+    )
+    .all(...playerIds) as Array<{
+    player_id: number;
+    avg_fp: number;
+    cnt: number;
+  }>;
+  const ipl2024Map = new Map(ipl2024Rows.map((r) => [r.player_id, r]));
+
+  // D: All quality T20 last 2.5yr
+  const t20AllRows = sqlite
+    .prepare(
+      `SELECT player_id, AVG(fantasy_points) as avg_fp, COUNT(*) as cnt
+       FROM match_performances
+       WHERE player_id IN (${placeholders})
+         AND (
+           format IN (${qualityList})
+           OR (format = 'T20' AND opposition IN (${top8Placeholders}))
+         )
+         AND match_date >= date('now', '-30 months')
+       GROUP BY player_id`
+    )
+    .all(...playerIds, ...TOP_8_NATIONS) as Array<{
+    player_id: number;
+    avg_fp: number;
+    cnt: number;
+  }>;
+  const t20AllMap = new Map(t20AllRows.map((r) => [r.player_id, r]));
+
+  // --- Batch Query: Score 2 data ---
+  const venueClassification = classifyVenues();
+  const teamSchedules = getTeamSchedules();
+  const playerVenueFP = batchPlayerVenueFP(playerIds);
+  const playerVenueTypeFP = batchPlayerVenueTypeFP(
+    playerIds,
+    venueClassification
+  );
+
+  // --- Batch Query: Bowling overs avg ---
+  const bowlOversRows = sqlite
+    .prepare(
+      `SELECT player_id, AVG(CAST(bowl_balls AS REAL) / 6.0) as avg_overs
+       FROM match_performances
+       WHERE player_id IN (${placeholders})
+         AND format = '${leagueFmt}'
+         AND bowl_balls > 0
+       GROUP BY player_id`
+    )
+    .all(...playerIds) as Array<{ player_id: number; avg_overs: number }>;
+  const bowlOversMap = new Map(
+    bowlOversRows.map((r) => [r.player_id, r.avg_overs])
+  );
+
+  // --- Batch Query: Ceiling (avg of top-10% matches) ---
+  const ceilingRows = sqlite
+    .prepare(
+      `SELECT player_id, AVG(fantasy_points) as ceiling_avg, cnt FROM (
+        SELECT player_id, fantasy_points, cnt,
+          NTILE(10) OVER (PARTITION BY player_id ORDER BY fantasy_points DESC) as tile
+        FROM (
+          SELECT player_id, fantasy_points,
+            COUNT(*) OVER (PARTITION BY player_id) as cnt
+          FROM match_performances
+          WHERE player_id IN (${placeholders})
+            AND (
+              format IN (${qualityList})
+              OR (format = 'T20' AND opposition IN (${top8Placeholders}))
+            )
+            AND match_date >= date('now', '-30 months')
+        )
+      )
+      WHERE tile = 1
+      GROUP BY player_id`
+    )
+    .all(...playerIds, ...TOP_8_NATIONS) as Array<{
+    player_id: number;
+    ceiling_avg: number;
+    cnt: number;
+  }>;
+  const ceilingMap = new Map(
+    ceilingRows.map((r) => [r.player_id, { ceilingAvg: r.ceiling_avg, cnt: r.cnt }])
+  );
+
+  // --- Compute valuations ---
+  const results: Array<{
+    id: number;
+    efppm: number;
+    seasonValue: number;
+    bowlOversAvg: number | null;
+  }> = [];
+
+  for (const p of availPool) {
+    // Score 1
+    const last10 = last10Map.get(p.player_id);
+    const ipl2025 = ipl2025Map.get(p.player_id);
+    const ipl2024 = ipl2024Map.get(p.player_id);
+    const t20All = t20AllMap.get(p.player_id);
+
+    const score1 = computeScore1({
+      last10Avg: last10?.avg_fp ?? 0,
+      last10Count: last10?.cnt ?? 0,
+      ipl2025Avg: ipl2025?.avg_fp ?? 0,
+      ipl2025Count: ipl2025?.cnt ?? 0,
+      ipl2024Avg: ipl2024?.avg_fp ?? 0,
+      ipl2024Count: ipl2024?.cnt ?? 0,
+      t20_2_5yrAvg: t20All?.avg_fp ?? 0,
+      t20_2_5yrCount: t20All?.cnt ?? 0,
+    });
+
+    // Score 2: conditions factor
+    const schedule = teamSchedules.get(p.ipl_team);
+    const conditionsFactor = computeConditionsFactor(
+      p.player_id,
+      score1,
+      schedule ?? [],
+      playerVenueFP.get(p.player_id),
+      playerVenueTypeFP.get(p.player_id),
+      venueClassification
+    );
+
+    const finalEfppm = score1 * conditionsFactor;
+    const expectedMatches = isMLC
+      ? mlcExpectedMatches(p.ipl_team, p.squad_number)
+      : isWomensWC
+      ? getWomensExpectedMatches(p.squad_number, WC_TEAM_TIERS[p.ipl_team] ?? "C")
+      : getExpectedMatches(p.squad_number);
+
+    // Ceiling premium: explosive players (high top-10% avg) get a boost
+    const ceilData = ceilingMap.get(p.player_id);
+    let ceilingBonus = 1.0;
+    if (ceilData && ceilData.ceilingAvg > finalEfppm) {
+      const ceilingRatio = (ceilData.ceilingAvg - finalEfppm) / finalEfppm;
+      const effectiveAlpha = 0.15 * Math.min(ceilData.cnt / 25, 1.0);
+      ceilingBonus = 1 + effectiveAlpha * ceilingRatio;
+    }
+
+    const seasonValue = finalEfppm * expectedMatches * ceilingBonus;
+
+    const bowlOversAvg =
+      p.role === "BOWL" || p.role === "AR"
+        ? bowlOversMap.get(p.player_id) ?? null
+        : null;
+
+    results.push({ id: p.id, efppm: finalEfppm, seasonValue, bowlOversAvg });
+  }
+
+  // --- Budget-balanced pricing ---
+  // Sort by seasonValue desc, take top N
+  const sorted = [...results].sort((a, b) => b.seasonValue - a.seasonValue);
+
+  // C/VC premium: only the genuine top players in the WHOLE pool are real
+  // Captain/Vice-Captain picks. Rank ALL players (sold + available) by EFPPM:
+  // the top (friends*captains) ranks are Captain slots, the next
+  // (friends*viceCaptains) are VC slots. A SOLD player in those bands CONSUMES
+  // its slot — the premium does NOT cascade down to whoever is now top of the
+  // available list (a mid-tier player isn't a captain pick just because the
+  // real marquees are gone).
+  const totalCSlots = numFriends * numCaptains;
+  const totalVCSlots = numFriends * numViceCaptains;
+
+  const ranked = [
+    ...pool
+      .filter((p) => p.status === "SOLD" && p.efppm > 0)
+      .map((p) => ({ efppm: p.efppm, id: -1 })), // sold occupies a slot, id<0
+    ...sorted.map((s) => ({ efppm: s.efppm, id: s.id })),
+  ].sort((a, b) => b.efppm - a.efppm);
+
+  const premiumById = new Map<number, number>();
+  for (let i = 0; i < ranked.length && i < totalCSlots + totalVCSlots; i++) {
+    const r = ranked[i];
+    if (r.id < 0) continue; // sold player consumes the slot — no cascade
+    premiumById.set(r.id, i < totalCSlots ? 1.8 : 1.35);
+  }
+  for (const s of sorted) {
+    const mult = premiumById.get(s.id);
+    if (mult) s.seasonValue *= mult;
+  }
+
+  // Normalize over what's ACTUALLY LEFT, not the full pool — otherwise prices
+  // of remaining players inflate as money/slots get consumed by sold players.
+  const spentMoney = pool
+    .filter((p) => p.status === "SOLD")
+    .reduce((s, p) => s + (p.sold_price || 0), 0);
+  const filledSlots = pool.filter((p) => p.status === "SOLD").length;
+  const remainingMoney = Math.max(0, totalMoney - spentMoney);
+  const remainingSlots = Math.max(1, topN - filledSlots);
+
+  const topPlayers = sorted.slice(0, remainingSlots);
+  const topPlayerIds = new Set(topPlayers.map((p) => p.id));
+
+  // Split remaining slots: bottom 10% get base price (1 Cr), rest get real prices
+  const baseSlots = Math.min(Math.ceil(remainingSlots * 0.1), topPlayers.length);
+  const realPlayers = topPlayers.slice(0, topPlayers.length - baseSlots);
+  const basePlayers = topPlayers.slice(topPlayers.length - baseSlots);
+
+  const baseBudget = baseSlots * 1; // 1 Cr each for base-price players
+  const realBudget = Math.max(0, remainingMoney - baseBudget);
+  const realTotal = realPlayers.reduce((s, v) => s + v.seasonValue, 0);
+
+  // Build price map — whole numbers, no floor/ceiling multipliers
+  const priceMap = new Map<number, { expected: number; floor: number; ceiling: number }>();
+
+  for (const v of realPlayers) {
+    const expected = Math.max(Math.round(
+      realTotal > 0 ? (v.seasonValue / realTotal) * realBudget : 0
+    ), 2);
+    priceMap.set(v.id, { expected, floor: expected, ceiling: expected });
+  }
+
+  for (const v of basePlayers) {
+    priceMap.set(v.id, { expected: 1, floor: 1, ceiling: 1 });
+  }
+
+  // Players outside top N: 1 Cr base
+  for (const v of results) {
+    if (!topPlayerIds.has(v.id)) {
+      priceMap.set(v.id, { expected: 1, floor: 1, ceiling: 1 });
+    }
+  }
+
+  // --- Write to DB ---
+  const updateStmt = sqlite.prepare(`
+    UPDATE auction_pool
+    SET efppm = ?, val_floor = ?, val_expected = ?, val_ceiling = ?, bowl_overs_avg = ?
+    WHERE id = ?
+  `);
+
+  // Build set of manually-priced pool IDs so we skip their price columns
+  const manualIds = new Set(pool.filter((p) => p.price_manual === 1).map((p) => p.id));
+
+  const updateManualStmt = sqlite.prepare(`
+    UPDATE auction_pool
+    SET efppm = ?, bowl_overs_avg = ?
+    WHERE id = ?
+  `);
+
+  const transaction = sqlite.transaction(() => {
+    for (const v of results) {
+      if (manualIds.has(v.id)) {
+        // Only update EFPPM + bowling overs, preserve user's manual price
+        updateManualStmt.run(
+          Math.round(v.efppm * 100) / 100,
+          v.bowlOversAvg !== null ? Math.round(v.bowlOversAvg * 10) / 10 : null,
+          v.id
+        );
+      } else {
+        const price = priceMap.get(v.id)!;
+        updateStmt.run(
+          Math.round(v.efppm * 100) / 100,
+          Math.round(price.floor * 100) / 100,
+          Math.round(price.expected * 100) / 100,
+          Math.round(price.ceiling * 100) / 100,
+          v.bowlOversAvg !== null ? Math.round(v.bowlOversAvg * 10) / 10 : null,
+          v.id
+        );
+      }
+    }
+  });
+  transaction();
+}
+
+export function initializeValuations(
+  tournamentId: number | string,
+  auctionId?: number | string
+) {
+  recalculateValuations(tournamentId, auctionId);
+  sqlite
+    .prepare("UPDATE tournaments SET status = 'AUCTION' WHERE id = ?")
+    .run(tournamentId);
+}
