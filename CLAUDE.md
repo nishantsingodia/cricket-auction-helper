@@ -11,9 +11,15 @@ accumulation).
   - ⚠️ `data/wc_fps_to_csv.py` is a **STALE copy** — the live points generator now lives in the
     standalone **wwc-points-bot** repo (runs in CI, writes the Google Sheet). Delete or re-sync it;
     don't edit this copy expecting it to take effect.
-- **Player identity:** `src/lib/registry/` mirrors `wwc-points-bot/registry/players.json` — the shared
-  global identity (cricsheet_id-anchored) used by the pool builders (registry-first). Re-copy after
-  re-running `build_registry.py`. Same mirror discipline as `fuzzy-name-match.ts`.
+- **Player identity:** `src/lib/registry/players.json` is the shared global identity (cricsheet_id-anchored)
+  used by the pool builders (registry-first). It is PRODUCED by `wwc-points-bot/build_registry.py`. To
+  refresh, run **`npm run sync-registry`** (pulls the canonical file straight from the wwc-points-bot
+  GitHub repo) — no more manual `cp` from a local checkout (which silently went stale).
+- **Fuzzy matcher:** `src/lib/fuzzy-name-match.ts` is now a thin re-export shim of the shared
+  **`cricket-identity`** package (`github:nishantsingodia/cricket-identity`), shared with wwc-draft. Edit the
+  algorithm ONLY in that repo, bump its version, then `npm update cricket-identity` here. Do NOT paste the
+  algorithm back. (`src/lib/registry/index.ts`'s `regNorm` is a SEPARATE, deliberately-different
+  normalizer — leave it alone.)
 - **Raw data:** `data/raw/{ipl,t20i,wpl}` (cricsheet JSON, by match id)
 - **Squad data:** `src/lib/squads/*.ts` · **Valuation:** `src/lib/valuation/engine.ts`
 
