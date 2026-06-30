@@ -54,6 +54,12 @@ export default function HomePage() {
       format: "T20",
       note: "6 USA franchises · valued on MLC 2023-25 + IPL/T20I",
     },
+    {
+      id: "India vs England Men's T20 2026",
+      label: "India vs England Men's T20 2026",
+      format: "T20",
+      note: "5-match bilateral T20I · recent T20I + IPL form, bowl-leaning venues",
+    },
   ];
 
   // Create form state

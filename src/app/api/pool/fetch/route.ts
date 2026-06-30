@@ -15,6 +15,11 @@ import {
   WOMENS_T20_WC_2026_NAME,
 } from "@/lib/squads/womens-t20-wc-2026";
 import { MLC_2026, MLC_2026_NAME } from "@/lib/squads/mlc-2026";
+import {
+  IND_VS_ENG_T20_2026,
+  IND_VS_ENG_T20_2026_NAME,
+} from "@/lib/squads/ind-vs-eng-t20-2026";
+import { buildBilateralT20Pool } from "@/lib/squads/build-bilateral-t20-pool";
 import { eq } from "drizzle-orm";
 
 export async function POST(request: NextRequest) {
@@ -104,6 +109,40 @@ export async function POST(request: NextRequest) {
         : undefined;
 
       const built = buildMLCPool(sqlite, { auctionId, tournamentId, teams });
+      initializeValuations(tournamentId);
+
+      return NextResponse.json({
+        success: true,
+        teams: built.teams,
+        players: built.players,
+        matched: built.matched,
+        created: built.created,
+        unmatched: built.unmatched,
+        teamBreakdown: built.teamBreakdown,
+      });
+    }
+
+    // ---- India vs England Men's T20 2026 (bilateral T20I series) ----
+    if (auctionRow.tournament_name === IND_VS_ENG_T20_2026_NAME) {
+      let tournamentId = auctionRow.tournament_id;
+      if (!tournamentId) {
+        const t = sqlite
+          .prepare(
+            `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size)
+             VALUES (?, 'BILATERAL', 'T20', 100, 17)`
+          )
+          .run(IND_VS_ENG_T20_2026_NAME);
+        tournamentId = Number(t.lastInsertRowid);
+        sqlite
+          .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
+          .run(tournamentId, auctionId);
+      }
+
+      const teams = Array.isArray(teamsFilter) && teamsFilter.length
+        ? IND_VS_ENG_T20_2026.filter((t) => teamsFilter.includes(t.short))
+        : undefined;
+
+      const built = buildBilateralT20Pool(sqlite, { auctionId, tournamentId, teams });
       initializeValuations(tournamentId);
 
       return NextResponse.json({

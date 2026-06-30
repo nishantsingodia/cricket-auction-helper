@@ -6,6 +6,12 @@ import {
   type StrengthTier,
 } from "@/lib/squads/womens-t20-wc-2026";
 import { MLC_2026_NAME, mlcExpectedMatches } from "@/lib/squads/mlc-2026";
+import {
+  IND_VS_ENG_T20_2026,
+  IND_VS_ENG_T20_2026_NAME,
+  IND_VS_ENG_VENUES,
+  bilateralExpectedMatches,
+} from "@/lib/squads/ind-vs-eng-t20-2026";
 
 /**
  * IPL Auction Valuation Engine — 2-Score Model
@@ -99,15 +105,21 @@ interface Score1Data {
   t20_2_5yrCount: number;
 }
 
-function computeScore1(data: Score1Data): number {
+// weights = [last10-quality, leagueSeason2025, leagueSeason2024, allQuality30mo].
+// Default (IPL/MLC/women) = [0.40,0.30,0.10,0.20]. A bilateral series has NO league
+// season, so it passes [0.60,0,0,0.40] — recent-form-heavy, season buckets dropped.
+function computeScore1(
+  data: Score1Data,
+  weights: number[] = [0.40, 0.30, 0.10, 0.20]
+): number {
   const sources: Array<{ weight: number; avg: number; hasData: boolean }> = [
-    { weight: 0.40, avg: data.last10Avg, hasData: data.last10Count > 0 },
-    { weight: 0.30, avg: data.ipl2025Avg, hasData: data.ipl2025Count > 0 },
-    { weight: 0.10, avg: data.ipl2024Avg, hasData: data.ipl2024Count > 0 },
-    { weight: 0.20, avg: data.t20_2_5yrAvg, hasData: data.t20_2_5yrCount > 0 },
+    { weight: weights[0], avg: data.last10Avg, hasData: data.last10Count > 0 },
+    { weight: weights[1], avg: data.ipl2025Avg, hasData: data.ipl2025Count > 0 },
+    { weight: weights[2], avg: data.ipl2024Avg, hasData: data.ipl2024Count > 0 },
+    { weight: weights[3], avg: data.t20_2_5yrAvg, hasData: data.t20_2_5yrCount > 0 },
   ];
 
-  const available = sources.filter((s) => s.hasData);
+  const available = sources.filter((s) => s.hasData && s.weight > 0);
   if (available.length === 0) return 20; // baseline for uncapped
 
   const totalWeight = available.reduce((s, v) => s + v.weight, 0);
@@ -376,10 +388,14 @@ export function recalculateValuations(
     .get(tournamentId) as { name: string } | undefined;
   const isWomensWC = tournamentRow?.name === WOMENS_T20_WC_2026_NAME;
   const isMLC = tournamentRow?.name === MLC_2026_NAME;
+  const isBilateral = tournamentRow?.name === IND_VS_ENG_T20_2026_NAME;
   // For MLC, the "primary league season" buckets are MLC (not IPL), and the
-  // quality pool is MLC + IPL + T20I (vs WPL for the women's path).
+  // quality pool is MLC + IPL + T20I (vs WPL for the women's path). A bilateral
+  // T20I series has NO league season: Score 1 drops the season buckets and weights
+  // Last-10-quality 60% + all-quality-30mo 40% (score1Weights); quality = IPL/MLC + top-8 T20I.
   const leagueFmt = isMLC ? "MLC" : "IPL";
-  const qualityList = isMLC ? "'MLC','IPL'" : "'IPL','WPL'";
+  const qualityList = isMLC || isBilateral ? "'MLC','IPL'" : "'IPL','WPL'";
+  const score1Weights = isBilateral ? [0.60, 0, 0, 0.40] : undefined;
 
   const purse = auctionConfig.purse_per_friend;
   const numFriends = auctionConfig.num_friends || 1;
@@ -489,7 +505,19 @@ export function recalculateValuations(
 
   // --- Batch Query: Score 2 data ---
   const venueClassification = classifyVenues();
-  const teamSchedules = getTeamSchedules();
+  let teamSchedules = getTeamSchedules();
+  if (isBilateral) {
+    // Bilateral: each side plays all 5 series grounds once. (a) Override the 5 grounds'
+    // classification with the consolidated, full-history, men's-only bat/bowl read —
+    // classifyVenues fragments cricsheet's renamed variants + thin-samples them; set BOTH
+    // spellings so a player's history under either buckets into the right venue type.
+    // (b) Replace the IPL-keyed schedule with a 5-ground one keyed by IND/ENG.
+    for (const v of IND_VS_ENG_VENUES) {
+      for (const variant of v.variants) venueClassification.set(variant, v.type);
+    }
+    const ground5 = IND_VS_ENG_VENUES.map((v) => ({ venue: v.canonical, games: 1 }));
+    teamSchedules = new Map(IND_VS_ENG_T20_2026.map((t) => [t.short, ground5]));
+  }
   const playerVenueFP = batchPlayerVenueFP(playerIds);
   const playerVenueTypeFP = batchPlayerVenueTypeFP(
     playerIds,
@@ -565,7 +593,7 @@ export function recalculateValuations(
       ipl2024Count: ipl2024?.cnt ?? 0,
       t20_2_5yrAvg: t20All?.avg_fp ?? 0,
       t20_2_5yrCount: t20All?.cnt ?? 0,
-    });
+    }, score1Weights);
 
     // Score 2: conditions factor
     const schedule = teamSchedules.get(p.ipl_team);
@@ -579,7 +607,9 @@ export function recalculateValuations(
     );
 
     const finalEfppm = score1 * conditionsFactor;
-    const expectedMatches = isMLC
+    const expectedMatches = isBilateral
+      ? bilateralExpectedMatches(p.squad_number)
+      : isMLC
       ? mlcExpectedMatches(p.ipl_team, p.squad_number)
       : isWomensWC
       ? getWomensExpectedMatches(p.squad_number, WC_TEAM_TIERS[p.ipl_team] ?? "C")

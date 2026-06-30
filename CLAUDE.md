@@ -124,3 +124,44 @@ expectedMatches × ceilingBonus`. Then C/VC premium, then budget-balanced price.
   don't inflate as players sell.
 - **C/VC premium is anchored to full-pool EFPPM rank** — a sold marquee consumes
   its slot; the premium does NOT cascade to whoever is top of the leftovers.
+
+---
+
+## Valuation model (bilateral T20I series) — quick reference
+For a short bilateral series (e.g. India vs England Men's T20 2026, 5 matches)
+there is **no franchise league season** to anchor Score 1 on, so the IPL-style
+`leagueFmt` buckets (IPL 2025 / 2024) do not apply. The archetype:
+
+- **Score 1 (form):** drop the two league-season buckets and put their weight on
+  the two T20-form buckets, **keeping recent-form heavier — 60% Last-10 quality T20
+  + 40% all-quality-30mo** (baseline 20 for no-data). IPL form is NOT lost: IPL
+  matches still count *inside* "quality" (quality = IPL/league OR a T20I vs a
+  top-8 nation), we just stop double-weighting old IPL seasons. Implemented as a
+  bilateral weight set in `computeScore1` (do not reuse the 40/30/10/20 set).
+- **Expected matches:** XI (squad 1–11) = **5** (plays every game), bench (12+) =
+  **2** (5-match bilaterals rotate / experiment in dead rubbers — bench is NOT 0).
+- **Venue:** ON, but it needs care for non-IPL grounds — see the venue rules below.
+  Net signal for English July grounds is **bowl-leaning** (Trent Bridge, Bristol,
+  Durham bowl_friendly; Old Trafford & Southampton balanced; none bat_road).
+- **Uncapped players:** use domestic/IPL form where it exists, else baseline 20.
+- **C/VC premium + remaining-money budget normalization:** identical to the other
+  tours.
+
+### Venue classification — READ THIS before trusting venue numbers
+The venue factor classifies each ground `bat_road / balanced / bowl_friendly`.
+Three things that are easy to get wrong (all bit us on the India-England setup):
+1. **Classify on Batting FP vs Bowling FP, NOT blended "Avg FP."** The signal is
+   `AVG(batter+WK fantasy_points) ÷ AVG(bowler fantasy_points)` (>1.10 bat_road,
+   ≥0.95 balanced, else bowl_friendly). A blended avg-FP-per-player number hides
+   the bat/bowl character — a high avg can come from big *bowling* hauls.
+2. **Consolidate cricsheet venue-name variants.** cricsheet renamed many grounds
+   ~2021 (`Trent Bridge` → `Trent Bridge, Nottingham`, `The Rose Bowl` → `The Rose
+   Bowl, Southampton`, `Riverside Ground` → `Riverside Ground, Chester-le-Street`,
+   etc.). `classifyVenues` groups by raw `venue_name` + filters `match_date>=2020`,
+   so it silently undercounts a famous ground to 2–5 matches. For bilateral grounds,
+   canonicalize the name variants (merge both spellings) so the full men's history
+   is used — Old Trafford/Trent Bridge/Southampton each have ~13–14 men's T20Is, not 3.
+3. **Bifurcate men's vs women's.** These grounds host both, both stored under
+   `format='T20'`, separated only by `players.gender`. Venue classification MUST
+   filter `gender='male'` for a men's tour (`classifyVenues` already does) — women's
+   T20Is at the same ground would otherwise pollute the bat/bowl ratio.
