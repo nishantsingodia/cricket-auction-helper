@@ -55,17 +55,27 @@ accumulation).
    - Venue model: only worth it if there's enough data (women's @ England
      grounds was too sparse → skipped).
 
-2. **Refresh data (get latest pre-tournament form):**
-   - The raw dump can be **stale** — check `SELECT MAX(match_date) ...` first.
-   - To update incrementally without re-downloading everything: download the
-     cricsheet zip to a temp dir, copy in only **new** match files (filename =
-     match id) to `data/raw/<folder>`, then run `python3 data/etl_cricsheet.py`
-     (it skips match_ids already ingested, recomputes `career_stats` globally).
-   - Cricsheet archives: `t20s_json.zip` (all T20Is), `ipl_json.zip`, `wpl_json.zip`.
-   - The ETL matches players by `cricsheet_id` then `(name, country)` →
-     **player IDs are preserved** (safe for existing auctions' references).
-   - WPL is tagged `format='WPL'` (distinct from T20I). To make a league count in
-     valuation, add it to the quality filter in `engine.ts` (the `format IN (...)`).
+2. **⚠️ REFRESH MATCH DATA FIRST — MANDATORY, not optional (this step gets skipped; don't).**
+   EVERYTHING downstream reads `match_performances`: the player-modal **"Recent Matches"** tab,
+   `career_stats`, EFPPM/valuations, and the venue model. If the dump is stale, the new tour is
+   valued on old form AND "Recent Matches" shows nothing recent — the exact "why aren't recent
+   matches updating?" symptom. Do this BEFORE adding squads / building any pool.
+   - **Check freshness first:** `SELECT format, MAX(match_date) FROM match_performances GROUP BY format;`
+   - **Incremental ingest (no full re-download):** download the cricsheet zip to a temp dir, copy
+     only **new** match files (filename = match id) into `data/raw/<folder>`, then
+     `python3 data/etl_cricsheet.py` (skips already-ingested ids; rebuilds career/venue/opposition
+     stats globally). Archives: `t20s_json.zip`, `ipl_json.zip`, `wpl_json.zip`, `mlc_json.zip`.
+   - Matches by `cricsheet_id` then `(name, country)` → **player IDs preserved** (safe for existing
+     auctions' references). Touches ONLY match/stats tables — never `auction_pool`.
+   - **🚫 NEVER run the ETL while an auction is LIVE** (app open on :3000 / SOLD rows present /
+     mid-bidding). It's the "global ETL recompute" the id=7 disaster warns about
+     ([[feedback_no_live_auction_pool_rebuild]]): concurrent writes with the running app can
+     lock/corrupt, and it shifts the valuation basis mid-auction. Gate check:
+     `SELECT auction_id, COUNT(*) FROM auction_pool WHERE status='SOLD' GROUP BY auction_id;`
+     If anything is live/sold → **back up, then DEFER the refresh until the session ends** (or work
+     on a copy). This is why the refresh must happen at tour-SETUP time, before anyone bids.
+   - WPL is tagged `format='WPL'` (distinct from T20I). To make a league count in valuation, add it
+     to the quality filter in `engine.ts` (the `format IN (...)`).
 
 3. **Add squad data** → `src/lib/squads/<tournament>.ts`:
    - Players ordered **XI (1–11, batting order) then bench (12–15)** — squad_number
