@@ -77,6 +77,7 @@ export const matchPerformances = sqliteTable("match_performances", {
   venueId: integer("venue_id").references(() => venues.id),
   venueName: text("venue_name"),
   opposition: text("opposition").notNull(),
+  series: text("series"), // cricsheet event.name — the tour/series (IPL, "India tour of England", ICC T20 WC…); null for a few event-less matches
   // Batting
   batRuns: integer("bat_runs"),
   batBalls: integer("bat_balls"),

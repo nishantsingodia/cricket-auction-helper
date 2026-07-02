@@ -327,6 +327,7 @@ def parse_match(filepath: str) -> dict:
         "teams": teams,
         "format": match_format,
         "gender": gender,
+        "series": (info.get("event", {}).get("name") or "").strip() or None,
         "registry": registry,
         "performances": {},
     }
@@ -563,8 +564,8 @@ def process_all_matches(conn: sqlite3.Connection):
                     player_id, match_id, match_date, format, venue_id, venue_name, opposition,
                     bat_runs, bat_balls, bat_4s, bat_6s, bat_dismissed, dismissal_type,
                     bowl_balls, bowl_runs, bowl_wickets, bowl_maidens, bowl_dots, bowl_lbw_bowled,
-                    catches, stumpings, run_outs, direct_run_outs, fantasy_points
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    catches, stumpings, run_outs, direct_run_outs, fantasy_points, series
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 player_id, match["match_id"], match["match_date"], match["format"],
                 venue_id, match["venue"], perf["opposition"],
@@ -573,7 +574,7 @@ def process_all_matches(conn: sqlite3.Connection):
                 perf["bowl_balls"], perf["bowl_runs"], perf["bowl_wickets"],
                 perf["bowl_maidens"], perf["bowl_dots"], perf["bowl_lbw_bowled"],
                 perf["catches"], perf["stumpings"], perf["run_outs"],
-                perf["direct_run_outs"], fantasy_pts,
+                perf["direct_run_outs"], fantasy_pts, match.get("series"),
             ))
 
             # Track for role inference

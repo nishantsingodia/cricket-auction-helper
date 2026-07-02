@@ -46,7 +46,9 @@ interface FantasyBreakdown {
 }
 
 interface SeasonStat {
-  season: string;
+  season?: string;
+  year?: string; // for tour rows
+  tour?: string; // tour/series label: IPL, "India tour of England", ICC T20 WC, "Other T20Is"
   league?: string; // IPL | MLC | WPL — for franchise-league rows
   matches: number;
   runs: number;
@@ -148,7 +150,7 @@ const ROLE_COLORS: Record<string, string> = {
 export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerStatus, isWatched, onRiskToggle, onSell, onUndo, onWatchlist }: PlayerDetailProps) {
   const [data, setData] = useState<PlayerDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [seasonData, setSeasonData] = useState<{ leagueSeasons: SeasonStat[]; t20Seasons: SeasonStat[] } | null>(null);
+  const [seasonData, setSeasonData] = useState<{ leagueSeasons: SeasonStat[]; tours: SeasonStat[] } | null>(null);
 
   useEffect(() => {
     async function fetchDetail() {
@@ -435,89 +437,52 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
                 </Table>
               </TabsContent>
 
-              {/* Season Stats */}
+              {/* Season Stats — every tour × year as its own row (IPL, Ind v Ire, MLC, T20 WC …) */}
               <TabsContent value="seasons">
-                {seasonData && (seasonData.leagueSeasons.length > 0 || seasonData.t20Seasons.length > 0) ? (
-                  <div className="space-y-4">
-                    {seasonData.leagueSeasons.length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-semibold mb-2 text-amber-400">League Seasons (IPL · MLC · WPL)</h4>
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Season</TableHead>
-                              <TableHead className="text-right">Mat</TableHead>
-                              <TableHead className="text-right">Runs</TableHead>
-                              <TableHead className="text-right">Avg</TableHead>
-                              <TableHead className="text-right">SR</TableHead>
-                              <TableHead className="text-right">50s</TableHead>
-                              <TableHead className="text-right">6s</TableHead>
-                              <TableHead className="text-right">Wkts</TableHead>
-                              <TableHead className="text-right">Econ</TableHead>
-                              <TableHead className="text-right font-bold text-amber-400">EFPPM</TableHead>
-                              <TableHead className="text-right">Best</TableHead>
-                              <TableHead className="text-right">Worst</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {seasonData.leagueSeasons.map((s) => (
-                              <TableRow key={s.season}>
-                                <TableCell className="font-medium">{s.season}</TableCell>
-                                <TableCell className="text-right">{s.matches}</TableCell>
-                                <TableCell className="text-right">{s.runs}</TableCell>
-                                <TableCell className="text-right">{s.batAvg?.toFixed(1) ?? "—"}</TableCell>
-                                <TableCell className="text-right">{s.batSr?.toFixed(1) ?? "—"}</TableCell>
-                                <TableCell className="text-right">{s.fifties}</TableCell>
-                                <TableCell className="text-right">{s.sixes}</TableCell>
-                                <TableCell className="text-right">{s.wickets}</TableCell>
-                                <TableCell className="text-right">{s.bowlEcon ? s.bowlEcon.toFixed(1) : "—"}</TableCell>
-                                <TableCell className="text-right font-bold text-amber-400">{s.avgFantasyPoints?.toFixed(1)}</TableCell>
-                                <TableCell className="text-right text-green-400">{s.bestMatch?.toFixed(0)}</TableCell>
-                                <TableCell className="text-right text-red-400">{s.worstMatch?.toFixed(0)}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-
-                    {seasonData.t20Seasons.length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-semibold mb-2 text-blue-400">T20 (Non-IPL) by Year</h4>
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Year</TableHead>
-                              <TableHead className="text-right">Mat</TableHead>
-                              <TableHead className="text-right">Runs</TableHead>
-                              <TableHead className="text-right">Avg</TableHead>
-                              <TableHead className="text-right">SR</TableHead>
-                              <TableHead className="text-right">50s</TableHead>
-                              <TableHead className="text-right">6s</TableHead>
-                              <TableHead className="text-right">Wkts</TableHead>
-                              <TableHead className="text-right">Econ</TableHead>
-                              <TableHead className="text-right font-bold text-amber-400">EFPPM</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {seasonData.t20Seasons.map((s) => (
-                              <TableRow key={s.season}>
-                                <TableCell className="font-medium">{s.season}</TableCell>
-                                <TableCell className="text-right">{s.matches}</TableCell>
-                                <TableCell className="text-right">{s.runs}</TableCell>
-                                <TableCell className="text-right">{s.batAvg?.toFixed(1) ?? "—"}</TableCell>
-                                <TableCell className="text-right">{s.batSr?.toFixed(1) ?? "—"}</TableCell>
-                                <TableCell className="text-right">{s.fifties}</TableCell>
-                                <TableCell className="text-right">{s.sixes}</TableCell>
-                                <TableCell className="text-right">{s.wickets}</TableCell>
-                                <TableCell className="text-right">{s.bowlEcon ? s.bowlEcon.toFixed(1) : "—"}</TableCell>
-                                <TableCell className="text-right font-bold text-amber-400">{s.avgFantasyPoints?.toFixed(1)}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
+                {seasonData && seasonData.tours.length > 0 ? (
+                  <div>
+                    <h4 className="text-sm font-semibold mb-2 text-amber-400">By Tour &amp; Year</h4>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Year</TableHead>
+                          <TableHead>Tour</TableHead>
+                          <TableHead className="text-right">Mat</TableHead>
+                          <TableHead className="text-right">Runs</TableHead>
+                          <TableHead className="text-right">Avg</TableHead>
+                          <TableHead className="text-right">SR</TableHead>
+                          <TableHead className="text-right">50s</TableHead>
+                          <TableHead className="text-right">6s</TableHead>
+                          <TableHead className="text-right">Wkts</TableHead>
+                          <TableHead className="text-right">Econ</TableHead>
+                          <TableHead className="text-right font-bold text-amber-400">EFPPM</TableHead>
+                          <TableHead className="text-right">Best</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {seasonData.tours.map((s) => (
+                          <TableRow key={`${s.year}-${s.tour}`}>
+                            <TableCell className="font-medium">{s.year}</TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              {s.tour}
+                              {["IPL", "MLC", "WPL"].includes(s.tour ?? "") && (
+                                <span className="ml-1 text-[10px] uppercase text-amber-400/70">league</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">{s.matches}</TableCell>
+                            <TableCell className="text-right">{s.runs}</TableCell>
+                            <TableCell className="text-right">{s.batAvg?.toFixed(1) ?? "—"}</TableCell>
+                            <TableCell className="text-right">{s.batSr?.toFixed(1) ?? "—"}</TableCell>
+                            <TableCell className="text-right">{s.fifties}</TableCell>
+                            <TableCell className="text-right">{s.sixes}</TableCell>
+                            <TableCell className="text-right">{s.wickets}</TableCell>
+                            <TableCell className="text-right">{s.bowlEcon ? s.bowlEcon.toFixed(1) : "—"}</TableCell>
+                            <TableCell className="text-right font-bold text-amber-400">{s.avgFantasyPoints?.toFixed(1)}</TableCell>
+                            <TableCell className="text-right text-green-400">{s.bestMatch?.toFixed(0)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
                 ) : (
                   <p className="text-muted-foreground py-4 text-center">No season data available</p>
