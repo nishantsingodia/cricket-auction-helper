@@ -145,6 +145,73 @@ def compute_fantasy_points(perf: dict, role: str) -> float:
     return pts
 
 
+def compute_fantasy_points_hundred(perf: dict, role: str) -> float:
+    """Dream11 'The Hundred' FPS (per Nishant's config, Jul 2026).
+    Same core scale as the T20 scorer (run+1, four+4, six+6, wicket+30, dot+1) EXCEPT:
+      - NO strike-rate, NO economy, NO maiden points (The Hundred awards none).
+      - Milestones (TIERED, highest only): 25 -> +4, 50 -> +8, 75 -> +12, 100 -> +16.
+      - Wicket hauls (TIERED, highest only): 2w -> +4, 3w -> +8, 4w -> +12, 5w+ -> +16.
+    """
+    pts = 0.0
+    # === BATTING ===
+    bat_runs = perf.get("bat_runs", 0) or 0
+    bat_balls = perf.get("bat_balls", 0) or 0
+    bat_4s = perf.get("bat_4s", 0) or 0
+    bat_6s = perf.get("bat_6s", 0) or 0
+    bat_dismissed = perf.get("bat_dismissed", False)
+    if bat_balls > 0 or bat_runs > 0:
+        pts += bat_runs * 1 + bat_4s * 4 + bat_6s * 6
+        if bat_runs >= 100:
+            pts += 16
+        elif bat_runs >= 75:
+            pts += 12
+        elif bat_runs >= 50:
+            pts += 8
+        elif bat_runs >= 25:
+            pts += 4
+        if bat_dismissed and bat_runs == 0 and role in ("BAT", "WK", "AR"):
+            pts -= 2
+        # No strike-rate points in The Hundred.
+
+    # === BOWLING (no maiden, no economy) ===
+    bowl_balls = perf.get("bowl_balls", 0) or 0
+    bowl_wickets = perf.get("bowl_wickets", 0) or 0
+    bowl_dots = perf.get("bowl_dots", 0) or 0
+    bowl_lbw_bowled = perf.get("bowl_lbw_bowled", 0) or 0
+    if bowl_balls > 0:
+        pts += bowl_wickets * 30 + bowl_lbw_bowled * 8 + bowl_dots * 1
+        if bowl_wickets >= 5:
+            pts += 16
+        elif bowl_wickets >= 4:
+            pts += 12
+        elif bowl_wickets >= 3:
+            pts += 8
+        elif bowl_wickets >= 2:
+            pts += 4
+        # No maiden, no economy points in The Hundred.
+
+    # === FIELDING ===
+    catches = perf.get("catches", 0) or 0
+    stumpings = perf.get("stumpings", 0) or 0
+    run_outs = perf.get("run_outs", 0) or 0
+    direct_run_outs = perf.get("direct_run_outs", 0) or 0
+    pts += catches * 8
+    if catches >= 3:
+        pts += 4
+    pts += stumpings * 12
+    pts += direct_run_outs * 12 + (run_outs - direct_run_outs) * 6  # indirect run-out +6
+
+    pts += 4  # announced XI
+    return pts
+
+
+def score_perf(perf: dict, role: str, fmt: str) -> float:
+    """Dispatch to the correct fantasy scorer for the format."""
+    if fmt == "HUN":
+        return compute_fantasy_points_hundred(perf, role)
+    return compute_fantasy_points(perf, role)
+
+
 # ==================== CRICSHEET JSON PARSER ====================
 
 def detect_format(match_info: dict) -> str:
@@ -160,6 +227,10 @@ def detect_format(match_info: dict) -> str:
         return "MLC"
     if "indian premier league" in event or "ipl" in event:
         return "IPL"
+    # The Hundred (100-ball, ECB) — its own bucket. cricsheet tags it match_type="T20",
+    # so this MUST come before the T20 branch or Hundred games pollute the T20 pool.
+    if "hundred" in event:
+        return "HUN"
     if mt in ("T20", "T20I"):
         return "T20I" if mt == "T20I" else "T20"
     if mt == "ODI":
@@ -488,7 +559,7 @@ def process_all_matches(conn: sqlite3.Connection):
 
     # Gather all JSON files
     json_files = []
-    for folder in ["ipl", "t20i", "wpl", "mlc"]:
+    for folder in ["ipl", "t20i", "wpl", "mlc", "hundred"]:
         folder_path = os.path.join(RAW_DIR, folder)
         if os.path.isdir(folder_path):
             files = glob.glob(os.path.join(folder_path, "*.json"))
@@ -556,7 +627,7 @@ def process_all_matches(conn: sqlite3.Connection):
 
             # Compute fantasy points
             # Need role — use "BAT" for now, will recompute after role inference
-            fantasy_pts = compute_fantasy_points(perf, "BAT")
+            fantasy_pts = score_perf(perf, "BAT", match["format"])
 
             # Insert match performance
             conn.execute("""
@@ -647,7 +718,7 @@ def recompute_fantasy_points_with_roles(conn: sqlite3.Connection):
                mp.bowl_balls, mp.bowl_runs, mp.bowl_wickets, mp.bowl_maidens,
                mp.bowl_dots, mp.bowl_lbw_bowled,
                mp.catches, mp.stumpings, mp.run_outs, mp.direct_run_outs,
-               p.role
+               p.role, mp.format
         FROM match_performances mp
         JOIN players p ON mp.player_id = p.id
     """)
@@ -664,7 +735,8 @@ def recompute_fantasy_points_with_roles(conn: sqlite3.Connection):
             "direct_run_outs": row[16],
         }
         role = row[17] or "BAT"
-        fps = compute_fantasy_points(perf, role)
+        fmt = row[18] or "T20"
+        fps = score_perf(perf, role, fmt)
         batch.append((fps, row[0]))
         count += 1
 

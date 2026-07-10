@@ -20,6 +20,13 @@ import {
   IND_VS_ENG_T20_2026_NAME,
 } from "@/lib/squads/ind-vs-eng-t20-2026";
 import { buildBilateralT20Pool } from "@/lib/squads/build-bilateral-t20-pool";
+import {
+  THE_HUNDRED_MEN_2026_NAME,
+  THE_HUNDRED_WOMEN_2026_NAME,
+  HUNDRED_MEN_2026,
+  HUNDRED_WOMEN_2026,
+} from "@/lib/squads/the-hundred-2026";
+import { buildHundredPool } from "@/lib/squads/build-hundred-pool";
 import { eq } from "drizzle-orm";
 
 export async function POST(request: NextRequest) {
@@ -143,6 +150,50 @@ export async function POST(request: NextRequest) {
         : undefined;
 
       const built = buildBilateralT20Pool(sqlite, { auctionId, tournamentId, teams });
+      initializeValuations(tournamentId);
+
+      return NextResponse.json({
+        success: true,
+        teams: built.teams,
+        players: built.players,
+        matched: built.matched,
+        created: built.created,
+        unmatched: built.unmatched,
+        teamBreakdown: built.teamBreakdown,
+      });
+    }
+
+    // ---- The Hundred 2026 (Men / Women) — franchise league on the D11 Hundred scale ----
+    if (
+      auctionRow.tournament_name === THE_HUNDRED_MEN_2026_NAME ||
+      auctionRow.tournament_name === THE_HUNDRED_WOMEN_2026_NAME
+    ) {
+      const isWomen = auctionRow.tournament_name === THE_HUNDRED_WOMEN_2026_NAME;
+      let tournamentId = auctionRow.tournament_id;
+      if (!tournamentId) {
+        const t = sqlite
+          .prepare(
+            `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size)
+             VALUES (?, 'CUSTOM', 'T20', 100, 16)`
+          )
+          .run(auctionRow.tournament_name);
+        tournamentId = Number(t.lastInsertRowid);
+        sqlite
+          .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
+          .run(tournamentId, auctionId);
+      }
+
+      const allTeams = isWomen ? HUNDRED_WOMEN_2026 : HUNDRED_MEN_2026;
+      const teams = Array.isArray(teamsFilter) && teamsFilter.length
+        ? allTeams.filter((t) => teamsFilter.includes(t.short))
+        : undefined;
+
+      const built = buildHundredPool(sqlite, {
+        auctionId,
+        tournamentId,
+        gender: isWomen ? "female" : "male",
+        teams,
+      });
       initializeValuations(tournamentId);
 
       return NextResponse.json({

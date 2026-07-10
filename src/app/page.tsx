@@ -60,6 +60,18 @@ export default function HomePage() {
       format: "T20",
       note: "5-match bilateral T20I · recent T20I + IPL form, bowl-leaning venues",
     },
+    {
+      id: "The Hundred Men 2026",
+      label: "The Hundred Men 2026",
+      format: "T20",
+      note: "8 franchises · D11 Hundred FPS · Hundred+T20/IPL form, bowl-leaning venues",
+    },
+    {
+      id: "The Hundred Women 2026",
+      label: "The Hundred Women 2026",
+      format: "T20",
+      note: "8 franchises · D11 Hundred FPS · Hundred+WPL form, bowl-leaning venues",
+    },
   ];
 
   // Create form state

@@ -12,6 +12,15 @@ import {
   IND_VS_ENG_VENUES,
   bilateralExpectedMatches,
 } from "@/lib/squads/ind-vs-eng-t20-2026";
+import {
+  THE_HUNDRED_MEN_2026_NAME,
+  THE_HUNDRED_WOMEN_2026_NAME,
+  HUNDRED_MEN_2026,
+  HUNDRED_VENUES,
+  HUNDRED_ROLE_NORM,
+  hundredExpectedMatches,
+  type Role as HundredRole,
+} from "@/lib/squads/the-hundred-2026";
 
 /**
  * IPL Auction Valuation Engine — 2-Score Model
@@ -389,12 +398,23 @@ export function recalculateValuations(
   const isWomensWC = tournamentRow?.name === WOMENS_T20_WC_2026_NAME;
   const isMLC = tournamentRow?.name === MLC_2026_NAME;
   const isBilateral = tournamentRow?.name === IND_VS_ENG_T20_2026_NAME;
-  // For MLC, the "primary league season" buckets are MLC (not IPL), and the
-  // quality pool is MLC + IPL + T20I (vs WPL for the women's path). A bilateral
-  // T20I series has NO league season: Score 1 drops the season buckets and weights
-  // Last-10-quality 60% + all-quality-30mo 40% (score1Weights); quality = IPL/MLC + top-8 T20I.
-  const leagueFmt = isMLC ? "MLC" : "IPL";
-  const qualityList = isMLC || isBilateral ? "'MLC','IPL'" : "'IPL','WPL'";
+  const isHundredMen = tournamentRow?.name === THE_HUNDRED_MEN_2026_NAME;
+  const isHundredWomen = tournamentRow?.name === THE_HUNDRED_WOMEN_2026_NAME;
+  const isHundred = isHundredMen || isHundredWomen;
+  // For MLC, the "primary league season" buckets are MLC (not IPL), and the quality pool is
+  // MLC + IPL + T20I (vs WPL for the women's path). A bilateral T20I series has NO league
+  // season: Score 1 drops the season buckets, weights Last-10 60% + all-quality-30mo 40%.
+  // The Hundred is a franchise league scored on its OWN scale ('HUN'): league season = HUN
+  // 2025/2024; quality = HUN + T20/IPL/MLC (men) or HUN + WPL + women's-T20 (women); the
+  // non-Hundred proxy form is normalized to the Hundred scale per role (normMult below).
+  const leagueFmt = isHundred ? "HUN" : isMLC ? "MLC" : "IPL";
+  const qualityList = isHundredMen
+    ? "'HUN','T20','IPL','MLC'"
+    : isHundredWomen
+    ? "'HUN','WPL','T20'"
+    : isMLC || isBilateral
+    ? "'MLC','IPL'"
+    : "'IPL','WPL'";
   const score1Weights = isBilateral ? [0.60, 0, 0, 0.40] : undefined;
 
   const purse = auctionConfig.purse_per_friend;
@@ -503,9 +523,48 @@ export function recalculateValuations(
   }>;
   const t20AllMap = new Map(t20AllRows.map((r) => [r.player_id, r]));
 
+  // For the Hundred: each player's fraction of recent quality games that ARE Hundred games,
+  // used to blend the per-role scale normalization (Hundred games already on-scale; the rest
+  // scaled by HUNDRED_ROLE_NORM). Empty for non-Hundred tours.
+  const hunFracMap = new Map<number, number>();
+  const qualNMap = new Map<number, number>(); // player -> total quality games (30mo), for shrinkage
+  if (isHundred) {
+    const hunFracRows = sqlite
+      .prepare(
+        `SELECT player_id,
+           SUM(CASE WHEN format='HUN' THEN 1 ELSE 0 END) AS hun, COUNT(*) AS tot
+         FROM match_performances
+         WHERE player_id IN (${placeholders})
+           AND format IN (${qualityList})
+           AND match_date >= date('now','-30 months')
+         GROUP BY player_id`
+      )
+      .all(...playerIds) as Array<{ player_id: number; hun: number; tot: number }>;
+    for (const r of hunFracRows) {
+      hunFracMap.set(r.player_id, r.tot > 0 ? r.hun / r.tot : 0);
+      qualNMap.set(r.player_id, r.tot);
+    }
+  }
+
   // --- Batch Query: Score 2 data ---
   const venueClassification = classifyVenues();
   let teamSchedules = getTeamSchedules();
+  if (isHundred) {
+    // Override the 8 English grounds' classification (consolidated men's bat/bowl read) and
+    // build each team's 8-game schedule: home ground x4 + the other 7 grounds spread (~4/7).
+    for (const v of HUNDRED_VENUES) {
+      for (const variant of v.variants) venueClassification.set(variant, v.type);
+    }
+    const grounds = HUNDRED_VENUES.map((v) => v.canonical);
+    teamSchedules = new Map(
+      HUNDRED_MEN_2026.map((t) => {
+        const away = grounds
+          .filter((g) => g !== t.home)
+          .map((g) => ({ venue: g, games: 4 / 7 }));
+        return [t.short, [{ venue: t.home, games: 4 }, ...away]];
+      })
+    );
+  }
   if (isBilateral) {
     // Bilateral: each side plays all 5 series grounds once. (a) Override the 5 grounds'
     // classification with the consolidated, full-history, men's-only bat/bowl read —
@@ -584,7 +643,7 @@ export function recalculateValuations(
     const ipl2024 = ipl2024Map.get(p.player_id);
     const t20All = t20AllMap.get(p.player_id);
 
-    const score1 = computeScore1({
+    const rawScore1 = computeScore1({
       last10Avg: last10?.avg_fp ?? 0,
       last10Count: last10?.cnt ?? 0,
       ipl2025Avg: ipl2025?.avg_fp ?? 0,
@@ -595,7 +654,27 @@ export function recalculateValuations(
       t20_2_5yrCount: t20All?.cnt ?? 0,
     }, score1Weights);
 
-    // Score 2: conditions factor
+    // Hundred small-sample shrinkage (empirical-Bayes: k=5 pseudo-games toward a prior of 40).
+    // Regresses the form estimate when a player has few quality games, so thin-sample fliers
+    // (e.g. an uncapped bowler with ~0 Hundred games) don't top the board; large-n players
+    // (Rashid/Buttler/Marsh) barely move. Hundred-only; all other tours use the raw estimate.
+    const score1 = isHundred
+      ? ((qualNMap.get(p.player_id) ?? 0) * rawScore1 + 5 * 40) /
+        ((qualNMap.get(p.player_id) ?? 0) + 5)
+      : rawScore1;
+
+    // Hundred: convert the (mostly non-Hundred) proxy form to the D11 Hundred scale, weighted
+    // by how much of the player's recent quality history is actually Hundred. normMult=1 else.
+    let normMult = 1.0;
+    if (isHundred) {
+      const hf = hunFracMap.get(p.player_id) ?? 0;
+      const rf = HUNDRED_ROLE_NORM[p.role as HundredRole] ?? 1.0;
+      normMult = hf + (1 - hf) * rf;
+    }
+    const normScore1 = score1 * normMult;
+
+    // Score 2: conditions factor. The venue multiplier is a scale-invariant ratio, so compute
+    // it from the raw score1, then apply it to the normalized score1.
     const schedule = teamSchedules.get(p.ipl_team);
     const conditionsFactor = computeConditionsFactor(
       p.player_id,
@@ -606,8 +685,10 @@ export function recalculateValuations(
       venueClassification
     );
 
-    const finalEfppm = score1 * conditionsFactor;
-    const expectedMatches = isBilateral
+    const finalEfppm = normScore1 * conditionsFactor;
+    const expectedMatches = isHundred
+      ? hundredExpectedMatches(p.squad_number)
+      : isBilateral
       ? bilateralExpectedMatches(p.squad_number)
       : isMLC
       ? mlcExpectedMatches(p.ipl_team, p.squad_number)
@@ -618,8 +699,9 @@ export function recalculateValuations(
     // Ceiling premium: explosive players (high top-10% avg) get a boost
     const ceilData = ceilingMap.get(p.player_id);
     let ceilingBonus = 1.0;
-    if (ceilData && ceilData.ceilingAvg > finalEfppm) {
-      const ceilingRatio = (ceilData.ceilingAvg - finalEfppm) / finalEfppm;
+    const ceilAvg = ceilData ? ceilData.ceilingAvg * normMult : 0; // same Hundred-scale normalization
+    if (ceilData && ceilAvg > finalEfppm) {
+      const ceilingRatio = (ceilAvg - finalEfppm) / finalEfppm;
       const effectiveAlpha = 0.15 * Math.min(ceilData.cnt / 25, 1.0);
       ceilingBonus = 1 + effectiveAlpha * ceilingRatio;
     }
