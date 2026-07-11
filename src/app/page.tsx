@@ -72,6 +72,18 @@ export default function HomePage() {
       format: "T20",
       note: "8 franchises · D11 Hundred FPS · Hundred+WPL form, bowl-leaning venues",
     },
+    {
+      id: "Ireland vs West Indies Women's ODI 2026",
+      label: "Ireland vs West Indies Women's ODI 2026",
+      format: "ODI",
+      note: "3-match women's ODI bilateral · valued on women's ODI form (36mo), venue-neutral",
+    },
+    {
+      id: "New Zealand vs West Indies Men's ODI 2026",
+      label: "New Zealand vs West Indies Men's ODI 2026",
+      format: "ODI",
+      note: "5-match men's ODI bilateral · ODI form vs top-8 (36mo) · bowl-leaning Caribbean venues",
+    },
   ];
 
   // Create form state

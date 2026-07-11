@@ -64,7 +64,7 @@ accumulation).
    - **Incremental ingest (no full re-download):** download the cricsheet zip to a temp dir, copy
      only **new** match files (filename = match id) into `data/raw/<folder>`, then
      `python3 data/etl_cricsheet.py` (skips already-ingested ids; rebuilds career/venue/opposition
-     stats globally). Archives: `t20s_json.zip`, `ipl_json.zip`, `wpl_json.zip`, `mlc_json.zip`.
+     stats globally). Archives: `t20s_json.zip`, `ipl_json.zip`, `wpl_json.zip`, `mlc_json.zip`, `odis_json.zip`.
    - Matches by `cricsheet_id` then `(name, country)` → **player IDs preserved** (safe for existing
      auctions' references). Touches ONLY match/stats tables — never `auction_pool`.
    - **🚫 NEVER run the ETL while an auction is LIVE** (app open on :3000 / SOLD rows present /
@@ -76,6 +76,20 @@ accumulation).
      on a copy). This is why the refresh must happen at tour-SETUP time, before anyone bids.
    - WPL is tagged `format='WPL'` (distinct from T20I). To make a league count in valuation, add it
      to the quality filter in `engine.ts` (the `format IN (...)`).
+   - **ODI tour:** ingest the ODI archive `odis_json.zip` (`download_cricsheet.py` already lists it →
+     `data/raw/odi`); the ETL folder loop already includes `"odi"` and `detect_format` tags
+     `format='ODI'` (DB schema was already ODI-ready — no migration). **Confirm it landed BEFORE
+     building the pool:** `SELECT format, COUNT(*) FROM match_performances WHERE format='ODI';` must
+     be populated first (Recent Matches + ODI valuations read it; empty = wrong).
+   - **Scoring is now format-aware.** The ETL scores ODI perfs with `compute_fantasy_points_odi`
+     (ODI rules: duck −3, +1 per 3 dot balls, maiden +4, 4w/5w/6w hauls +4/+8/+12, SR bands
+     >140 / 120.1–140 / 100–120 & 40–50 / 30–39.99 / <30 at min 20 balls, econ bands
+     <2.5 / 2.5–3.49 / 3.5–4.5 & 7–8 / 8.01–9 / >9 at min 5 overs) — mirrored by
+     `src/lib/fantasy-points/rules.ts` (`ODI_RULES`) and the bot's `wc_fps_to_csv.py`.
+     **⚠️ Known divergence to reconcile later:** the T20 ETL scorer `compute_fantasy_points` awards
+     milestone bonuses **CUMULATIVELY** (75 runs = +24) while the bot, the TS calculator, and the new
+     ODI scorer all use **HIGHEST-only** (75 = +12). This inflates T20 historical `fantasy_points`;
+     left as-is for now to avoid shifting existing T20 valuations, but should be reconciled.
 
 3. **Add squad data** → `src/lib/squads/<tournament>.ts`:
    - Players ordered **XI (1–11, batting order) then bench (12–15)** — squad_number
@@ -175,3 +189,20 @@ Three things that are easy to get wrong (all bit us on the India-England setup):
    `format='T20'`, separated only by `players.gender`. Venue classification MUST
    filter `gender='male'` for a men's tour (`classifyVenues` already does) — women's
    T20Is at the same ground would otherwise pollute the bat/bowl ratio.
+
+---
+
+## Valuation model (women's ODI bilateral) — quick reference
+First ODI-format archetype (e.g. Ireland vs West Indies Women's ODI 2026, 3 matches). Like the
+bilateral T20I set there's no league season to anchor Score 1 on, and — as with every women's tour —
+venue data is too sparse to trust. Scores here are scoped to `format='ODI'`.
+
+- **Venue factor = 1.0** — skip the venue model (women's ODI grounds are data-sparse, same call as
+  the women's WC).
+- **Score 1 (form):** **60% Last-10 ODIs + 40% all women's ODIs in the last 36 months** (baseline 20
+  for no-data). Recency-heavy, like the bilateral T20I set.
+- **Quality filter:** **ALL women's ODIs count** — no opposition / top-8 gate (the women's ODI pool
+  is thin, so gating would starve the sample).
+- **Expected matches:** XI (squad 1–11) plays all **3**; bench (12+) ≈ **1**.
+- **XI order:** curated from the announced squads.
+- **C/VC premium + remaining-money budget normalization:** identical to the other tours.

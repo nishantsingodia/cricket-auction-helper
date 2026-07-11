@@ -13,6 +13,16 @@ import {
   bilateralExpectedMatches,
 } from "@/lib/squads/ind-vs-eng-t20-2026";
 import {
+  IRE_VS_WI_W_ODI_2026_NAME,
+  odiExpectedMatches,
+} from "@/lib/squads/ire-wi-w-odi-2026";
+import {
+  NZ_VS_WI_MEN_ODI_2026,
+  NZ_VS_WI_MEN_ODI_2026_NAME,
+  NZ_WI_MEN_ODI_VENUES,
+  mensOdiExpectedMatches,
+} from "@/lib/squads/nz-wi-men-odi-2026";
+import {
   THE_HUNDRED_MEN_2026_NAME,
   THE_HUNDRED_WOMEN_2026_NAME,
   HUNDRED_MEN_2026,
@@ -235,18 +245,21 @@ function getTeamSchedules(): Map<string, Array<{ venue: string; games: number }>
 }
 
 function batchPlayerVenueFP(
-  playerIds: number[]
+  playerIds: number[],
+  formats: readonly string[] = ["IPL", "T20"],
+  windowMonths = 30
 ): Map<number, Map<string, { avg: number; cnt: number }>> {
   if (playerIds.length === 0) return new Map();
 
   const placeholders = playerIds.map(() => "?").join(",");
+  const fmtIn = formats.map((f) => `'${f}'`).join(",");
   const rows = sqlite
     .prepare(
       `SELECT player_id, venue_name, AVG(fantasy_points) as avg_fp, COUNT(*) as cnt
        FROM match_performances
        WHERE player_id IN (${placeholders})
-         AND format IN ('IPL','T20')
-         AND match_date >= date('now', '-30 months')
+         AND format IN (${fmtIn})
+         AND match_date >= date('now', '-${windowMonths} months')
        GROUP BY player_id, venue_name`
     )
     .all(...playerIds) as Array<{
@@ -266,18 +279,21 @@ function batchPlayerVenueFP(
 
 function batchPlayerVenueTypeFP(
   playerIds: number[],
-  venueClassification: Map<string, VenueType>
+  venueClassification: Map<string, VenueType>,
+  formats: readonly string[] = ["IPL", "T20"],
+  windowMonths = 30
 ): Map<number, Map<VenueType, { avg: number; cnt: number }>> {
   if (playerIds.length === 0) return new Map();
 
   const placeholders = playerIds.map(() => "?").join(",");
+  const fmtIn = formats.map((f) => `'${f}'`).join(",");
   const rows = sqlite
     .prepare(
       `SELECT player_id, venue_name, fantasy_points
        FROM match_performances
        WHERE player_id IN (${placeholders})
-         AND format IN ('IPL','T20')
-         AND match_date >= date('now', '-30 months')`
+         AND format IN (${fmtIn})
+         AND match_date >= date('now', '-${windowMonths} months')`
     )
     .all(...playerIds) as Array<{
     player_id: number;
@@ -401,6 +417,12 @@ export function recalculateValuations(
   const isHundredMen = tournamentRow?.name === THE_HUNDRED_MEN_2026_NAME;
   const isHundredWomen = tournamentRow?.name === THE_HUNDRED_WOMEN_2026_NAME;
   const isHundred = isHundredMen || isHundredWomen;
+  // First ODI-format tour: a women's ODI bilateral. Scores purely on ODI form (no league season,
+  // no T20 supplement), venue OFF (women's grounds are sparse → factor 1.0, same as women's WC).
+  const isWomensOdi = tournamentRow?.name === IRE_VS_WI_W_ODI_2026_NAME;
+  // Men's ODI bilateral: ODI form vs top-8 nations, venue ON (Caribbean grounds classified on
+  // men's ODI data), 60/40 recency weights, XI=5/bench=2 expected matches.
+  const isMensOdi = tournamentRow?.name === NZ_VS_WI_MEN_ODI_2026_NAME;
   // For MLC, the "primary league season" buckets are MLC (not IPL), and the quality pool is
   // MLC + IPL + T20I (vs WPL for the women's path). A bilateral T20I series has NO league
   // season: Score 1 drops the season buckets, weights Last-10 60% + all-quality-30mo 40%.
@@ -415,7 +437,9 @@ export function recalculateValuations(
     : isMLC || isBilateral
     ? "'MLC','IPL'"
     : "'IPL','WPL'";
-  const score1Weights = isBilateral ? [0.60, 0, 0, 0.40] : undefined;
+  // Bilateral (T20I) AND both ODI archetypes have no league season → recent-form-heavy.
+  const score1Weights =
+    isBilateral || isWomensOdi || isMensOdi ? [0.60, 0, 0, 0.40] : undefined;
 
   const purse = auctionConfig.purse_per_friend;
   const numFriends = auctionConfig.num_friends || 1;
@@ -444,6 +468,20 @@ export function recalculateValuations(
   // Top-8 nations filter for T20I quality
   const top8Placeholders = TOP_8_NATIONS.map(() => "?").join(",");
 
+  // Quality-form filter + recency windows. For the women's ODI tour, quality = ALL women's ODIs
+  // (no opposition gate, no T20 supplement) and the windows widen (women's ODIs are infrequent):
+  // last-10 over 48mo (effectively "10 most recent"), all-form over 36mo. Non-ODI tours keep the
+  // exact prior behaviour (T20 quality list + top-8 T20I supplement; 24mo / 30mo) — byte-identical.
+  const qualityClause = isWomensOdi
+    ? `format = 'ODI'`
+    : isMensOdi
+    ? `format = 'ODI' AND opposition IN (${top8Placeholders})`
+    : `format IN (${qualityList}) OR (format = 'T20' AND opposition IN (${top8Placeholders}))`;
+  // women's ODI binds no extra params; men's ODI + T20 both bind the top-8 nation list.
+  const qualityParams = isWomensOdi ? [] : TOP_8_NATIONS;
+  const last10Window = isWomensOdi ? "-48 months" : isMensOdi ? "-36 months" : "-24 months";
+  const allWindow = isWomensOdi || isMensOdi ? "-36 months" : "-30 months";
+
   // --- Batch Query: Score 1 sources ---
 
   // A: Last 10 quality T20 matches per player
@@ -455,16 +493,13 @@ export function recalculateValuations(
            ROW_NUMBER() OVER (PARTITION BY player_id ORDER BY match_date DESC) as rn
          FROM match_performances
          WHERE player_id IN (${placeholders})
-           AND (
-             format IN (${qualityList})
-             OR (format = 'T20' AND opposition IN (${top8Placeholders}))
-           )
-           AND match_date >= date('now', '-24 months')
+           AND (${qualityClause})
+           AND match_date >= date('now', '${last10Window}')
        )
        WHERE rn <= 10
        GROUP BY player_id`
     )
-    .all(...playerIds, ...TOP_8_NATIONS) as Array<{
+    .all(...playerIds, ...qualityParams) as Array<{
     player_id: number;
     avg_fp: number;
     cnt: number;
@@ -509,14 +544,11 @@ export function recalculateValuations(
       `SELECT player_id, AVG(fantasy_points) as avg_fp, COUNT(*) as cnt
        FROM match_performances
        WHERE player_id IN (${placeholders})
-         AND (
-           format IN (${qualityList})
-           OR (format = 'T20' AND opposition IN (${top8Placeholders}))
-         )
-         AND match_date >= date('now', '-30 months')
+         AND (${qualityClause})
+         AND match_date >= date('now', '${allWindow}')
        GROUP BY player_id`
     )
-    .all(...playerIds, ...TOP_8_NATIONS) as Array<{
+    .all(...playerIds, ...qualityParams) as Array<{
     player_id: number;
     avg_fp: number;
     cnt: number;
@@ -577,10 +609,29 @@ export function recalculateValuations(
     const ground5 = IND_VS_ENG_VENUES.map((v) => ({ venue: v.canonical, games: 1 }));
     teamSchedules = new Map(IND_VS_ENG_T20_2026.map((t) => [t.short, ground5]));
   }
-  const playerVenueFP = batchPlayerVenueFP(playerIds);
+  if (isMensOdi) {
+    // Men's ODI: both sides play all 5 ODIs at 2 Caribbean grounds (Providence x3, Kensington
+    // x2), both bowl_friendly on men's ODI bat/bowl history. Set both name variants so a
+    // player's ODI history under either spelling buckets into the right venue type.
+    for (const v of NZ_WI_MEN_ODI_VENUES) {
+      for (const variant of v.variants) venueClassification.set(variant, v.type);
+    }
+    const grounds = [
+      { venue: NZ_WI_MEN_ODI_VENUES[0].canonical, games: 3 },
+      { venue: NZ_WI_MEN_ODI_VENUES[1].canonical, games: 2 },
+    ];
+    teamSchedules = new Map(NZ_VS_WI_MEN_ODI_2026.map((t) => [t.short, grounds]));
+  }
+  // Men's ODI reads venue history from ODI matches (wider window — fewer ODIs per ground);
+  // every other tour keeps the T20-family default (byte-identical).
+  const venueFormats = isMensOdi ? ["ODI"] : ["IPL", "T20"];
+  const venueWindow = isMensOdi ? 60 : 30;
+  const playerVenueFP = batchPlayerVenueFP(playerIds, venueFormats, venueWindow);
   const playerVenueTypeFP = batchPlayerVenueTypeFP(
     playerIds,
-    venueClassification
+    venueClassification,
+    venueFormats,
+    venueWindow
   );
 
   // --- Batch Query: Bowling overs avg ---
@@ -609,17 +660,14 @@ export function recalculateValuations(
             COUNT(*) OVER (PARTITION BY player_id) as cnt
           FROM match_performances
           WHERE player_id IN (${placeholders})
-            AND (
-              format IN (${qualityList})
-              OR (format = 'T20' AND opposition IN (${top8Placeholders}))
-            )
-            AND match_date >= date('now', '-30 months')
+            AND (${qualityClause})
+            AND match_date >= date('now', '${allWindow}')
         )
       )
       WHERE tile = 1
       GROUP BY player_id`
     )
-    .all(...playerIds, ...TOP_8_NATIONS) as Array<{
+    .all(...playerIds, ...qualityParams) as Array<{
     player_id: number;
     ceiling_avg: number;
     cnt: number;
@@ -690,6 +738,10 @@ export function recalculateValuations(
       ? hundredExpectedMatches(p.squad_number)
       : isBilateral
       ? bilateralExpectedMatches(p.squad_number)
+      : isWomensOdi
+      ? odiExpectedMatches(p.squad_number)
+      : isMensOdi
+      ? mensOdiExpectedMatches(p.squad_number)
       : isMLC
       ? mlcExpectedMatches(p.ipl_team, p.squad_number)
       : isWomensWC

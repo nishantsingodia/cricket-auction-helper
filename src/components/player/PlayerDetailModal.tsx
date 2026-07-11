@@ -48,7 +48,8 @@ interface FantasyBreakdown {
 interface SeasonStat {
   season?: string;
   year?: string; // for tour rows
-  tour?: string; // tour/series label: IPL, "India tour of England", ICC T20 WC, "Other T20Is"
+  tour?: string; // tour/series label: IPL, "India tour of England", ICC T20 WC, "Other T20Is", ODI
+  format?: string; // IPL | MLC | WPL | T20 | ODI — for client-side format filtering
   league?: string; // IPL | MLC | WPL — for franchise-league rows
   matches: number;
   runs: number;
@@ -147,14 +148,36 @@ const ROLE_COLORS: Record<string, string> = {
   WK: "bg-amber-600",
 };
 
+// Compact labeled stat used inside the mobile stacked cards (Recent / Season tabs).
+function MiniStat({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string | number;
+  className?: string;
+}) {
+  return (
+    <div className="rounded-md bg-muted/30 px-1 py-1">
+      <div className={`text-sm font-semibold ${className ?? ""}`}>{value}</div>
+      <div className="text-[11px] leading-tight text-muted-foreground">{label}</div>
+    </div>
+  );
+}
+
 export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerStatus, isWatched, onRiskToggle, onSell, onUndo, onWatchlist }: PlayerDetailProps) {
   const [data, setData] = useState<PlayerDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [seasonData, setSeasonData] = useState<{ leagueSeasons: SeasonStat[]; tours: SeasonStat[] } | null>(null);
+  const [recentFmt, setRecentFmt] = useState<"ALL" | "T20" | "ODI">("ALL");
+  const [seasonFmt, setSeasonFmt] = useState<"ALL" | "T20" | "ODI">("ALL");
 
   useEffect(() => {
     async function fetchDetail() {
       setLoading(true);
+      setRecentFmt("ALL");
+      setSeasonFmt("ALL");
       try {
         const [res, seasonsRes] = await Promise.all([
           fetch(`/api/players/${playerId}`),
@@ -175,7 +198,7 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
 
   return (
     <Dialog open onOpenChange={() => onClose()}>
-      <DialogContent className="w-[95vw] max-w-[95vw] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-[95vw] max-h-[90vh] overflow-y-auto p-3 sm:p-4">
         {loading || !data ? (
           <div className="py-12 text-center text-muted-foreground">
             Loading player details...
@@ -183,8 +206,8 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
         ) : (
           <>
             <DialogHeader>
-              <div className="flex items-center gap-3">
-                <DialogTitle className="text-2xl">
+              <div className="flex flex-wrap items-center gap-3">
+                <DialogTitle className="text-xl sm:text-2xl">
                   {data.player.name}
                 </DialogTitle>
                 <Badge
@@ -193,7 +216,7 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
                   {data.player.role}
                 </Badge>
               </div>
-              <div className="flex gap-4 text-sm text-muted-foreground mt-1">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mt-1">
                 <span>{data.player.country}</span>
                 {data.player.batStyle && (
                   <span>Bat: {data.player.batStyle}</span>
@@ -257,7 +280,7 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
             </DialogHeader>
 
             <Tabs defaultValue="fantasy" className="mt-4">
-              <TabsList className="flex-wrap h-auto">
+              <TabsList className="flex-wrap h-auto w-full gap-1 sm:w-fit sm:gap-0 [&>button]:min-h-[34px] sm:[&>button]:min-h-0">
                 <TabsTrigger value="fantasy">Fantasy Breakdown</TabsTrigger>
                 <TabsTrigger value="career">Career Stats</TabsTrigger>
                 <TabsTrigger value="seasons">Season Stats</TabsTrigger>
@@ -298,24 +321,24 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
                               </div>
                               <div className="text-center p-2.5 bg-muted/30 rounded-lg">
                                 <div className="text-xl font-bold text-amber-400">{lastIpl.avgFantasyPoints?.toFixed(1)}</div>
-                                <div className="text-[10px] text-muted-foreground">FP / Match</div>
+                                <div className="text-[11px] text-muted-foreground sm:text-[10px]">FP / Match</div>
                               </div>
                               <div className="text-center p-2.5 bg-muted/30 rounded-lg">
                                 <div className="text-xl font-bold">{lastIpl.matches}</div>
-                                <div className="text-[10px] text-muted-foreground">Matches</div>
+                                <div className="text-[11px] text-muted-foreground sm:text-[10px]">Matches</div>
                               </div>
                               <div className="text-center p-2.5 bg-muted/30 rounded-lg">
                                 <div className="text-xl font-bold text-blue-400">{lastIpl.runs}</div>
-                                <div className="text-[10px] text-muted-foreground">Runs</div>
+                                <div className="text-[11px] text-muted-foreground sm:text-[10px]">Runs</div>
                               </div>
                               <div className="text-center p-2.5 bg-muted/30 rounded-lg">
                                 <div className="text-xl font-bold text-green-400">{lastIpl.wickets}</div>
-                                <div className="text-[10px] text-muted-foreground">Wickets</div>
+                                <div className="text-[11px] text-muted-foreground sm:text-[10px]">Wickets</div>
                               </div>
                               {bowlOversPerMatch != null && bowlOversPerMatch > 0 && (
                                 <div className="col-span-2 text-center p-2.5 bg-muted/30 rounded-lg">
                                   <div className="text-xl font-bold text-purple-400">{bowlOversPerMatch.toFixed(1)}</div>
-                                  <div className="text-[10px] text-muted-foreground">Avg Overs Bowled / Match</div>
+                                  <div className="text-[11px] text-muted-foreground sm:text-[10px]">Avg Overs Bowled / Match</div>
                                 </div>
                               )}
                             </>
@@ -379,7 +402,7 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
 
               {/* Career Stats */}
               <TabsContent value="career">
-                <Table>
+                <Table className="min-w-[560px]">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Format</TableHead>
@@ -440,50 +463,132 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
               {/* Season Stats — every tour × year as its own row (IPL, Ind v Ire, MLC, T20 WC …) */}
               <TabsContent value="seasons">
                 {seasonData && seasonData.tours.length > 0 ? (
-                  <div>
-                    <h4 className="text-sm font-semibold mb-2 text-amber-400">By Tour &amp; Year</h4>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Year</TableHead>
-                          <TableHead>Tour</TableHead>
-                          <TableHead className="text-right">Mat</TableHead>
-                          <TableHead className="text-right">Runs</TableHead>
-                          <TableHead className="text-right">Avg</TableHead>
-                          <TableHead className="text-right">SR</TableHead>
-                          <TableHead className="text-right">50s</TableHead>
-                          <TableHead className="text-right">6s</TableHead>
-                          <TableHead className="text-right">Wkts</TableHead>
-                          <TableHead className="text-right">Econ</TableHead>
-                          <TableHead className="text-right font-bold text-amber-400">EFPPM</TableHead>
-                          <TableHead className="text-right">Best</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {seasonData.tours.map((s) => (
-                          <TableRow key={`${s.year}-${s.tour}`}>
-                            <TableCell className="font-medium">{s.year}</TableCell>
-                            <TableCell className="whitespace-nowrap">
-                              {s.tour}
-                              {["IPL", "MLC", "WPL"].includes(s.tour ?? "") && (
-                                <span className="ml-1 text-[10px] uppercase text-amber-400/70">league</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right">{s.matches}</TableCell>
-                            <TableCell className="text-right">{s.runs}</TableCell>
-                            <TableCell className="text-right">{s.batAvg?.toFixed(1) ?? "—"}</TableCell>
-                            <TableCell className="text-right">{s.batSr?.toFixed(1) ?? "—"}</TableCell>
-                            <TableCell className="text-right">{s.fifties}</TableCell>
-                            <TableCell className="text-right">{s.sixes}</TableCell>
-                            <TableCell className="text-right">{s.wickets}</TableCell>
-                            <TableCell className="text-right">{s.bowlEcon ? s.bowlEcon.toFixed(1) : "—"}</TableCell>
-                            <TableCell className="text-right font-bold text-amber-400">{s.avgFantasyPoints?.toFixed(1)}</TableCell>
-                            <TableCell className="text-right text-green-400">{s.bestMatch?.toFixed(0)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                  (() => {
+                    const isOdi = (f?: string) => f === "ODI";
+                    const isT20 = (f?: string) => f !== "ODI" && f !== "TEST";
+                    const hasOdi = seasonData.tours.some((s) => isOdi(s.format));
+                    const hasT20 = seasonData.tours.some((s) => isT20(s.format));
+                    const filtered = seasonData.tours.filter((s) =>
+                      seasonFmt === "ALL"
+                        ? true
+                        : seasonFmt === "ODI"
+                        ? isOdi(s.format)
+                        : isT20(s.format)
+                    );
+                    const chips = ([
+                      { key: "ALL", label: "All", show: true },
+                      { key: "T20", label: "T20", show: hasT20 },
+                      { key: "ODI", label: "ODI", show: hasOdi },
+                    ] as const).filter((c) => c.show);
+                    return (
+                      <div>
+                        <h4 className="text-sm font-semibold mb-2 text-amber-400">By Tour &amp; Year</h4>
+                        {chips.length > 1 && (
+                          <div className="flex gap-1.5 mb-2">
+                            {chips.map((c) => (
+                              <button
+                                key={c.key}
+                                onClick={() => setSeasonFmt(c.key)}
+                                className={`inline-flex items-center min-h-[36px] text-xs px-3 py-2 rounded border font-medium sm:min-h-0 sm:text-[11px] sm:px-2.5 sm:py-1 ${
+                                  seasonFmt === c.key
+                                    ? "bg-amber-500/20 border-amber-500 text-amber-600 dark:text-amber-400"
+                                    : "border-border text-muted-foreground hover:border-amber-500 hover:text-amber-500"
+                                }`}
+                              >
+                                {c.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {/* Mobile: stacked cards */}
+                        <div className="space-y-2 sm:hidden">
+                          {filtered.map((s) => (
+                            <div
+                              key={`${s.year}-${s.tour}`}
+                              className="rounded-lg border border-border/60 bg-muted/10 p-3"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <div className="text-sm font-semibold">
+                                    {s.tour}
+                                    {["IPL", "MLC", "WPL"].includes(s.tour ?? "") && (
+                                      <span className="ml-1 text-[11px] uppercase text-amber-400/70">league</span>
+                                    )}
+                                  </div>
+                                  <div className="text-[11px] text-muted-foreground">{s.year}</div>
+                                </div>
+                                <div className="shrink-0 text-right">
+                                  <div className="text-lg font-bold leading-none text-amber-400">
+                                    {s.avgFantasyPoints?.toFixed(1)}
+                                  </div>
+                                  <div className="text-[11px] text-muted-foreground">EFPPM</div>
+                                </div>
+                              </div>
+                              <div className="mt-2 grid grid-cols-3 gap-1.5 text-center">
+                                <MiniStat label="Mat" value={s.matches} />
+                                <MiniStat label="Runs" value={s.runs} />
+                                <MiniStat
+                                  label="Best"
+                                  value={s.bestMatch != null ? s.bestMatch.toFixed(0) : "—"}
+                                  className="text-green-400"
+                                />
+                                <MiniStat label="Avg" value={s.batAvg != null ? s.batAvg.toFixed(1) : "—"} />
+                                <MiniStat label="SR" value={s.batSr != null ? s.batSr.toFixed(1) : "—"} />
+                                <MiniStat label="50s" value={s.fifties} />
+                                <MiniStat label="6s" value={s.sixes} />
+                                <MiniStat label="Wkts" value={s.wickets} />
+                                <MiniStat label="Econ" value={s.bowlEcon ? s.bowlEcon.toFixed(1) : "—"} />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {/* Desktop: full table */}
+                        <div className="hidden sm:block">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Year</TableHead>
+                              <TableHead>Tour</TableHead>
+                              <TableHead className="text-right">Mat</TableHead>
+                              <TableHead className="text-right">Runs</TableHead>
+                              <TableHead className="text-right">Avg</TableHead>
+                              <TableHead className="text-right">SR</TableHead>
+                              <TableHead className="text-right">50s</TableHead>
+                              <TableHead className="text-right">6s</TableHead>
+                              <TableHead className="text-right">Wkts</TableHead>
+                              <TableHead className="text-right">Econ</TableHead>
+                              <TableHead className="text-right font-bold text-amber-400">EFPPM</TableHead>
+                              <TableHead className="text-right">Best</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {filtered.map((s) => (
+                              <TableRow key={`${s.year}-${s.tour}`}>
+                                <TableCell className="font-medium">{s.year}</TableCell>
+                                <TableCell className="whitespace-nowrap">
+                                  {s.tour}
+                                  {["IPL", "MLC", "WPL"].includes(s.tour ?? "") && (
+                                    <span className="ml-1 text-[10px] uppercase text-amber-400/70">league</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">{s.matches}</TableCell>
+                                <TableCell className="text-right">{s.runs}</TableCell>
+                                <TableCell className="text-right">{s.batAvg?.toFixed(1) ?? "—"}</TableCell>
+                                <TableCell className="text-right">{s.batSr?.toFixed(1) ?? "—"}</TableCell>
+                                <TableCell className="text-right">{s.fifties}</TableCell>
+                                <TableCell className="text-right">{s.sixes}</TableCell>
+                                <TableCell className="text-right">{s.wickets}</TableCell>
+                                <TableCell className="text-right">{s.bowlEcon ? s.bowlEcon.toFixed(1) : "—"}</TableCell>
+                                <TableCell className="text-right font-bold text-amber-400">{s.avgFantasyPoints?.toFixed(1)}</TableCell>
+                                <TableCell className="text-right text-green-400">{s.bestMatch?.toFixed(0)}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                        </div>
+                      </div>
+                    );
+                  })()
                 ) : (
                   <p className="text-muted-foreground py-4 text-center">No season data available</p>
                 )}
@@ -491,26 +596,110 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
 
               {/* Recent Matches */}
               <TabsContent value="recent">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Fmt</TableHead>
-                      <TableHead>vs</TableHead>
-                      <TableHead>Venue</TableHead>
-                      <TableHead className="text-right">Runs</TableHead>
-                      <TableHead className="text-right">Balls</TableHead>
-                      <TableHead className="text-right">4s</TableHead>
-                      <TableHead className="text-right">6s</TableHead>
-                      <TableHead className="text-right">Wkts</TableHead>
-                      <TableHead className="text-right">Catches</TableHead>
-                      <TableHead className="text-right font-bold text-amber-400">
-                        FPts
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.recentMatches.map((m, i) => (
+                {(() => {
+                  const isOdi = (f: string) => f === "ODI";
+                  const isT20 = (f: string) => f !== "ODI" && f !== "TEST";
+                  const hasOdi = data.recentMatches.some((m) => isOdi(m.format));
+                  const hasT20 = data.recentMatches.some((m) => isT20(m.format));
+                  const filtered = data.recentMatches.filter((m) =>
+                    recentFmt === "ALL"
+                      ? true
+                      : recentFmt === "ODI"
+                      ? isOdi(m.format)
+                      : isT20(m.format)
+                  );
+                  const chips = ([
+                    { key: "ALL", label: "All", show: true },
+                    { key: "T20", label: "T20", show: hasT20 },
+                    { key: "ODI", label: "ODI", show: hasOdi },
+                  ] as const).filter((c) => c.show);
+                  return (
+                    <>
+                      {chips.length > 1 && (
+                        <div className="flex gap-1.5 mb-2">
+                          {chips.map((c) => (
+                            <button
+                              key={c.key}
+                              onClick={() => setRecentFmt(c.key)}
+                              className={`inline-flex items-center min-h-[36px] text-xs px-3 py-2 rounded border font-medium sm:min-h-0 sm:text-[11px] sm:px-2.5 sm:py-1 ${
+                                recentFmt === c.key
+                                  ? "bg-amber-500/20 border-amber-500 text-amber-600 dark:text-amber-400"
+                                  : "border-border text-muted-foreground hover:border-amber-500 hover:text-amber-500"
+                              }`}
+                            >
+                              {c.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {/* Mobile: stacked cards */}
+                      <div className="space-y-2 sm:hidden">
+                        {filtered.map((m, i) => (
+                          <div
+                            key={i}
+                            className="rounded-lg border border-border/60 bg-muted/10 p-3"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <span
+                                    className={`shrink-0 text-[11px] px-1.5 py-0.5 rounded font-medium ${
+                                      m.format === "WPL"
+                                        ? "bg-fuchsia-500/20 text-fuchsia-300"
+                                        : m.format === "IPL"
+                                        ? "bg-amber-500/20 text-amber-300"
+                                        : "bg-muted text-muted-foreground"
+                                    }`}
+                                  >
+                                    {m.format}
+                                  </span>
+                                  <span className="truncate text-sm font-semibold">vs {m.opposition}</span>
+                                </div>
+                                <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                                  {m.date} · {m.venue}
+                                </div>
+                              </div>
+                              <div className="shrink-0 text-right">
+                                <div className="text-lg font-bold leading-none text-amber-400">
+                                  {m.fantasyPoints?.toFixed(0)}
+                                </div>
+                                <div className="text-[11px] text-muted-foreground">FPts</div>
+                              </div>
+                            </div>
+                            <div className="mt-2 grid grid-cols-4 gap-1.5 text-center">
+                              <MiniStat
+                                label="Runs"
+                                value={`${m.batRuns ?? "—"}${m.batBalls != null ? ` (${m.batBalls})` : ""}`}
+                              />
+                              <MiniStat label="4s/6s" value={`${m.bat4s ?? 0}/${m.bat6s ?? 0}`} />
+                              <MiniStat label="Wkts" value={m.bowlWickets ?? 0} />
+                              <MiniStat label="Ct" value={m.catches ?? 0} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {/* Desktop: full table */}
+                      <div className="hidden sm:block">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Fmt</TableHead>
+                            <TableHead>vs</TableHead>
+                            <TableHead>Venue</TableHead>
+                            <TableHead className="text-right">Runs</TableHead>
+                            <TableHead className="text-right">Balls</TableHead>
+                            <TableHead className="text-right">4s</TableHead>
+                            <TableHead className="text-right">6s</TableHead>
+                            <TableHead className="text-right">Wkts</TableHead>
+                            <TableHead className="text-right">Catches</TableHead>
+                            <TableHead className="text-right font-bold text-amber-400">
+                              FPts
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filtered.map((m, i) => (
                       <TableRow key={i}>
                         <TableCell className="text-sm">{m.date}</TableCell>
                         <TableCell>
@@ -552,14 +741,18 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
                           {m.fantasyPoints?.toFixed(0)}
                         </TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      </div>
+                    </>
+                  );
+                })()}
               </TabsContent>
 
               {/* Venue Stats */}
               <TabsContent value="venues">
-                <Table>
+                <Table className="min-w-[520px]">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Venue</TableHead>
@@ -614,7 +807,7 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
 
               {/* Opposition Stats */}
               <TabsContent value="opposition">
-                <Table>
+                <Table className="min-w-[520px]">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Opposition</TableHead>

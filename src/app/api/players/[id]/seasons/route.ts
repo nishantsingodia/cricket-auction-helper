@@ -27,6 +27,7 @@ export async function GET(
       `SELECT
         CASE
           WHEN format IN ('IPL','MLC','WPL') THEN format
+          WHEN format = 'ODI' THEN 'ODI'
           WHEN series IS NULL OR TRIM(series) = '' THEN 'Other T20Is'
           ELSE series
         END AS tour,

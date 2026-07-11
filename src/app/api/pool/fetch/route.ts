@@ -21,6 +21,16 @@ import {
 } from "@/lib/squads/ind-vs-eng-t20-2026";
 import { buildBilateralT20Pool } from "@/lib/squads/build-bilateral-t20-pool";
 import {
+  IRE_VS_WI_W_ODI_2026,
+  IRE_VS_WI_W_ODI_2026_NAME,
+} from "@/lib/squads/ire-wi-w-odi-2026";
+import { buildWomensOdiPool } from "@/lib/squads/build-womens-odi-pool";
+import {
+  NZ_VS_WI_MEN_ODI_2026,
+  NZ_VS_WI_MEN_ODI_2026_NAME,
+} from "@/lib/squads/nz-wi-men-odi-2026";
+import { buildMensOdiPool } from "@/lib/squads/build-mens-odi-pool";
+import {
   THE_HUNDRED_MEN_2026_NAME,
   THE_HUNDRED_WOMEN_2026_NAME,
   HUNDRED_MEN_2026,
@@ -150,6 +160,74 @@ export async function POST(request: NextRequest) {
         : undefined;
 
       const built = buildBilateralT20Pool(sqlite, { auctionId, tournamentId, teams });
+      initializeValuations(tournamentId);
+
+      return NextResponse.json({
+        success: true,
+        teams: built.teams,
+        players: built.players,
+        matched: built.matched,
+        created: built.created,
+        unmatched: built.unmatched,
+        teamBreakdown: built.teamBreakdown,
+      });
+    }
+
+    // ---- Ireland vs West Indies Women's ODI 2026 (women's ODI bilateral) ----
+    if (auctionRow.tournament_name === IRE_VS_WI_W_ODI_2026_NAME) {
+      let tournamentId = auctionRow.tournament_id;
+      if (!tournamentId) {
+        const t = sqlite
+          .prepare(
+            `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size)
+             VALUES (?, 'BILATERAL', 'ODI', 100, 14)`
+          )
+          .run(IRE_VS_WI_W_ODI_2026_NAME);
+        tournamentId = Number(t.lastInsertRowid);
+        sqlite
+          .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
+          .run(tournamentId, auctionId);
+      }
+
+      const teams = Array.isArray(teamsFilter) && teamsFilter.length
+        ? IRE_VS_WI_W_ODI_2026.filter((t) => teamsFilter.includes(t.short))
+        : undefined;
+
+      const built = buildWomensOdiPool(sqlite, { auctionId, tournamentId, teams });
+      initializeValuations(tournamentId);
+
+      return NextResponse.json({
+        success: true,
+        teams: built.teams,
+        players: built.players,
+        matched: built.matched,
+        created: built.created,
+        unmatched: built.unmatched,
+        teamBreakdown: built.teamBreakdown,
+      });
+    }
+
+    // ---- New Zealand vs West Indies Men's ODI 2026 (men's ODI bilateral) ----
+    if (auctionRow.tournament_name === NZ_VS_WI_MEN_ODI_2026_NAME) {
+      let tournamentId = auctionRow.tournament_id;
+      if (!tournamentId) {
+        const t = sqlite
+          .prepare(
+            `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size)
+             VALUES (?, 'BILATERAL', 'ODI', 100, 16)`
+          )
+          .run(NZ_VS_WI_MEN_ODI_2026_NAME);
+        tournamentId = Number(t.lastInsertRowid);
+        sqlite
+          .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
+          .run(tournamentId, auctionId);
+      }
+
+      const teams = Array.isArray(teamsFilter) && teamsFilter.length
+        ? NZ_VS_WI_MEN_ODI_2026.filter((t) => teamsFilter.includes(t.short))
+        : undefined;
+
+      const built = buildMensOdiPool(sqlite, { auctionId, tournamentId, teams });
       initializeValuations(tournamentId);
 
       return NextResponse.json({

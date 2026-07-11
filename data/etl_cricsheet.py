@@ -205,10 +205,115 @@ def compute_fantasy_points_hundred(perf: dict, role: str) -> float:
     return pts
 
 
+def compute_fantasy_points_odi(perf: dict, role: str) -> float:
+    """Dream11 ODI / One-Day FPS (per Nishant's config, Jul 2026).
+    Mirrors ODI_RULES in src/lib/fantasy-points/rules.ts and the bot's ODI path.
+    Differs from the T20 scorer:
+      - Duck -3 (T20 -2), awarded OUTSIDE the runs/balls gate (0-off-0 run-out still counts).
+      - Dot ball: +1 for every 3 dot balls (floored); T20 is +1 per dot.
+      - Maiden over +4 (T20 +12).
+      - Wicket hauls start at 4w: 4w/5w/6w = +4/+8/+12 (T20 is 3w/4w/5w).
+      - Milestones HIGHEST-only (25/50/75/100 = 4/8/12/16) — matches the live bot; the T20
+        scorer above is cumulative (a known divergence, left as-is for T20).
+      - SR bands >140 / 120.1-140 / 100-120 & 40-50 / 30-39.99 / <30 at min 20 balls.
+      - Economy <2.5 / 2.5-3.49 / 3.5-4.5 & 7-8 / 8.01-9 / >9 at min 5 overs (30 balls).
+    Batting run/boundary/six and all fielding values are identical to T20.
+    """
+    pts = 0.0
+
+    # === BATTING ===
+    bat_runs = perf.get("bat_runs", 0) or 0
+    bat_balls = perf.get("bat_balls", 0) or 0
+    bat_4s = perf.get("bat_4s", 0) or 0
+    bat_6s = perf.get("bat_6s", 0) or 0
+    bat_dismissed = perf.get("bat_dismissed", False)
+
+    if bat_balls > 0 or bat_runs > 0:
+        pts += bat_runs * 1 + bat_4s * 4 + bat_6s * 6
+        # Milestone (highest only)
+        if bat_runs >= 100:
+            pts += 16
+        elif bat_runs >= 75:
+            pts += 12
+        elif bat_runs >= 50:
+            pts += 8
+        elif bat_runs >= 25:
+            pts += 4
+        # Strike rate (min 20 balls, excludes pure bowlers)
+        if bat_balls >= 20 and role != "BOWL":
+            sr = (bat_runs / bat_balls) * 100
+            if sr > 140:
+                pts += 6
+            elif sr > 120:
+                pts += 4
+            elif sr >= 100:
+                pts += 2
+            elif 40 <= sr <= 50:
+                pts -= 2
+            elif 30 <= sr < 40:
+                pts -= 4
+            elif sr < 30:
+                pts -= 6
+
+    # Duck (-3, BAT/WK/AR only) — OUTSIDE the gate so a 0-off-0 run-out still counts.
+    if bat_dismissed and bat_runs == 0 and role in ("BAT", "WK", "AR"):
+        pts -= 3
+
+    # === BOWLING ===
+    bowl_balls = perf.get("bowl_balls", 0) or 0
+    bowl_runs_conceded = perf.get("bowl_runs", 0) or 0
+    bowl_wickets = perf.get("bowl_wickets", 0) or 0
+    bowl_maidens = perf.get("bowl_maidens", 0) or 0
+    bowl_dots = perf.get("bowl_dots", 0) or 0
+    bowl_lbw_bowled = perf.get("bowl_lbw_bowled", 0) or 0
+
+    if bowl_balls > 0:
+        pts += bowl_wickets * 30 + bowl_lbw_bowled * 8
+        pts += (bowl_dots // 3) * 1  # +1 for every 3 dot balls
+        pts += bowl_maidens * 4
+        if bowl_wickets >= 6:
+            pts += 12
+        elif bowl_wickets >= 5:
+            pts += 8
+        elif bowl_wickets >= 4:
+            pts += 4
+        # Economy (min 5 overs = 30 balls)
+        if bowl_balls >= 30:
+            econ = bowl_runs_conceded / (bowl_balls / 6)
+            if econ < 2.5:
+                pts += 6
+            elif econ < 3.5:
+                pts += 4
+            elif econ <= 4.5:
+                pts += 2
+            elif 7 <= econ <= 8:
+                pts -= 2
+            elif 8 < econ <= 9:
+                pts -= 4
+            elif econ > 9:
+                pts -= 6
+
+    # === FIELDING === (identical to T20)
+    catches = perf.get("catches", 0) or 0
+    stumpings = perf.get("stumpings", 0) or 0
+    run_outs = perf.get("run_outs", 0) or 0
+    direct_run_outs = perf.get("direct_run_outs", 0) or 0
+    pts += catches * 8
+    if catches >= 3:
+        pts += 4
+    pts += stumpings * 12
+    pts += direct_run_outs * 12 + (run_outs - direct_run_outs) * 6
+
+    pts += 4  # announced XI
+    return pts
+
+
 def score_perf(perf: dict, role: str, fmt: str) -> float:
     """Dispatch to the correct fantasy scorer for the format."""
     if fmt == "HUN":
         return compute_fantasy_points_hundred(perf, role)
+    if fmt == "ODI":
+        return compute_fantasy_points_odi(perf, role)
     return compute_fantasy_points(perf, role)
 
 
@@ -559,7 +664,7 @@ def process_all_matches(conn: sqlite3.Connection):
 
     # Gather all JSON files
     json_files = []
-    for folder in ["ipl", "t20i", "wpl", "mlc", "hundred"]:
+    for folder in ["ipl", "t20i", "wpl", "mlc", "hundred", "odi"]:
         folder_path = os.path.join(RAW_DIR, folder)
         if os.path.isdir(folder_path):
             files = glob.glob(os.path.join(folder_path, "*.json"))

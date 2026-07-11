@@ -13,8 +13,9 @@ RAW_DIR = os.path.join(os.path.dirname(__file__), "raw")
 
 # Cricsheet JSON download URLs
 ARCHIVES = {
-    "t20i": "https://cricsheet.org/downloads/t20s_json.zip",  # All T20Is
+    "t20i": "https://cricsheet.org/downloads/t20s_json.zip",  # All T20Is (men's + women's)
     "ipl": "https://cricsheet.org/downloads/ipl_json.zip",    # IPL matches
+    "odi": "https://cricsheet.org/downloads/odis_json.zip",   # All ODIs (men's + women's)
 }
 
 def download_file(url: str, dest: str):

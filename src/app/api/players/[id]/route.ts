@@ -34,7 +34,7 @@ export async function GET(
       SELECT * FROM match_performances
       WHERE player_id = ?
       ORDER BY match_date DESC
-      LIMIT 20
+      LIMIT 40
     `)
     .all(playerId) as Record<string, unknown>[];
 
@@ -77,11 +77,11 @@ export async function GET(
   // Compute fantasy breakdown from match performances (IPL/T20 matches)
   const breakdownMatches = sqlite
     .prepare(`
-      SELECT bat_runs, bat_balls, bat_4s, bat_6s, bat_dismissed, dismissal_type,
+      SELECT format, bat_runs, bat_balls, bat_4s, bat_6s, bat_dismissed, dismissal_type,
              bowl_balls, bowl_runs, bowl_wickets, bowl_maidens, bowl_dots, bowl_lbw_bowled,
              catches, stumpings, run_outs, direct_run_outs, fantasy_points
       FROM match_performances
-      WHERE player_id = ? AND format IN ('IPL', 'T20I', 'T20')
+      WHERE player_id = ? AND format IN ('IPL', 'T20I', 'T20', 'ODI')
       ORDER BY match_date DESC
       LIMIT 50
     `)
@@ -112,7 +112,7 @@ export async function GET(
         runOuts: (m.run_outs as number) || 0,
         directRunOuts: (m.direct_run_outs as number) || 0,
       };
-      const bd = calculateFantasyPoints(perf, role);
+      const bd = calculateFantasyPoints(perf, role, m.format as string);
       sumBatting += bd.batting;
       sumBowling += bd.bowling;
       sumFielding += bd.fielding;
