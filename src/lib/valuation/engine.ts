@@ -31,7 +31,12 @@ import {
   hundredExpectedMatches,
   type Role as HundredRole,
 } from "@/lib/squads/the-hundred-2026";
-import { LPL_2026_NAME, lplExpectedMatches } from "@/lib/squads/lpl-2026";
+import {
+  LPL_2026_NAME,
+  lplExpectedMatches,
+  LPL_VENUES,
+  LPL_TEAM_SCHEDULE,
+} from "@/lib/squads/lpl-2026";
 
 /**
  * IPL Auction Valuation Engine — 2-Score Model
@@ -427,8 +432,8 @@ export function recalculateValuations(
   // LPL 2026: standard 20-over franchise T20 → modelled like MLC. Own 'LPL' league bucket so
   // its games count; quality = LPL + IPL + top-8 T20Is; default 40/30/10/20 weights (LPL had no
   // 2025 edition, so the 2025 season bucket is empty and its weight redistributes — handled by
-  // computeScore1). No scale-normalization / no shrinkage (that is Hundred-only). Venue OFF
-  // (no LPL venue override below → empty schedule → conditions factor 1.0), like the women's tours.
+  // computeScore1). No scale-normalization / no shrinkage (that is Hundred-only). Venue ON: all
+  // 2026 grounds read bowl_friendly on ingested LPL+SL-T20I history — see the isLpl venue block.
   const isLpl = tournamentRow?.name === LPL_2026_NAME;
   // For MLC, the "primary league season" buckets are MLC (not IPL), and the quality pool is
   // MLC + IPL + T20I (vs WPL for the women's path). A bilateral T20I series has NO league
@@ -436,6 +441,8 @@ export function recalculateValuations(
   // The Hundred is a franchise league scored on its OWN scale ('HUN'): league season = HUN
   // 2025/2024; quality = HUN + T20/IPL/MLC (men) or HUN + WPL + women's-T20 (women); the
   // non-Hundred proxy form is normalized to the Hundred scale per role (normMult below).
+  // LPL: venue ON — all 2026 grounds read bowl_friendly on LPL+SL-T20I history (subcontinent);
+  // venueClassification + per-team schedule overridden in the isLpl block below.
   const leagueFmt = isHundred ? "HUN" : isMLC ? "MLC" : isLpl ? "LPL" : "IPL";
   const qualityList = isHundredMen
     ? "'HUN','T20','IPL','MLC'"
@@ -631,10 +638,20 @@ export function recalculateValuations(
     ];
     teamSchedules = new Map(NZ_VS_WI_MEN_ODI_2026.map((t) => [t.short, grounds]));
   }
+  if (isLpl) {
+    // LPL: all 3 league venues (SSC / Dambulla / Pallekele) read bowl_friendly on LPL+SL-T20I
+    // history — set every cricsheet name variant so a player's ground history buckets correctly.
+    // Replace the IPL-keyed schedule with each franchise's actual 8-game venue split.
+    for (const v of LPL_VENUES) {
+      for (const variant of v.variants) venueClassification.set(variant, v.type);
+    }
+    teamSchedules = new Map(Object.entries(LPL_TEAM_SCHEDULE));
+  }
   // Men's ODI reads venue history from ODI matches (wider window — fewer ODIs per ground);
-  // every other tour keeps the T20-family default (byte-identical).
-  const venueFormats = isMensOdi ? ["ODI"] : ["IPL", "T20"];
-  const venueWindow = isMensOdi ? 60 : 30;
+  // LPL reads its own league + SL-T20I ground history over a wider (60mo) window (5 seasons,
+  // 2020–2024); every other tour keeps the T20-family default (byte-identical).
+  const venueFormats = isMensOdi ? ["ODI"] : isLpl ? ["LPL", "T20"] : ["IPL", "T20"];
+  const venueWindow = isMensOdi ? 60 : isLpl ? 60 : 30;
   const playerVenueFP = batchPlayerVenueFP(playerIds, venueFormats, venueWindow);
   const playerVenueTypeFP = batchPlayerVenueTypeFP(
     playerIds,

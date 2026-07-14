@@ -212,3 +212,36 @@ export const LPL_NAME_ALIASES: Record<string, string> = {
   "marques ackerman": "MP Ackerman",
   "sediqullah atal": "Sediqullah",
 };
+
+// LPL venue model — ALL 2026 grounds are Sri-Lankan and read BOWL-FRIENDLY on the ingested
+// LPL + SL-T20I bat-FP÷bowl-FP history (subcontinent pitches, spin-heavy). Ratios (bat/bowl):
+//   SSC Colombo 0.65 · R Premadasa 0.77 · Rangiri Dambulla 0.90 · Pallekele 0.91  (<0.95 = bowl_friendly).
+// Set every cricsheet name variant so a player's history under either spelling buckets correctly.
+// (Premadasa is the playoffs venue — classified but NOT in the 8-league-game base schedule.)
+export type VenueType = "bat_road" | "balanced" | "bowl_friendly";
+export const LPL_VENUES: Array<{ canonical: string; variants: string[]; type: VenueType }> = [
+  { canonical: "Sinhalese Sports Club Ground, Colombo",
+    variants: ["Sinhalese Sports Club Ground, Colombo", "Sinhalese Sports Club Ground"], type: "bowl_friendly" },
+  { canonical: "Rangiri Dambulla International Stadium",
+    variants: ["Rangiri Dambulla International Stadium", "Dambulla International Cricket Stadium"], type: "bowl_friendly" },
+  { canonical: "Pallekele International Cricket Stadium",
+    variants: ["Pallekele International Cricket Stadium", "Pallekele International Cricket Stadium, Kandy",
+               "Muttiah Muralitharan International Cricket Stadium, Kandy"], type: "bowl_friendly" },
+  { canonical: "R Premadasa Stadium, Colombo",
+    variants: ["R Premadasa Stadium, Colombo", "R Premadasa Stadium", "R.Premadasa Stadium, Khettarama",
+               "R.Premadasa Stadium, Khettarama, Colombo"], type: "bowl_friendly" },
+];
+
+// Per-team league schedule (8 games) across this year's 3 league venues — derived from the actual
+// fixture list (SSC blocks Jul17-19, Dambulla Jul21-26, Pallekele Jul28-Aug2). Neutral-venue
+// festival, so distributions are similar across teams. Playoffs (Premadasa) are upside, excluded.
+const SSC = "Sinhalese Sports Club Ground, Colombo";
+const DAM = "Rangiri Dambulla International Stadium";
+const PAL = "Pallekele International Cricket Stadium";
+export const LPL_TEAM_SCHEDULE: Record<string, Array<{ venue: string; games: number }>> = {
+  JK: [{ venue: SSC, games: 2 }, { venue: DAM, games: 3 }, { venue: PAL, games: 3 }],
+  CK: [{ venue: SSC, games: 2 }, { venue: DAM, games: 3 }, { venue: PAL, games: 3 }],
+  KR: [{ venue: SSC, games: 2 }, { venue: DAM, games: 4 }, { venue: PAL, games: 2 }],
+  DS: [{ venue: SSC, games: 2 }, { venue: DAM, games: 4 }, { venue: PAL, games: 2 }],
+  GG: [{ venue: SSC, games: 2 }, { venue: DAM, games: 4 }, { venue: PAL, games: 2 }],
+};
