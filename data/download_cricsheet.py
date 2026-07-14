@@ -16,6 +16,7 @@ ARCHIVES = {
     "t20i": "https://cricsheet.org/downloads/t20s_json.zip",  # All T20Is (men's + women's)
     "ipl": "https://cricsheet.org/downloads/ipl_json.zip",    # IPL matches
     "odi": "https://cricsheet.org/downloads/odis_json.zip",   # All ODIs (men's + women's)
+    "lpl": "https://cricsheet.org/downloads/lpl_json.zip",    # Lanka Premier League (franchise T20)
 }
 
 def download_file(url: str, dest: str):

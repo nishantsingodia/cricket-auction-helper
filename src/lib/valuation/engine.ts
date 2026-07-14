@@ -31,6 +31,7 @@ import {
   hundredExpectedMatches,
   type Role as HundredRole,
 } from "@/lib/squads/the-hundred-2026";
+import { LPL_2026_NAME, lplExpectedMatches } from "@/lib/squads/lpl-2026";
 
 /**
  * IPL Auction Valuation Engine — 2-Score Model
@@ -423,17 +424,25 @@ export function recalculateValuations(
   // Men's ODI bilateral: ODI form vs top-8 nations, venue ON (Caribbean grounds classified on
   // men's ODI data), 60/40 recency weights, XI=5/bench=2 expected matches.
   const isMensOdi = tournamentRow?.name === NZ_VS_WI_MEN_ODI_2026_NAME;
+  // LPL 2026: standard 20-over franchise T20 → modelled like MLC. Own 'LPL' league bucket so
+  // its games count; quality = LPL + IPL + top-8 T20Is; default 40/30/10/20 weights (LPL had no
+  // 2025 edition, so the 2025 season bucket is empty and its weight redistributes — handled by
+  // computeScore1). No scale-normalization / no shrinkage (that is Hundred-only). Venue OFF
+  // (no LPL venue override below → empty schedule → conditions factor 1.0), like the women's tours.
+  const isLpl = tournamentRow?.name === LPL_2026_NAME;
   // For MLC, the "primary league season" buckets are MLC (not IPL), and the quality pool is
   // MLC + IPL + T20I (vs WPL for the women's path). A bilateral T20I series has NO league
   // season: Score 1 drops the season buckets, weights Last-10 60% + all-quality-30mo 40%.
   // The Hundred is a franchise league scored on its OWN scale ('HUN'): league season = HUN
   // 2025/2024; quality = HUN + T20/IPL/MLC (men) or HUN + WPL + women's-T20 (women); the
   // non-Hundred proxy form is normalized to the Hundred scale per role (normMult below).
-  const leagueFmt = isHundred ? "HUN" : isMLC ? "MLC" : "IPL";
+  const leagueFmt = isHundred ? "HUN" : isMLC ? "MLC" : isLpl ? "LPL" : "IPL";
   const qualityList = isHundredMen
     ? "'HUN','T20','IPL','MLC'"
     : isHundredWomen
     ? "'HUN','WPL','T20'"
+    : isLpl
+    ? "'LPL','IPL'"
     : isMLC || isBilateral
     ? "'MLC','IPL'"
     : "'IPL','WPL'";
@@ -735,7 +744,7 @@ export function recalculateValuations(
 
     const finalEfppm = normScore1 * conditionsFactor;
     const expectedMatches = isHundred
-      ? hundredExpectedMatches(p.squad_number)
+      ? hundredExpectedMatches(p.ipl_team, p.squad_number, isHundredWomen)
       : isBilateral
       ? bilateralExpectedMatches(p.squad_number)
       : isWomensOdi
@@ -744,6 +753,8 @@ export function recalculateValuations(
       ? mensOdiExpectedMatches(p.squad_number)
       : isMLC
       ? mlcExpectedMatches(p.ipl_team, p.squad_number)
+      : isLpl
+      ? lplExpectedMatches(p.squad_number)
       : isWomensWC
       ? getWomensExpectedMatches(p.squad_number, WC_TEAM_TIERS[p.ipl_team] ?? "C")
       : getExpectedMatches(p.squad_number);

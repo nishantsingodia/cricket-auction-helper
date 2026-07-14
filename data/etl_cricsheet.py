@@ -330,6 +330,9 @@ def detect_format(match_info: dict) -> str:
     # MLC (USA franchise league) — its own bucket, like IPL.
     if "major league cricket" in event or event.strip() == "mlc":
         return "MLC"
+    # LPL (Sri Lanka franchise league) — its own bucket, like IPL/MLC.
+    if "lanka premier league" in event or event.strip() == "lpl":
+        return "LPL"
     if "indian premier league" in event or "ipl" in event:
         return "IPL"
     # The Hundred (100-ball, ECB) — its own bucket. cricsheet tags it match_type="T20",
@@ -664,7 +667,7 @@ def process_all_matches(conn: sqlite3.Connection):
 
     # Gather all JSON files
     json_files = []
-    for folder in ["ipl", "t20i", "wpl", "mlc", "hundred", "odi"]:
+    for folder in ["ipl", "t20i", "wpl", "mlc", "hundred", "odi", "lpl"]:
         folder_path = os.path.join(RAW_DIR, folder)
         if os.path.isdir(folder_path):
             files = glob.glob(os.path.join(folder_path, "*.json"))

@@ -16,11 +16,20 @@
 export type Role = "BAT" | "BOWL" | "AR" | "WK";
 export type HundredVenueType = "bat_road" | "balanced" | "bowl_friendly";
 
+// Availability (from the 2026-07-13 research pass — refine closer to the auction). OVERRIDES
+// the positional expected-matches. OUT=withdrawn(0); LATE1=misses opener(7); LATE2=misses
+// ~first 2 (6); EARLY=misses ~closing 3-4 + eliminator(6); DOUBT=injury monitor(6).
+export type Avail = "OUT" | "LATE1" | "LATE2" | "EARLY" | "DOUBT";
+export const AVAIL_MATCHES: Record<Avail, number> = {
+  OUT: 0, LATE1: 7, LATE2: 6, EARLY: 6, DOUBT: 6,
+};
+
 export interface HundredSquadPlayer {
   name: string;
   role: Role;
   overseas: boolean;
   captain?: boolean;
+  avail?: Avail;
   note?: string;
 }
 
@@ -46,8 +55,16 @@ export const HUNDRED_ROLE_NORM: Record<Role, number> = {
   BOWL: 0.99,
 };
 
-// XI (1–11) plays all 8 group games; bench tapers (12=3, 13–14=2, 15+=1).
-export function hundredExpectedMatches(squadNumber: number): number {
+// XI (1–11) plays all 8 group games; bench tapers (12=3, 13–14=2, 15+=1). A player's
+// `avail` flag (availability research) OVERRIDES the positional value.
+export function hundredExpectedMatches(
+  teamShort: string,
+  squadNumber: number,
+  isWomen: boolean
+): number {
+  const teams = isWomen ? HUNDRED_WOMEN_2026 : HUNDRED_MEN_2026;
+  const player = teams.find((t) => t.short === teamShort)?.players[squadNumber - 1];
+  if (player?.avail) return AVAIL_MATCHES[player.avail];
   if (squadNumber >= 1 && squadNumber <= HUNDRED_XI_SIZE) return 8;
   if (squadNumber === 12) return 3;
   if (squadNumber <= 14) return 2;
@@ -62,12 +79,12 @@ export const HUNDRED_MEN_2026: HundredTeam[] = [
       { name: "Jason Roy", role: "BAT", overseas: false },
       { name: "Will Jacks", role: "AR", overseas: false },
       { name: "James Vince", role: "BAT", overseas: false },
-      { name: "Nicholas Pooran", role: "WK", overseas: true },
+      { name: "Nicholas Pooran", role: "WK", overseas: true, avail: "LATE1", note: "MLC playoffs to ~Jul 18 → tight USA turnaround, may miss the Jul 21 opener" },
       { name: "Sherfane Rutherford", role: "AR", overseas: true },
       { name: "Sam Curran", role: "AR", overseas: false, captain: true },
       { name: "Tom Curran", role: "AR", overseas: false },
-      { name: "Rashid Khan", role: "AR", overseas: true },
-      { name: "Trent Boult", role: "BOWL", overseas: true },
+      { name: "Rashid Khan", role: "AR", overseas: true, avail: "EARLY", note: "SPECULATIVE: Afghanistan-Ireland ODIs Aug 5-14 could pull him from closing games + Aug 14 eliminator IF picked & released — unconfirmed" },
+      { name: "Trent Boult", role: "BOWL", overseas: true, avail: "LATE1", note: "MLC playoffs to ~Jul 18 → may miss the Jul 21 opener" },
       { name: "Richard Gleeson", role: "BOWL", overseas: false },
       { name: "Olly Stone", role: "BOWL", overseas: false },
       { name: "Ollie Pope", role: "BAT", overseas: false },
@@ -87,7 +104,7 @@ export const HUNDRED_MEN_2026: HundredTeam[] = [
       { name: "Paul Walter", role: "AR", overseas: false },
       { name: "Gus Atkinson", role: "BOWL", overseas: false },
       { name: "Tom Hartley", role: "BOWL", overseas: false },
-      { name: "Noor Ahmad", role: "BOWL", overseas: true },
+      { name: "Noor Ahmad", role: "BOWL", overseas: true, avail: "EARLY", note: "SPECULATIVE: Afghanistan-Ireland ODIs Aug 5-14 could pull him from closing games IF picked & released — unconfirmed" },
       { name: "Josh Tongue", role: "BOWL", overseas: false },
       { name: "Sonny Baker", role: "BOWL", overseas: false },
       { name: "Tim Seifert", role: "WK", overseas: true },
@@ -129,7 +146,7 @@ export const HUNDRED_MEN_2026: HundredTeam[] = [
       { name: "Rehan Ahmed", role: "AR", overseas: false },
       { name: "Scott Currie", role: "AR", overseas: false },
       { name: "Saqib Mahmood", role: "BOWL", overseas: false },
-      { name: "Mustafizur Rahman", role: "BOWL", overseas: true },
+      { name: "Mustafizur Rahman", role: "BOWL", overseas: true, avail: "DOUBT", note: "Injury monitor: grade-1 hamstring + knee (early Jul, ~4wk); later reported cleared to join. BCB full NOC (no duty clash)" },
       { name: "Usman Tariq", role: "BOWL", overseas: true, note: "England-qualification unconfirmed" },
       { name: "Jordan Thompson", role: "AR", overseas: false },
       { name: "Chris Wood", role: "BOWL", overseas: false },
@@ -165,10 +182,10 @@ export const HUNDRED_MEN_2026: HundredTeam[] = [
       { name: "Tim David", role: "AR", overseas: true },
       { name: "Lewis Gregory", role: "AR", overseas: false },
       { name: "Dan Mousley", role: "AR", overseas: false },
-      { name: "Mitchell Santner", role: "AR", overseas: true },
+      { name: "Mitchell Santner", role: "AR", overseas: true, avail: "LATE1", note: "NZ captain on WI ODI tour, last ODI Jul 21 (Barbados) → likely misses the Jul 24 opener" },
       { name: "Craig Overton", role: "BOWL", overseas: false },
       { name: "Matt Henry", role: "BOWL", overseas: true },
-      { name: "David Payne", role: "BOWL", overseas: false },
+      { name: "Mohammad Amir", role: "BOWL", overseas: false, note: "Local (British passport, retired from Pakistan — no clash) injury replacement for David Payne (ankle, ruled out)" },
       { name: "Danny Briggs", role: "BOWL", overseas: false },
       { name: "Aneurin Donald", role: "BAT", overseas: false },
       { name: "Brad Currie", role: "BOWL", overseas: false },
@@ -181,7 +198,7 @@ export const HUNDRED_MEN_2026: HundredTeam[] = [
       { name: "Jamie Smith", role: "WK", overseas: false },
       { name: "Tristan Stubbs", role: "BAT", overseas: true },
       { name: "David Miller", role: "BAT", overseas: true },
-      { name: "Marcus Stoinis", role: "AR", overseas: true },
+      { name: "Marcus Stoinis", role: "AR", overseas: true, avail: "LATE1", note: "MLC playoffs to ~Jul 18 → may miss the Jul 22 opener" },
       { name: "Tom Abell", role: "AR", overseas: false },
       { name: "Michael Pepper", role: "WK", overseas: false },
       { name: "Chris Jordan", role: "BOWL", overseas: false, captain: true },
@@ -201,12 +218,12 @@ export const HUNDRED_MEN_2026: HundredTeam[] = [
       { name: "Phil Salt", role: "WK", overseas: false, captain: true },
       { name: "Matthew Short", role: "AR", overseas: true },
       { name: "Joe Root", role: "BAT", overseas: false },
-      { name: "Rachin Ravindra", role: "AR", overseas: true },
+      { name: "Rachin Ravindra", role: "AR", overseas: true, avail: "LATE1", note: "MLC (Washington) playoffs to ~Jul 18 → may miss the Jul 22 opener" },
       { name: "Tom Kohler-Cadmore", role: "BAT", overseas: false },
       { name: "Chris Woakes", role: "AR", overseas: false },
       { name: "Marco Jansen", role: "AR", overseas: true },
       { name: "Ben Kellaway", role: "AR", overseas: false },
-      { name: "Lockie Ferguson", role: "BOWL", overseas: true },
+      { name: "Lockie Ferguson", role: "BOWL", overseas: true, avail: "LATE1", note: "MLC (Washington) playoffs to ~Jul 18 → may miss the Jul 22 opener" },
       { name: "Sam Cook", role: "BOWL", overseas: false },
       { name: "Jafer Chohan", role: "BOWL", overseas: false },
       { name: "Jordan Cox", role: "WK", overseas: false },
@@ -270,9 +287,9 @@ export const HUNDRED_WOMEN_2026: HundredTeam[] = [
       { name: "Kate Cross", role: "BOWL", overseas: false },
       { name: "Cassidy McCarthy", role: "BOWL", overseas: false },
       { name: "Hannah Baker", role: "BOWL", overseas: false },
-      { name: "Rachel Slater", role: "BOWL", overseas: false },
-      { name: "Maddie Ward", role: "AR", overseas: false },
-      { name: "Florence Miller", role: "AR", overseas: false },
+      { name: "Chloe Skelton", role: "BOWL", overseas: false, note: "Injury replacement for Rachel Slater (single-source, M-confidence)" },
+      { name: "Katie Jones", role: "BAT", overseas: false, note: "Injury replacement for Maddie Ward (single-source, M-confidence)" },
+      { name: "Emily Windsor", role: "BAT", overseas: false, note: "Injury replacement for Florence Miller (single-source, M-confidence)" },
       { name: "Claudie Cooper", role: "AR", overseas: false },
     ],
   },
@@ -285,8 +302,9 @@ export const HUNDRED_WOMEN_2026: HundredTeam[] = [
       { name: "Ellyse Perry", role: "AR", overseas: true, captain: true },
       { name: "Annerie Dercksen", role: "AR", overseas: true },
       { name: "Emma Lamb", role: "BAT", overseas: false },
-      { name: "Cordelia Griffith", role: "BAT", overseas: false },
+      { name: "Meg Austin", role: "AR", overseas: false, note: "Injury replacement for Cordelia Griffith (season-ending Essex injury)" },
       { name: "Alana King", role: "BOWL", overseas: true },
+      { name: "Fatima Sana", role: "AR", overseas: true, avail: "LATE2", note: "Wildcard replacement for Lucy Hamilton; Pakistan ODIs v SL Jul 23-28 (NOC to skip T20I leg) → misses first ~2 games" },
       { name: "Linsey Smith", role: "BOWL", overseas: false },
       { name: "Lauren Filer", role: "BOWL", overseas: false },
       { name: "Eva Gray", role: "AR", overseas: false },
@@ -306,11 +324,11 @@ export const HUNDRED_WOMEN_2026: HundredTeam[] = [
       { name: "Charlie Dean", role: "AR", overseas: false, captain: true },
       { name: "Marie Kelly", role: "BAT", overseas: false },
       { name: "Sterre Kalis", role: "BAT", overseas: true },
-      { name: "Mahika Gaur", role: "BOWL", overseas: false },
+      { name: "Katie George", role: "BOWL", overseas: false, note: "Injury replacement for Mahika Gaur (foot)" },
       { name: "Lucy Higham", role: "BOWL", overseas: false },
       { name: "Charis Pavely", role: "AR", overseas: false },
       { name: "Seren Smale", role: "WK", overseas: false },
-      { name: "Phoebe Turner", role: "BAT", overseas: false },
+      { name: "Hannah Rainey", role: "BOWL", overseas: false, note: "Injury replacement for Phoebe Turner (single-source, M-confidence)" },
       { name: "Josephine Groves", role: "AR", overseas: false },
     ],
   },
@@ -328,7 +346,7 @@ export const HUNDRED_WOMEN_2026: HundredTeam[] = [
       { name: "Samantha Bates", role: "BOWL", overseas: true },
       { name: "Emma Jones", role: "BOWL", overseas: false },
       { name: "Millicent Taylor", role: "AR", overseas: false },
-      { name: "Ailsa Lister", role: "AR", overseas: false },
+      { name: "Sophie Luff", role: "BAT", overseas: false, note: "Injury replacement for Ailsa Lister" },
       { name: "Georgia Adams", role: "AR", overseas: false },
       { name: "Charley Phillips", role: "WK", overseas: false },
     ],

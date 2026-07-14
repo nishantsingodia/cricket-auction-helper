@@ -55,6 +55,12 @@ export default function HomePage() {
       note: "6 USA franchises · valued on MLC 2023-25 + IPL/T20I",
     },
     {
+      id: "LPL 2026",
+      label: "LPL 2026",
+      format: "T20",
+      note: "5 Sri Lanka franchises · valued on LPL + IPL/T20I form (venue-neutral)",
+    },
+    {
       id: "India vs England Men's T20 2026",
       label: "India vs England Men's T20 2026",
       format: "T20",

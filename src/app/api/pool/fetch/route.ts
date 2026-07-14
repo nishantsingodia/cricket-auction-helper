@@ -37,6 +37,8 @@ import {
   HUNDRED_WOMEN_2026,
 } from "@/lib/squads/the-hundred-2026";
 import { buildHundredPool } from "@/lib/squads/build-hundred-pool";
+import { LPL_2026, LPL_2026_NAME } from "@/lib/squads/lpl-2026";
+import { buildLPLPool } from "@/lib/squads/build-lpl-pool";
 import { eq } from "drizzle-orm";
 
 export async function POST(request: NextRequest) {
@@ -272,6 +274,40 @@ export async function POST(request: NextRequest) {
         gender: isWomen ? "female" : "male",
         teams,
       });
+      initializeValuations(tournamentId);
+
+      return NextResponse.json({
+        success: true,
+        teams: built.teams,
+        players: built.players,
+        matched: built.matched,
+        created: built.created,
+        unmatched: built.unmatched,
+        teamBreakdown: built.teamBreakdown,
+      });
+    }
+
+    // ---- LPL 2026 (Lanka Premier League) — franchise T20, modelled like MLC ----
+    if (auctionRow.tournament_name === LPL_2026_NAME) {
+      let tournamentId = auctionRow.tournament_id;
+      if (!tournamentId) {
+        const t = sqlite
+          .prepare(
+            `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size, max_overseas)
+             VALUES (?, 'CUSTOM', 'T20', 100, 18, 4)`
+          )
+          .run(LPL_2026_NAME);
+        tournamentId = Number(t.lastInsertRowid);
+        sqlite
+          .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
+          .run(tournamentId, auctionId);
+      }
+
+      const teams = Array.isArray(teamsFilter) && teamsFilter.length
+        ? LPL_2026.filter((t) => teamsFilter.includes(t.short))
+        : undefined;
+
+      const built = buildLPLPool(sqlite, { auctionId, tournamentId, teams });
       initializeValuations(tournamentId);
 
       return NextResponse.json({

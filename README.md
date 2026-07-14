@@ -6,6 +6,22 @@ A self-hosted **live auction room** for the fantasy-cricket draft my friends run
 
 ---
 
+## Screenshots
+
+**Live auction room** — the shared board: the player pool, the lot on the block, and every friend's purse debiting in real time.
+
+![Live auction room — pool, current lot, and per-friend purses](docs/1-auction-room.png)
+
+**Data-driven valuations** — every player carries an EFPPM-derived *expected price* before the hammer falls, so bidding opens from fair value instead of vibes.
+
+![Player valuations — EFPPM-derived expected price per player](docs/2-valuations.png)
+
+**AI bid advisor** — a streaming Claude advisor answers *bid or skip?* in the context of the live board (purse left, EFPPM, who's still available).
+
+![AI bid advisor responding in the context of the live auction](docs/3-advisor.png)
+
+---
+
 ## Why I built it
 
 My friends and I don't do this once a season — we run a fresh auction almost **every month**, across whatever's on: IPL, the Women's T20 World Cup, MLC, a bilateral series. And every single time we hit the same wall: *who's even in the squad? who'll actually make the XI? and what on earth is anyone worth?* Nobody had a real read on a player's recent form, how they go at the venues on the actual schedule, or how they've done against quality opposition — so the early lots went for silly money and the marquee names we wanted sailed past our remaining purse. We were bidding on vibes.
