@@ -50,3 +50,6 @@ next-env.d.ts
 
 # cricsheet raw data
 /data/raw/
+
+# db backups
+*.bak-*
