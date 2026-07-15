@@ -16,7 +16,18 @@ ARCHIVES = {
     "t20i": "https://cricsheet.org/downloads/t20s_json.zip",  # All T20Is (men's + women's)
     "ipl": "https://cricsheet.org/downloads/ipl_json.zip",    # IPL matches
     "odi": "https://cricsheet.org/downloads/odis_json.zip",   # All ODIs (men's + women's)
-    "lpl": "https://cricsheet.org/downloads/lpl_json.zip",    # Lanka Premier League (franchise T20)
+    "lpl": "https://cricsheet.org/downloads/lpl_json.zip",    # Lanka Premier League
+    "wpl": "https://cricsheet.org/downloads/wpl_json.zip",    # Women's Premier League
+    "mlc": "https://cricsheet.org/downloads/mlc_json.zip",    # Major League Cricket (USA)
+    "hundred": "https://cricsheet.org/downloads/hnd_json.zip",# The Hundred (men's + women's)
+    # Marquee T20 franchise leagues — bucketed by folder in etl_cricsheet.py (FOLDER_FORMAT),
+    # so they feed the "quality" recency blend (last-15) for T20 tours like The Hundred.
+    "bbl": "https://cricsheet.org/downloads/bbl_json.zip",    # Big Bash League
+    "blast": "https://cricsheet.org/downloads/ntb_json.zip",  # Vitality Blast (English domestic T20)
+    "psl": "https://cricsheet.org/downloads/psl_json.zip",    # Pakistan Super League
+    "sa20": "https://cricsheet.org/downloads/sat_json.zip",   # SA20
+    "ilt20": "https://cricsheet.org/downloads/ilt_json.zip",  # International League T20 (UAE)
+    "cpl": "https://cricsheet.org/downloads/cpl_json.zip",    # Caribbean Premier League
 }
 
 def download_file(url: str, dest: str):

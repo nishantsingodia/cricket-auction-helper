@@ -42,7 +42,7 @@ import {
  * IPL Auction Valuation Engine — 2-Score Model
  *
  * Score 1: Recency-weighted base EFPPM
- *   A (40%): Last 10 quality T20 matches
+ *   A (40%): Last 15 quality T20 matches
  *   B (30%): IPL 2025
  *   C (10%): IPL 2024
  *   D (20%): All quality T20 last 2.5yr
@@ -120,8 +120,8 @@ function getWomensExpectedMatches(
 // ==================== SCORE 1: Recency-Weighted Base EFPPM ====================
 
 interface Score1Data {
-  last10Avg: number;
-  last10Count: number;
+  last15Avg: number;
+  last15Count: number;
   ipl2025Avg: number;
   ipl2025Count: number;
   ipl2024Avg: number;
@@ -130,7 +130,7 @@ interface Score1Data {
   t20_2_5yrCount: number;
 }
 
-// weights = [last10-quality, leagueSeason2025, leagueSeason2024, allQuality30mo].
+// weights = [last15-quality, leagueSeason2025, leagueSeason2024, allQuality30mo].
 // Default (IPL/MLC/women) = [0.40,0.30,0.10,0.20]. A bilateral series has NO league
 // season, so it passes [0.60,0,0,0.40] — recent-form-heavy, season buckets dropped.
 function computeScore1(
@@ -138,7 +138,7 @@ function computeScore1(
   weights: number[] = [0.40, 0.30, 0.10, 0.20]
 ): number {
   const sources: Array<{ weight: number; avg: number; hasData: boolean }> = [
-    { weight: weights[0], avg: data.last10Avg, hasData: data.last10Count > 0 },
+    { weight: weights[0], avg: data.last15Avg, hasData: data.last15Count > 0 },
     { weight: weights[1], avg: data.ipl2025Avg, hasData: data.ipl2025Count > 0 },
     { weight: weights[2], avg: data.ipl2024Avg, hasData: data.ipl2024Count > 0 },
     { weight: weights[3], avg: data.t20_2_5yrAvg, hasData: data.t20_2_5yrCount > 0 },
@@ -446,7 +446,7 @@ export function recalculateValuations(
   // venueClassification + per-team schedule overridden in the isLpl block below.
   const leagueFmt = isHundred ? "HUN" : isMLC ? "MLC" : isLpl ? "LPL" : "IPL";
   const qualityList = isHundredMen
-    ? "'HUN','T20','IPL','MLC'"
+    ? "'HUN','T20','IPL','MLC','BBL','BLAST','PSL','SA20','ILT20','CPL','LPL'"
     : isHundredWomen
     ? "'HUN','WPL','T20'"
     : isLpl
@@ -500,13 +500,13 @@ export function recalculateValuations(
     : `format IN (${qualityList}) OR (format = 'T20' AND opposition IN (${top8Placeholders}))`;
   // women's ODI binds no extra params; men's ODI + T20 both bind the top-8 nation list.
   const qualityParams = isWomensOdi ? [] : TOP_8_NATIONS;
-  const last10Window = isWomensOdi ? "-48 months" : isMensOdi ? "-36 months" : "-24 months";
+  const last15Window = isWomensOdi ? "-48 months" : isMensOdi ? "-36 months" : "-24 months";
   const allWindow = isWomensOdi || isMensOdi ? "-36 months" : "-30 months";
 
   // --- Batch Query: Score 1 sources ---
 
-  // A: Last 10 quality T20 matches per player
-  const last10Rows = sqlite
+  // A: Last 15 quality T20 matches per player
+  const last15Rows = sqlite
     .prepare(
       `SELECT player_id, AVG(fantasy_points) as avg_fp, COUNT(*) as cnt
        FROM (
@@ -515,9 +515,9 @@ export function recalculateValuations(
          FROM match_performances
          WHERE player_id IN (${placeholders})
            AND (${qualityClause})
-           AND match_date >= date('now', '${last10Window}')
+           AND match_date >= date('now', '${last15Window}')
        )
-       WHERE rn <= 10
+       WHERE rn <= 15
        GROUP BY player_id`
     )
     .all(...playerIds, ...qualityParams) as Array<{
@@ -525,7 +525,7 @@ export function recalculateValuations(
     avg_fp: number;
     cnt: number;
   }>;
-  const last10Map = new Map(last10Rows.map((r) => [r.player_id, r]));
+  const last15Map = new Map(last15Rows.map((r) => [r.player_id, r]));
 
   // B: IPL 2025 avg FP
   const ipl2025Rows = sqlite
@@ -717,14 +717,14 @@ export function recalculateValuations(
 
   for (const p of availPool) {
     // Score 1
-    const last10 = last10Map.get(p.player_id);
+    const last15 = last15Map.get(p.player_id);
     const ipl2025 = ipl2025Map.get(p.player_id);
     const ipl2024 = ipl2024Map.get(p.player_id);
     const t20All = t20AllMap.get(p.player_id);
 
     const rawScore1 = computeScore1({
-      last10Avg: last10?.avg_fp ?? 0,
-      last10Count: last10?.cnt ?? 0,
+      last15Avg: last15?.avg_fp ?? 0,
+      last15Count: last15?.cnt ?? 0,
       ipl2025Avg: ipl2025?.avg_fp ?? 0,
       ipl2025Count: ipl2025?.cnt ?? 0,
       ipl2024Avg: ipl2024?.avg_fp ?? 0,

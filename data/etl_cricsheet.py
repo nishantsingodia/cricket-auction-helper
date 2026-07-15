@@ -15,6 +15,14 @@ from datetime import datetime
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "db", "cricket-auction.db")
 RAW_DIR = os.path.join(os.path.dirname(__file__), "raw")
 
+# Franchise T20 leagues bucketed by their raw FOLDER (event.name varies across seasons —
+# esp. Vitality Blast: "Vitality Blast"/"NatWest t20 Blast"/older — so folder is the robust
+# signal). Existing folders (ipl/t20i/wpl/mlc/hundred/lpl/odi) keep using detect_format().
+FOLDER_FORMAT = {
+    "bbl": "BBL", "blast": "BLAST", "psl": "PSL",
+    "sa20": "SA20", "ilt20": "ILT20", "cpl": "CPL",
+}
+
 # ==================== DREAM11 T20 FANTASY POINTS ====================
 
 def compute_fantasy_points(perf: dict, role: str) -> float:
@@ -667,7 +675,7 @@ def process_all_matches(conn: sqlite3.Connection):
 
     # Gather all JSON files
     json_files = []
-    for folder in ["ipl", "t20i", "wpl", "mlc", "hundred", "odi", "lpl"]:
+    for folder in ["ipl", "t20i", "wpl", "mlc", "hundred", "odi", "lpl", "bbl", "blast", "psl", "sa20", "ilt20", "cpl"]:
         folder_path = os.path.join(RAW_DIR, folder)
         if os.path.isdir(folder_path):
             files = glob.glob(os.path.join(folder_path, "*.json"))
@@ -701,6 +709,9 @@ def process_all_matches(conn: sqlite3.Connection):
 
         try:
             match = parse_match(filepath)
+            _folder = os.path.basename(os.path.dirname(filepath))
+            if _folder in FOLDER_FORMAT:
+                match["format"] = FOLDER_FORMAT[_folder]  # franchise league: folder-driven format
         except Exception as e:
             errors += 1
             if errors <= 5:
