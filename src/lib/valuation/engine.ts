@@ -446,7 +446,10 @@ export function recalculateValuations(
   // venueClassification + per-team schedule overridden in the isLpl block below.
   const leagueFmt = isHundred ? "HUN" : isMLC ? "MLC" : isLpl ? "LPL" : "IPL";
   const qualityList = isHundredMen
-    ? "'HUN','T20','IPL','MLC','BBL','BLAST','PSL','SA20','ILT20','CPL','LPL'"
+    // Marquee franchise leagues only — Vitality Blast ('BLAST') is EXCLUDED: it's domestic
+    // county T20 (a tier below), and at 1,557 matches it's the largest bucket, so counting it
+    // would let county form dominate the last-15 window — the opposite of reducing single-tour bias.
+    ? "'HUN','T20','IPL','MLC','BBL','PSL','SA20','ILT20','CPL','LPL'"
     : isHundredWomen
     ? "'HUN','WPL','T20'"
     : isLpl
