@@ -211,6 +211,9 @@ export const auctions = sqliteTable("auctions", {
   playersPerFriend: integer("players_per_friend").notNull(),
   numCaptains: integer("num_captains").default(1),
   numViceCaptains: integer("num_vice_captains").default(1),
+  // House-rule lever (default OFF): movable C/VC armband (in-tournament changes),
+  // consumed by the valuation engine's C/VC premium (wider band, lower peak).
+  changesAllowed: integer("changes_allowed").default(0),
   status: text("status", {
     enum: ["SETUP", "LIVE", "COMPLETED"],
   }).default("SETUP"),

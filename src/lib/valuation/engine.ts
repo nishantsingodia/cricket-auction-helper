@@ -394,12 +394,12 @@ export function recalculateValuations(
   const auctionQuery = auctionId
     ? sqlite
         .prepare(
-          "SELECT purse_per_friend, num_friends, players_per_friend, num_captains, num_vice_captains FROM auctions WHERE id = ?"
+          "SELECT purse_per_friend, num_friends, players_per_friend, num_captains, num_vice_captains, changes_allowed FROM auctions WHERE id = ?"
         )
         .get(auctionId)
     : sqlite
         .prepare(
-          "SELECT purse_per_friend, num_friends, players_per_friend, num_captains, num_vice_captains FROM auctions WHERE tournament_id = ? LIMIT 1"
+          "SELECT purse_per_friend, num_friends, players_per_friend, num_captains, num_vice_captains, changes_allowed FROM auctions WHERE tournament_id = ? LIMIT 1"
         )
         .get(tournamentId);
   const auctionConfig = auctionQuery as {
@@ -408,6 +408,7 @@ export function recalculateValuations(
     players_per_friend: number;
     num_captains: number;
     num_vice_captains: number;
+    changes_allowed: number | null;
   } | undefined;
 
   if (!auctionConfig) return;
@@ -462,6 +463,10 @@ export function recalculateValuations(
   const playersPerFriend = auctionConfig.players_per_friend || 35;
   const numCaptains = auctionConfig.num_captains || 1;
   const numViceCaptains = auctionConfig.num_vice_captains || 1;
+  // House-rule lever (default OFF so every other auction is unaffected):
+  //  - changesAllowed: in-tournament C/VC armband moves permitted per friend → movable-armband
+  //    premium (wider band, lower peak) instead of the fixed C/VC tiers.
+  const changesAllowed = auctionConfig.changes_allowed || 0;
   const totalMoney = purse * numFriends;
   const topN = numFriends * playersPerFriend;
 
@@ -818,10 +823,34 @@ export function recalculateValuations(
   ].sort((a, b) => b.efppm - a.efppm);
 
   const premiumById = new Map<number, number>();
-  for (let i = 0; i < ranked.length && i < totalCSlots + totalVCSlots; i++) {
-    const r = ranked[i];
-    if (r.id < 0) continue; // sold player consumes the slot — no cascade
-    premiumById.set(r.id, i < totalCSlots ? 1.8 : 1.35);
+  if (changesAllowed > 0) {
+    // Movable-armband model (in-tournament C/VC changes allowed). Base points always
+    // accrue for every game a player features; only the ×2 / ×1.5 multiplier moves. So
+    // the captaincy multiplier is a FLEXIBLE resource spread across a friend's top players
+    // over the season rather than locked onto one. Two consequences:
+    //  (a) the premium BAND widens — beyond the (numFriends × (C+VC)) armband slots held
+    //      at any instant, ~60% of the mobility headroom (numFriends × changesAllowed)
+    //      brings extra distinct names into armband contention (capped below the naive
+    //      ceiling because friends chase the same elite players); and
+    //  (b) the PEAK drops to 1.6× — a captain counts ×2, but the top player wears the C
+    //      only ~60% of games → 1 + 0.6 × (2 − 1) ≈ 1.6. Decays linearly to 1.0× at the
+    //      band edge. A SOLD player still consumes its rank (no cascade).
+    const fixedBand = numFriends * (numCaptains + numViceCaptains);
+    const mobilityBand = numFriends * changesAllowed * 0.6;
+    const premiumBand = Math.round(fixedBand + mobilityBand);
+    const peakPremium = 1.6;
+    for (let i = 0; i < ranked.length && i < premiumBand; i++) {
+      const r = ranked[i];
+      if (r.id < 0) continue; // sold player consumes its rank — no cascade
+      premiumById.set(r.id, 1 + (peakPremium - 1) * ((premiumBand - i) / premiumBand));
+    }
+  } else {
+    // Fixed-armband model (default): hard C/VC tiers.
+    for (let i = 0; i < ranked.length && i < totalCSlots + totalVCSlots; i++) {
+      const r = ranked[i];
+      if (r.id < 0) continue; // sold player consumes the slot — no cascade
+      premiumById.set(r.id, i < totalCSlots ? 1.8 : 1.35);
+    }
   }
   for (const s of sorted) {
     const mult = premiumById.get(s.id);
