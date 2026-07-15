@@ -261,7 +261,7 @@ export const HUNDRED_WOMEN_2026: HundredTeam[] = [
       { name: "Smriti Mandhana", role: "BAT", overseas: true },
       { name: "Meg Lanning", role: "BAT", overseas: true, captain: true },
       { name: "Grace Scrivens", role: "AR", overseas: false },
-      { name: "Kathryn Bryce", role: "AR", overseas: true },
+      { name: "Kathryn Bryce", role: "AR", overseas: false }, // Scotland — Hundred local slot (not an overseas spot)
       { name: "Richa Ghosh", role: "WK", overseas: true },
       { name: "Paige Scholfield", role: "BAT", overseas: false },
       { name: "Mady Villiers", role: "AR", overseas: false },
@@ -323,7 +323,7 @@ export const HUNDRED_WOMEN_2026: HundredTeam[] = [
       { name: "Nadine de Klerk", role: "AR", overseas: true },
       { name: "Charlie Dean", role: "AR", overseas: false, captain: true },
       { name: "Marie Kelly", role: "BAT", overseas: false },
-      { name: "Sterre Kalis", role: "BAT", overseas: true },
+      { name: "Sterre Kalis", role: "BAT", overseas: false }, // Netherlands — Hundred local slot (not an overseas spot)
       { name: "Katie George", role: "BOWL", overseas: false, note: "Injury replacement for Mahika Gaur (foot)" },
       { name: "Lucy Higham", role: "BOWL", overseas: false },
       { name: "Charis Pavely", role: "AR", overseas: false },
@@ -376,7 +376,7 @@ export const HUNDRED_WOMEN_2026: HundredTeam[] = [
       { name: "Georgia Voll", role: "BAT", overseas: true },
       { name: "Ella McCaughan", role: "BAT", overseas: false },
       { name: "Sophie Devine", role: "AR", overseas: true, captain: true },
-      { name: "Sarah Bryce", role: "WK", overseas: true },
+      { name: "Sarah Bryce", role: "WK", overseas: false }, // Scotland — Hundred local slot (not an overseas spot)
       { name: "Freya Kemp", role: "AR", overseas: false },
       { name: "Heather Graham", role: "AR", overseas: true },
       { name: "Georgia Wareham", role: "AR", overseas: true },
