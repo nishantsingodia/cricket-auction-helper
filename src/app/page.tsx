@@ -100,6 +100,8 @@ export default function HomePage() {
   const [playersPerFriend, setPlayersPerFriend] = useState(15);
   const [numCaptains, setNumCaptains] = useState(1);
   const [numViceCaptains, setNumViceCaptains] = useState(1);
+  // Movable-armband house rule: in-tournament C/VC changes allowed per friend (0 = off).
+  const [changesAllowed, setChangesAllowed] = useState(0);
   const [friends, setFriends] = useState<FriendInput[]>([
     { name: "", shortName: "", isMe: true },
     { name: "", shortName: "", isMe: false },
@@ -173,6 +175,7 @@ export default function HomePage() {
           playersPerFriend,
           numCaptains,
           numViceCaptains,
+          changesAllowed,
           tournamentName: tournament,
           matchFormat:
             TOURNAMENTS.find((t) => t.id === tournament)?.format || "T20",
@@ -437,6 +440,23 @@ export default function HomePage() {
                         title="Vice-Captains"
                       />
                     </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">
+                      Changes
+                    </label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={10}
+                      value={changesAllowed}
+                      onChange={(e) =>
+                        setChangesAllowed(
+                          Math.max(0, parseInt(e.target.value) || 0)
+                        )
+                      }
+                      title="In-tournament C/VC armband changes allowed per friend (0 = fixed armband). >0 widens the C/VC price premium and lowers its peak, since the captaincy multiplier is shared across your top players over the season."
+                    />
                   </div>
                 </div>
               </CardContent>

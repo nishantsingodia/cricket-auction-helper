@@ -38,6 +38,9 @@ interface CreateAuctionBody {
   playersPerFriend: number;
   numCaptains?: number;
   numViceCaptains?: number;
+  // Movable-armband house rule: in-tournament C/VC changes allowed per friend
+  // (0 = off = fixed armband). Consumed by the valuation engine's C/VC premium.
+  changesAllowed?: number;
   tournamentName?: string;
   matchFormat?: string;
   friends: { name: string; shortName: string; isMe: boolean }[];
@@ -53,6 +56,7 @@ export async function POST(request: NextRequest) {
       playersPerFriend,
       numCaptains = 1,
       numViceCaptains = 1,
+      changesAllowed = 0,
       tournamentName = "IPL 2026",
       matchFormat = "T20",
       friends,
@@ -86,8 +90,8 @@ export async function POST(request: NextRequest) {
       // Create auction
       const result = sqlite
         .prepare(
-          `INSERT INTO auctions (name, tournament_name, match_format, num_friends, purse_per_friend, players_per_friend, num_captains, num_vice_captains, status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'SETUP')`
+          `INSERT INTO auctions (name, tournament_name, match_format, num_friends, purse_per_friend, players_per_friend, num_captains, num_vice_captains, changes_allowed, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'SETUP')`
         )
         .run(
           name,
@@ -97,7 +101,8 @@ export async function POST(request: NextRequest) {
           pursePerFriend,
           playersPerFriend,
           numCaptains,
-          numViceCaptains
+          numViceCaptains,
+          changesAllowed
         );
       auctionId = Number(result.lastInsertRowid);
 
