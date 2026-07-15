@@ -62,6 +62,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Auction not found" }, { status: 404 });
     }
 
+    // A brand-new auction has no tournament row yet. ONLY then do we seed its
+    // lineup from the most recent earlier auction of the same tour (see
+    // carryOverPreviousLineups). On any later fetch (adding teams, re-fetch of a
+    // live auction) tournament_id is already set, so carry-over is skipped and
+    // existing lineups / sold rows are never disturbed.
+    const isFirstBuild = auctionRow.tournament_id == null;
+
     // ---- Women's T20 World Cup 2026: build pool from announced squads in DB ----
     if (auctionRow.tournament_name === WOMENS_T20_WC_2026_NAME) {
       let tournamentId = auctionRow.tournament_id;
@@ -90,6 +97,13 @@ export async function POST(request: NextRequest) {
         tournamentId,
         teams,
       });
+
+      if (isFirstBuild)
+        carryOverPreviousLineups({
+          tournamentName: auctionRow.tournament_name,
+          tournamentId,
+          auctionId,
+        });
 
       // Auto-run valuation so prices are never left empty after a pool build.
       // Re-valuing only writes val_expected/efppm — never sold rows or purses —
@@ -128,6 +142,12 @@ export async function POST(request: NextRequest) {
         : undefined;
 
       const built = buildMLCPool(sqlite, { auctionId, tournamentId, teams });
+      if (isFirstBuild)
+        carryOverPreviousLineups({
+          tournamentName: auctionRow.tournament_name,
+          tournamentId,
+          auctionId,
+        });
       initializeValuations(tournamentId);
 
       return NextResponse.json({
@@ -162,6 +182,12 @@ export async function POST(request: NextRequest) {
         : undefined;
 
       const built = buildBilateralT20Pool(sqlite, { auctionId, tournamentId, teams });
+      if (isFirstBuild)
+        carryOverPreviousLineups({
+          tournamentName: auctionRow.tournament_name,
+          tournamentId,
+          auctionId,
+        });
       initializeValuations(tournamentId);
 
       return NextResponse.json({
@@ -196,6 +222,12 @@ export async function POST(request: NextRequest) {
         : undefined;
 
       const built = buildWomensOdiPool(sqlite, { auctionId, tournamentId, teams });
+      if (isFirstBuild)
+        carryOverPreviousLineups({
+          tournamentName: auctionRow.tournament_name,
+          tournamentId,
+          auctionId,
+        });
       initializeValuations(tournamentId);
 
       return NextResponse.json({
@@ -230,6 +262,12 @@ export async function POST(request: NextRequest) {
         : undefined;
 
       const built = buildMensOdiPool(sqlite, { auctionId, tournamentId, teams });
+      if (isFirstBuild)
+        carryOverPreviousLineups({
+          tournamentName: auctionRow.tournament_name,
+          tournamentId,
+          auctionId,
+        });
       initializeValuations(tournamentId);
 
       return NextResponse.json({
@@ -274,6 +312,12 @@ export async function POST(request: NextRequest) {
         gender: isWomen ? "female" : "male",
         teams,
       });
+      if (isFirstBuild)
+        carryOverPreviousLineups({
+          tournamentName: auctionRow.tournament_name,
+          tournamentId,
+          auctionId,
+        });
       initializeValuations(tournamentId);
 
       return NextResponse.json({
@@ -308,6 +352,12 @@ export async function POST(request: NextRequest) {
         : undefined;
 
       const built = buildLPLPool(sqlite, { auctionId, tournamentId, teams });
+      if (isFirstBuild)
+        carryOverPreviousLineups({
+          tournamentName: auctionRow.tournament_name,
+          tournamentId,
+          auctionId,
+        });
       initializeValuations(tournamentId);
 
       return NextResponse.json({
@@ -422,6 +472,13 @@ export async function POST(request: NextRequest) {
 
     transaction(teams);
 
+    if (isFirstBuild)
+      carryOverPreviousLineups({
+        tournamentName: auctionRow.tournament_name,
+        tournamentId,
+        auctionId,
+      });
+
     // Auto-run valuation so prices are never left empty after a pool build.
     initializeValuations(tournamentId);
 
@@ -474,4 +531,69 @@ function findPlayerId(
   }
 
   return null;
+}
+
+/**
+ * Replicate the user's lineup edits into repeat auctions of the SAME tour.
+ *
+ * The user tweaks each auction's Playing-XI order (`squad_number`) by feel, and
+ * wants those tweaks to carry forward when they spin up another auction of the
+ * same tournament — instead of resetting to the squad-file default order.
+ *
+ * Copies ONLY `squad_number`, and only for players present in BOTH pools. It
+ * never touches sold status / price / purses (those are per-auction). Players
+ * new to this edition (swaps / additions) keep their squad-file default slot.
+ * Callers gate this to a FRESH pool build (first fetch for the auction) so it
+ * can never clobber a live or hand-edited auction.
+ *
+ * "Previous" = the most recent EARLIER auction of the same tournament_name that
+ * has a pool built, so each new auction inherits the latest accumulated edits.
+ */
+function carryOverPreviousLineups(opts: {
+  tournamentName: string;
+  tournamentId: number;
+  auctionId: number;
+}): { sourceAuctionId: number | null; updated: number } {
+  const { tournamentName, tournamentId, auctionId } = opts;
+
+  const prev = sqlite
+    .prepare(
+      `SELECT a.id AS auction_id, a.tournament_id AS tournament_id
+         FROM auctions a
+        WHERE a.tournament_name = ?
+          AND a.id <> ?
+          AND a.tournament_id IS NOT NULL
+          AND EXISTS (
+            SELECT 1 FROM auction_pool p WHERE p.tournament_id = a.tournament_id
+          )
+        ORDER BY a.id DESC
+        LIMIT 1`
+    )
+    .get(tournamentName, auctionId) as
+    | { auction_id: number; tournament_id: number }
+    | undefined;
+
+  if (!prev) return { sourceAuctionId: null, updated: 0 };
+
+  const res = sqlite
+    .prepare(
+      `UPDATE auction_pool
+          SET squad_number = (
+            SELECT prev.squad_number FROM auction_pool prev
+             WHERE prev.tournament_id = ?
+               AND prev.player_id = auction_pool.player_id
+          )
+        WHERE tournament_id = ?
+          AND EXISTS (
+            SELECT 1 FROM auction_pool prev
+             WHERE prev.tournament_id = ?
+               AND prev.player_id = auction_pool.player_id
+          )`
+    )
+    .run(prev.tournament_id, tournamentId, prev.tournament_id);
+
+  console.log(
+    `[pool/fetch] Carried over ${res.changes} lineup slot(s) from auction ${prev.auction_id} (${tournamentName})`
+  );
+  return { sourceAuctionId: prev.auction_id, updated: res.changes };
 }

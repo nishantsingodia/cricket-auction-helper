@@ -124,10 +124,16 @@ accumulation).
 3. **(Re-)compute prices** → `POST /api/auction/start {tournamentId}`. Only needed
    to RE-value after a manual change (e.g. lineup edits, C/VC tweaks). Not required
    right after a pool fetch anymore.
-4. **Carry over lineups** from a previous auction of the same tournament, if the
-   user customized XIs: copy `squad_number` per `player_id`
-   (`UPDATE auction_pool ... SET squad_number = (SELECT ... FROM auction_pool a7 WHERE a7.auction_id=<prev> AND a7.player_id=...)`),
-   then re-value.
+4. **Lineups carry over automatically.** On the FIRST pool fetch of a brand-new
+   auction (`auctions.tournament_id` still null), `/api/pool/fetch` seeds
+   `squad_number` from the **most recent earlier auction of the same
+   `tournament_name`** (`carryOverPreviousLineups`) — so the XI edits you made by
+   feel in one auction replicate into every repeat auction of that tour, instead
+   of resetting to the squad-file order. It copies ONLY `squad_number`, only for
+   players in both pools; sold status/price/purses are untouched; players new to
+   this edition (swaps/additions) keep their default slot. Gated to the first
+   build, so re-fetches / add-teams / live auctions are never disturbed. Re-edit
+   the board if you want a different lineup for this one.
 5. **Verify "everything in line":**
    - Config + participant purses match intent.
    - Pool count + team count (e.g. 180 / 12 teams).
