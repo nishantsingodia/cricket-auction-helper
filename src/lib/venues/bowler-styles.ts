@@ -1,15 +1,38 @@
-// Bowler spin/pace classification — keyed by stable cricsheet_id (no name-collision risk).
-// Used to compute the venue "wickets by bowler type" split from actual bowl_wickets in
-// match_performances. This is a FACTUAL attribute per bowler (not a fabricated stat), but we
-// hold no bowler-style data in the pipeline (cricsheet carries none; players.bowl_style is
-// empty), so this map is hand-maintained. Seeded from the top wicket-takers at the Hundred +
-// LPL grounds so coverage is highest exactly where it's shown; the venue view reports the
-// share of wickets that ARE classified so a partial map stays honest. Extend freely.
+// Bowler spin/pace classification — the FALLBACK/override layer for the venue "wickets by bowler
+// type" split. The PRIMARY source is now players.bowl_style in the DB, backfilled from Wikipedia
+// infoboxes via data/backfill_bowl_styles.py (cricsheet register → Wikidata P2697 → enwiki infobox,
+// an exact cricinfo-id join). The venue route reads players.bowl_style first and falls back to this
+// hand map (keyed by stable cricsheet_id) only where the column is still empty, or as a curated
+// override. Kept because it (a) covers players before/without a Wikipedia article and (b) lets us
+// correct a wrong infobox by hand. The venue view reports coverage so a partial map stays honest.
 //
 // "spin" = finger/wrist spin (off, leg, SLA, left-arm wrist). "pace" = any seam/fast/medium.
-// Only high-confidence classifications are included — accuracy matters more than coverage.
 
 export type BowlerStyle = "spin" | "pace";
+
+// Classify a raw bowling-style string (players.bowl_style / Wikipedia infobox text) → spin | pace.
+// Mirrors the Python classifier in data/backfill_bowl_styles.py: strip wiki markup, and when a
+// player bowls both, take the FIRST-mentioned discipline (usually their primary).
+export function classifyBowlStyle(raw: string | null | undefined): BowlerStyle | null {
+  if (!raw) return null;
+  const t = raw.replace(/[[\]{}']/g, " ").replace(/<[^>]+>/g, " ").toLowerCase();
+  const SPIN = ["break", "spin", "orthodox", "googly", "chinaman", "slow left", "legspin", "tweak"];
+  const PACE = ["fast", "medium", "seam", "swing", "pace", "quick"];
+  const firstIdx = (keys: string[]) => {
+    let min = -1;
+    for (const k of keys) {
+      const i = t.indexOf(k);
+      if (i !== -1 && (min === -1 || i < min)) min = i;
+    }
+    return min;
+  };
+  const s = firstIdx(SPIN);
+  const p = firstIdx(PACE);
+  if (s === -1 && p === -1) return null;
+  if (s === -1) return "pace";
+  if (p === -1) return "spin";
+  return s <= p ? "spin" : "pace";
+}
 
 export const BOWLER_STYLE: Record<string, BowlerStyle> = {
   // ── Spin ──────────────────────────────────────────────────────────────────

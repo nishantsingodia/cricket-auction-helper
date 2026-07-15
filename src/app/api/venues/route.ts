@@ -6,7 +6,7 @@ import {
   VENUE_TYPE_LABEL,
   type VenueType,
 } from "@/lib/venues/tour-venues";
-import { BOWLER_STYLE } from "@/lib/venues/bowler-styles";
+import { BOWLER_STYLE, classifyBowlStyle } from "@/lib/venues/bowler-styles";
 
 // GET /api/venues?tour=<tournament_name>
 // Returns per-ground behavior for a tour's venues: the authoritative bat/bowl class (same one
@@ -132,6 +132,7 @@ export async function GET(request: NextRequest) {
       const wktRows = sqlite
         .prepare(
           `SELECT p.cricsheet_id AS cid,
+                  p.bowl_style AS bowl_style,
                   SUM(mp.bowl_wickets) AS w,
                   SUM(COALESCE(mp.bowl_runs,0)) AS r,
                   SUM(COALESCE(mp.bowl_balls,0)) AS b
@@ -146,6 +147,7 @@ export async function GET(request: NextRequest) {
         )
         .all(...v.variants, ...ctx.venueFormats, ctx.gender, SINCE) as Array<{
         cid: string | null;
+        bowl_style: string | null;
         w: number;
         r: number;
         b: number;
@@ -154,7 +156,8 @@ export async function GET(request: NextRequest) {
       let spinRuns = 0, spinBalls = 0, paceRuns = 0, paceBalls = 0;
       for (const row of wktRows) {
         totalWkts += row.w;
-        const style = row.cid ? BOWLER_STYLE[row.cid] : undefined;
+        // PRIMARY: players.bowl_style (Wikipedia-backfilled); FALLBACK: hand-map by cricsheet_id.
+        const style = classifyBowlStyle(row.bowl_style) ?? (row.cid ? BOWLER_STYLE[row.cid] : undefined);
         if (style === "spin") { spinWkts += row.w; spinRuns += row.r; spinBalls += row.b; }
         else if (style === "pace") { paceWkts += row.w; paceRuns += row.r; paceBalls += row.b; }
       }
