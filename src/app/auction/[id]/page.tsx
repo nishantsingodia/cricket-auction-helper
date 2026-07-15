@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PlayerDetailModal } from "@/components/player/PlayerDetailModal";
+import { VenueDetailModal } from "@/components/venue/VenueDetailModal";
 import { SellDialog } from "@/components/auction/SellDialog";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
@@ -101,6 +102,32 @@ interface AuctionData {
     { color: string | null; priority: number; notes: string | null }
   >;
   teamPitchBreakdown: Record<string, { F: number; B: number; T: number }>;
+  teamVenueSummary: Record<string, TeamVenueSummary> | null;
+  hasVenueView: boolean;
+}
+
+type VenueClass = "bat_road" | "balanced" | "bowl_friendly";
+interface TeamVenueSummary {
+  neutral: boolean;
+  home: string | null;
+  homeGames: number;
+  homeType: VenueClass | null;
+  batGames: number;
+  balancedGames: number;
+  bowlGames: number;
+}
+
+// bat/bowl class → short pill label + color (bowl-friendly=green, balanced=amber, bat=red).
+const VENUE_CLASS_META: Record<VenueClass, { short: string; cls: string }> = {
+  bat_road: { short: "Bat-friendly", cls: "bg-red-600/80" },
+  balanced: { short: "Balanced", cls: "bg-amber-600/80" },
+  bowl_friendly: { short: "Bowl-friendly", cls: "bg-emerald-600/80" },
+};
+
+// "Lord's, London" -> "Lord's"; "The Rose Bowl, Southampton" -> "The Rose Bowl".
+function shortVenue(canonical: string | null): string {
+  if (!canonical) return "—";
+  return canonical.split(",")[0].trim();
 }
 
 // IPL Best-of-12: top 12 are "Playing XII", rest are bench
@@ -196,6 +223,7 @@ export default function AuctionPage() {
 
   // Modal states
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
+  const [selectedVenue, setSelectedVenue] = useState<string | null>(null);
   const [sellPlayer, setSellPlayer] = useState<PoolPlayer | null>(null);
   const [showCalc, setShowCalc] = useState(false);
   const [showChat, setShowChat] = useState(false);
@@ -315,6 +343,7 @@ export default function AuctionPage() {
   const pool = data?.pool ?? [];
   const watchlist = data?.watchlist ?? {};
   const teamPitchBreakdown = data?.teamPitchBreakdown ?? {};
+  const teamVenueSummary = data?.teamVenueSummary ?? null;
   const myParticipant = participants.find((p) => p.is_me);
   const myId = myParticipant?.id;
 
@@ -579,6 +608,8 @@ export default function AuctionPage() {
               getAdjustedPrice={getAdjustedPrice}
               marketFactor={marketFactor}
               teamPitchBreakdown={teamPitchBreakdown}
+              teamVenueSummary={teamVenueSummary}
+              onVenueClick={setSelectedVenue}
             />
           ) : (
             <Masterlist
@@ -629,6 +660,15 @@ export default function AuctionPage() {
           />
         );
       })()}
+
+      {/* Venue Detail Modal */}
+      {selectedVenue !== null && auction && (
+        <VenueDetailModal
+          tour={auction.tournament_name}
+          initialVenue={selectedVenue === "__ALL__" ? null : selectedVenue}
+          onClose={() => setSelectedVenue(null)}
+        />
+      )}
 
       {/* Quick Sell Chat */}
       {showChat && (
@@ -687,6 +727,8 @@ function SquadGrid({
   getAdjustedPrice,
   marketFactor,
   teamPitchBreakdown,
+  teamVenueSummary,
+  onVenueClick,
 }: {
   sortedTeams: [string, PoolPlayer[]][];
   watchlist: Record<number, unknown>;
@@ -705,6 +747,8 @@ function SquadGrid({
   getAdjustedPrice: (p: PoolPlayer) => number;
   marketFactor: number;
   teamPitchBreakdown: Record<string, { F: number; B: number; T: number }>;
+  teamVenueSummary: Record<string, TeamVenueSummary> | null;
+  onVenueClick: (canonical: string) => void;
 }) {
   return (
     <div className="overflow-x-auto p-4">
@@ -728,6 +772,8 @@ function SquadGrid({
             getAdjustedPrice={getAdjustedPrice}
             marketFactor={marketFactor}
             pitchBreakdown={teamPitchBreakdown[team]}
+            venueSummary={teamVenueSummary?.[team]}
+            onVenueClick={onVenueClick}
           />
         ))}
       </div>
@@ -754,6 +800,8 @@ function TeamColumn({
   getAdjustedPrice,
   marketFactor,
   pitchBreakdown,
+  venueSummary,
+  onVenueClick,
 }: {
   team: string;
   players: PoolPlayer[];
@@ -771,6 +819,8 @@ function TeamColumn({
   getAdjustedPrice: (p: PoolPlayer) => number;
   marketFactor: number;
   pitchBreakdown?: { F: number; B: number; T: number };
+  venueSummary?: TeamVenueSummary;
+  onVenueClick?: (canonical: string) => void;
 }) {
   const [players, setPlayers] = useState(initialPlayers);
 
@@ -820,20 +870,50 @@ function TeamColumn({
         className="rounded-t-lg px-3 py-2 text-white font-bold text-center text-sm"
         style={{ backgroundColor: IPL_COLORS[team] || "#555" }}
       >
-        {team}
-        {pitchBreakdown && (pitchBreakdown.F + pitchBreakdown.B + pitchBreakdown.T) > 0 ? (
-          <span className="ml-1 font-normal text-xs opacity-80" title="Flat / Balanced / Tricky pitches">
-            ({pitchBreakdown.F}F+{pitchBreakdown.B}B+{pitchBreakdown.T}T)
+        <div>
+          {team}
+          {!venueSummary && pitchBreakdown && (pitchBreakdown.F + pitchBreakdown.B + pitchBreakdown.T) > 0 ? (
+            <span className="ml-1 font-normal text-xs opacity-80" title="Flat / Balanced / Tricky pitches">
+              ({pitchBreakdown.F}F+{pitchBreakdown.B}B+{pitchBreakdown.T}T)
+            </span>
+          ) : (
+            <span className="ml-1 font-normal text-xs opacity-80">
+              ({players.length})
+            </span>
+          )}
+          <span className={`ml-1 text-[10px] font-normal ${overseasInXII > 4 ? "bg-red-600 px-1 rounded" : "opacity-80"}`}
+            title={`${overseasInXII}/4 overseas in Playing XII`}>
+            ✈{overseasInXII}/4
           </span>
-        ) : (
-          <span className="ml-1 font-normal text-xs opacity-80">
-            ({players.length})
-          </span>
-        )}
-        <span className={`ml-1 text-[10px] font-normal ${overseasInXII > 4 ? "bg-red-600 px-1 rounded" : "opacity-80"}`}
-          title={`${overseasInXII}/4 overseas in Playing XII`}>
-          ✈{overseasInXII}/4
-        </span>
+        </div>
+        {venueSummary && (() => {
+          const dominant: VenueClass =
+            venueSummary.homeType ??
+            (venueSummary.bowlGames >= venueSummary.batGames && venueSummary.bowlGames >= venueSummary.balancedGames
+              ? "bowl_friendly"
+              : venueSummary.batGames >= venueSummary.balancedGames
+              ? "bat_road"
+              : "balanced");
+          const meta = VENUE_CLASS_META[dominant];
+          return (
+            <button
+              type="button"
+              onClick={() => onVenueClick?.(venueSummary.home ?? "__ALL__")}
+              title="Venue conditions — click for the full breakdown (bat/bowl + curated spin/pace read)"
+              className="mt-1 w-full flex items-center justify-center gap-1 rounded bg-black/25 hover:bg-black/40 transition-colors px-1.5 py-0.5 text-[10px] font-normal"
+            >
+              <span aria-hidden>🏟</span>
+              {venueSummary.neutral ? (
+                <span className="truncate">Neutral · {venueSummary.bowlGames + venueSummary.balancedGames + venueSummary.batGames}g</span>
+              ) : (
+                <span className="truncate">
+                  {shortVenue(venueSummary.home)} · {venueSummary.homeGames}g home
+                </span>
+              )}
+              <span className={`shrink-0 rounded px-1 leading-tight ${meta.cls}`}>{meta.short}</span>
+            </button>
+          );
+        })()}
       </div>
 
       {/* Players — sortable */}

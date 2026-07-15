@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sqlite } from "@/db";
+import { getTourVenueContext, buildTeamVenueSummaries } from "@/lib/venues/tour-venues";
 
 export async function GET(
   _request: NextRequest,
@@ -150,12 +151,21 @@ export async function GET(
       }
     }
 
+    // Per-team venue summary (home ground + games + bat/bowl character) — Hundred & LPL for now.
+    // Reads the SAME schedules + authoritative venue classes the EFPPM engine uses (#transparency).
+    // IPL keeps its inline teamPitchBreakdown above; other tours fall through to null.
+    const tourName = (auction as { tournament_name?: string }).tournament_name ?? "";
+    const venueCtx = getTourVenueContext(tourName);
+    const teamVenueSummary = venueCtx ? buildTeamVenueSummaries(venueCtx) : null;
+
     return NextResponse.json({
       auction,
       participants,
       pool,
       watchlist: watchlistMap,
       teamPitchBreakdown,
+      teamVenueSummary,
+      hasVenueView: !!venueCtx,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
