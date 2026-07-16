@@ -57,6 +57,34 @@ def http_get(url, params=None, headers=None, retries=5):
     return None
 
 
+def wikidata_query(sparql, retries=5):
+    """POST a SPARQL query to WDQS (POST has no URL-length limit → big VALUES batches are safe;
+    GET 414'd at ~1000 ids). Returns response text or None."""
+    body = urllib.parse.urlencode({"query": sparql, "format": "json"}).encode()
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(WD_SPARQL, data=body, headers={
+                "User-Agent": UA, "Accept": "application/sparql-results+json",
+                "Content-Type": "application/x-www-form-urlencoded"})
+            with urllib.request.urlopen(req, timeout=90) as r:
+                return r.read().decode("utf-8", "replace")
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt < retries - 1:
+                print(f"  … WD 429, waiting 65s (attempt {attempt+1})")
+                time.sleep(65)
+                continue
+            if attempt == retries - 1:
+                print(f"  ! WD POST failed ({e})")
+                return None
+            time.sleep(2 * (attempt + 1))
+        except Exception as e:
+            if attempt == retries - 1:
+                print(f"  ! WD POST failed ({e})")
+                return None
+            time.sleep(2 * (attempt + 1))
+    return None
+
+
 def classify(raw: str):
     """Raw infobox bowling text -> 'spin' | 'pace' | None. Strips wiki markup, picks the
     FIRST-mentioned discipline when a player bowls both."""
@@ -103,7 +131,7 @@ def wikidata_titles(cricinfo_ids):
     SUCCESSFUL batch, so genuine misses can be cached but transient failures retry next run."""
     out, ok = {}, set()
     ids = list(cricinfo_ids)
-    CHUNK = 1000
+    CHUNK = 500
     for i in range(0, len(ids), CHUNK):
         chunk = ids[i:i + CHUNK]
         values = " ".join(f'"{c}"' for c in chunk)
@@ -112,8 +140,7 @@ def wikidata_titles(cricinfo_ids):
             ?item wdt:P2697 ?cid .
             ?article schema:about ?item ; schema:isPartOf <https://en.wikipedia.org/> .
         }}"""
-        res = http_get(WD_SPARQL, {"query": q, "format": "json"},
-                       headers={"Accept": "application/sparql-results+json"})
+        res = wikidata_query(q)  # POST (GET 414'd on big VALUES batches)
         if res:
             try:
                 for b in json.loads(res)["results"]["bindings"]:
