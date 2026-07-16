@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sqlite } from "@/db";
 import { getTourVenueContext, buildTeamVenueSummaries } from "@/lib/venues/tour-venues";
+import { getTourStatScope, computeTourConsensus } from "@/lib/venues/consensus";
 
 export async function GET(
   _request: NextRequest,
@@ -158,6 +159,10 @@ export async function GET(
     const venueCtx = getTourVenueContext(tourName);
     const teamVenueSummary = venueCtx ? buildTeamVenueSummaries(venueCtx) : null;
 
+    // Tour-level bat/bowl "general stats" for the header chip (works for all tours, venue or not).
+    const statScope = getTourStatScope(tourName);
+    const tourConsensus = statScope ? computeTourConsensus(statScope) : null;
+
     return NextResponse.json({
       auction,
       participants,
@@ -166,6 +171,7 @@ export async function GET(
       teamPitchBreakdown,
       teamVenueSummary,
       hasVenueView: !!venueCtx,
+      tourConsensus,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

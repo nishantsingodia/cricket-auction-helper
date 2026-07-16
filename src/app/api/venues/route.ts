@@ -7,6 +7,7 @@ import {
   type VenueType,
 } from "@/lib/venues/tour-venues";
 import { BOWLER_STYLE, classifyBowlStyle } from "@/lib/venues/bowler-styles";
+import { getTourStatScope, computeTourConsensus } from "@/lib/venues/consensus";
 
 // GET /api/venues?tour=<tournament_name>
 // Returns per-ground behavior for a tour's venues: the authoritative bat/bowl class (same one
@@ -217,50 +218,10 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // Tour-level bat vs bowl consensus — across ALL the tour's grounds, does history reward batting
-    // or bowling, and by how much? Same batter-FP vs bowler-FP read the per-venue class uses, pooled.
-    const allVariants = ctx.venues.flatMap((v) => v.variants);
-    const avp = allVariants.map(() => "?").join(",");
-    const tourAgg = sqlite
-      .prepare(
-        `SELECT
-           AVG(CASE WHEN p.role IN ('BAT','WK') THEN mp.fantasy_points END) AS bat_fp,
-           AVG(CASE WHEN p.role = 'BOWL' THEN mp.fantasy_points END) AS bowl_fp,
-           COUNT(DISTINCT mp.match_id) AS matches
-         FROM match_performances mp
-         JOIN players p ON mp.player_id = p.id
-         WHERE mp.venue_name IN (${avp})
-           AND mp.format IN (${fmtPlaceholders})
-           AND p.gender = ?
-           AND mp.match_date >= ?`
-      )
-      .get(...allVariants, ...ctx.venueFormats, ctx.gender, SINCE) as {
-      bat_fp: number | null;
-      bowl_fp: number | null;
-      matches: number;
-    };
-    const tBat = tourAgg.bat_fp;
-    const tBowl = tourAgg.bowl_fp;
-    let consensus: {
-      lean: "batting" | "bowling" | "balanced";
-      marginPct: number;
-      batFp: number | null;
-      bowlFp: number | null;
-      matches: number;
-    } = { lean: "balanced", marginPct: 0, batFp: null, bowlFp: null, matches: tourAgg.matches };
-    if (tBat && tBowl) {
-      const higher = Math.max(tBat, tBowl);
-      const lower = Math.min(tBat, tBowl);
-      const marginPct = Math.round((higher / lower - 1) * 100);
-      const lean = marginPct < 3 ? "balanced" : tBowl > tBat ? "bowling" : "batting";
-      consensus = {
-        lean,
-        marginPct,
-        batFp: Math.round(tBat * 10) / 10,
-        bowlFp: Math.round(tBowl * 10) / 10,
-        matches: tourAgg.matches,
-      };
-    }
+    // Tour-level bat vs bowl consensus — the SAME number shown on the auction header chip
+    // (shared helper, scoped by the tour's format+gender), so the two never disagree.
+    const scope = getTourStatScope(ctx.tour) ?? { formats: ctx.venueFormats, gender: ctx.gender };
+    const consensus = computeTourConsensus(scope);
 
     return NextResponse.json({
       tour: ctx.tour,

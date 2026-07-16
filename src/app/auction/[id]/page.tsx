@@ -104,6 +104,17 @@ interface AuctionData {
   teamPitchBreakdown: Record<string, { F: number; B: number; T: number }>;
   teamVenueSummary: Record<string, TeamVenueSummary> | null;
   hasVenueView: boolean;
+  tourConsensus: TourConsensus | null;
+}
+
+interface TourConsensus {
+  lean: "batting" | "bowling" | "balanced";
+  marginPct: number;
+  batFp: number | null;
+  bowlFp: number | null;
+  matches: number;
+  formats: string[];
+  gender: "male" | "female";
 }
 
 type VenueClass = "bat_road" | "balanced" | "bowl_friendly";
@@ -344,6 +355,8 @@ export default function AuctionPage() {
   const watchlist = data?.watchlist ?? {};
   const teamPitchBreakdown = data?.teamPitchBreakdown ?? {};
   const teamVenueSummary = data?.teamVenueSummary ?? null;
+  const tourConsensus = data?.tourConsensus ?? null;
+  const hasVenueView = data?.hasVenueView ?? false;
   const myParticipant = participants.find((p) => p.is_me);
   const myId = myParticipant?.id;
 
@@ -434,6 +447,30 @@ export default function AuctionPage() {
           </a>
           <h1 className="font-bold text-lg">{auction.name}</h1>
           <Badge variant="outline">{auction.tournament_name}</Badge>
+
+          {/* Tour bat/bowl "general stats" chip — always visible; click for the venue breakdown */}
+          {tourConsensus && tourConsensus.batFp != null && (() => {
+            const { lean, marginPct, batFp, bowlFp, matches } = tourConsensus;
+            const meta =
+              lean === "bowling"
+                ? { cls: "border-emerald-500/50 text-emerald-500", txt: `Bowlers +${marginPct}%`, emoji: "🎳" }
+                : lean === "batting"
+                ? { cls: "border-red-500/50 text-red-500", txt: `Batters +${marginPct}%`, emoji: "🏏" }
+                : { cls: "border-amber-500/50 text-amber-500", txt: "Balanced", emoji: "⚖️" };
+            const clickable = hasVenueView;
+            return (
+              <button
+                type="button"
+                disabled={!clickable}
+                onClick={() => clickable && setSelectedVenue("__ALL__")}
+                title={`Tour lean (${tourConsensus.formats.join("+")} history, ${matches} matches): bat ${batFp} vs bowl ${bowlFp} avg fantasy pts.${clickable ? " Click for the venue breakdown." : ""}`}
+                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${meta.cls} ${clickable ? "hover:bg-foreground/5 cursor-pointer" : "cursor-default"}`}
+              >
+                <span aria-hidden>{meta.emoji}</span>
+                <span className="opacity-70">Tour lean:</span> {meta.txt}
+              </button>
+            );
+          })()}
 
           <div className="flex-1" />
 
