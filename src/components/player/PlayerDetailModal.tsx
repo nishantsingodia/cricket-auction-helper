@@ -61,10 +61,17 @@ interface SeasonStat {
   fours: number;
   wickets: number;
   bowlEcon: number;
+  oversPerMatch?: number;
   avgFantasyPoints: number;
   totalFantasyPoints: number;
   bestMatch?: number;
   worstMatch?: number;
+}
+
+// Balls -> cricket overs notation for a single match (22 balls -> "3.4" = 3 overs, 4 balls).
+function ballsToOvers(balls?: number | null): string {
+  if (!balls || balls <= 0) return "—";
+  return `${Math.floor(balls / 6)}.${balls % 6}`;
 }
 
 interface PlayerDetail {
@@ -538,6 +545,7 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
                                 <MiniStat label="6s" value={s.sixes} />
                                 <MiniStat label="Wkts" value={s.wickets} />
                                 <MiniStat label="Econ" value={s.bowlEcon ? s.bowlEcon.toFixed(1) : "—"} />
+                                <MiniStat label="Ov/M" value={s.oversPerMatch != null ? s.oversPerMatch.toFixed(1) : "—"} />
                               </div>
                             </div>
                           ))}
@@ -557,6 +565,7 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
                               <TableHead className="text-right">6s</TableHead>
                               <TableHead className="text-right">Wkts</TableHead>
                               <TableHead className="text-right">Econ</TableHead>
+                              <TableHead className="text-right">Ov/M</TableHead>
                               <TableHead className="text-right font-bold text-amber-400">EFPPM</TableHead>
                               <TableHead className="text-right">Best</TableHead>
                             </TableRow>
@@ -579,6 +588,7 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
                                 <TableCell className="text-right">{s.sixes}</TableCell>
                                 <TableCell className="text-right">{s.wickets}</TableCell>
                                 <TableCell className="text-right">{s.bowlEcon ? s.bowlEcon.toFixed(1) : "—"}</TableCell>
+                                <TableCell className="text-right">{s.oversPerMatch != null ? s.oversPerMatch.toFixed(1) : "—"}</TableCell>
                                 <TableCell className="text-right font-bold text-amber-400">{s.avgFantasyPoints?.toFixed(1)}</TableCell>
                                 <TableCell className="text-right text-green-400">{s.bestMatch?.toFixed(0)}</TableCell>
                               </TableRow>
@@ -672,6 +682,9 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
                                 value={`${m.batRuns ?? "—"}${m.batBalls != null ? ` (${m.batBalls})` : ""}`}
                               />
                               <MiniStat label="4s/6s" value={`${m.bat4s ?? 0}/${m.bat6s ?? 0}`} />
+                              {m.bowlBalls != null && m.bowlBalls > 0 && (
+                                <MiniStat label="Ov" value={ballsToOvers(m.bowlBalls)} />
+                              )}
                               <MiniStat label="Wkts" value={m.bowlWickets ?? 0} />
                               <MiniStat label="Ct" value={m.catches ?? 0} />
                             </div>
@@ -691,6 +704,7 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
                             <TableHead className="text-right">Balls</TableHead>
                             <TableHead className="text-right">4s</TableHead>
                             <TableHead className="text-right">6s</TableHead>
+                            <TableHead className="text-right">Ov</TableHead>
                             <TableHead className="text-right">Wkts</TableHead>
                             <TableHead className="text-right">Catches</TableHead>
                             <TableHead className="text-right font-bold text-amber-400">
@@ -730,6 +744,9 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
                         </TableCell>
                         <TableCell className="text-right">
                           {m.bat6s ?? 0}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {ballsToOvers(m.bowlBalls)}
                         </TableCell>
                         <TableCell className="text-right">
                           {m.bowlWickets ?? 0}

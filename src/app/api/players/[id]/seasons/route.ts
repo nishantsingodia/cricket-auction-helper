@@ -51,6 +51,7 @@ export async function GET(
             THEN CAST(SUM(bowl_runs) AS REAL) / (CAST(SUM(bowl_balls) AS REAL) / 6)
           END, 2
         ) as bowl_econ,
+        ROUND(CAST(SUM(bowl_balls) AS REAL) / 6.0 / COUNT(*), 1) as overs_per_match,
         ROUND(AVG(fantasy_points), 1) as avg_fantasy_points,
         SUM(fantasy_points) as total_fantasy_points,
         MAX(fantasy_points) as best_match,
@@ -100,6 +101,7 @@ export async function GET(
       fours: s.fours,
       wickets: s.wickets,
       bowlEcon: s.bowl_econ,
+      oversPerMatch: s.overs_per_match,
       avgFantasyPoints: s.avg_fantasy_points,
       totalFantasyPoints: s.total_fantasy_points,
       bestMatch: s.best_match,
