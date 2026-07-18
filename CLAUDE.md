@@ -25,6 +25,29 @@ accumulation).
 
 ---
 
+## ⛔ Player identity / name-matching — READ before touching it
+The LPL 2026 saga (18 Jul) burned a full day on this. Rules, in order:
+1. **Fix identity in the SHARED registry, never in a local alias map.** `cricket-identity`
+   shares only the ALGORITHM; the registry (`wwc-points-bot/registry/players.json`, built by
+   `build_registry.py`) shares the anchored IDs. A fix in this repo's `LPL_NAME_ALIASES` /
+   `*_DISPLAY_NAMES` does NOT reach the bot or draft. Put announced→cricsheet mappings where
+   `build_registry.load_bridges()` reads them, rebuild, `sync-registry`. (LPL is now wired in.)
+2. **A fuzzy match is a HYPOTHESIS.** Never promote a fuzzy/generated map (e.g. a DISPLAY map)
+   to a shared/live artifact unverified. Spot-check high-match records: a squad player pointing
+   at a 274-match record is almost always a wrong namesake steal (Dale Phillips→GD/Glenn Phillips,
+   Kusal Perera→KKV Perera, Avishka→Asitha's AM Fernando). Same-surname ≠ same person.
+3. **SL names hide the go-by name in initials** (Nishan Madushka = KNM Fernando) and collide on
+   initials (Avishka & Vishwa = W.I.A.). Local data has NO full/common name → you cannot auto-tell
+   a correct SL match from a wrong namesake. Resolve full-name→cricsheet_id at SETUP (web-verify
+   the hard ones), and RUN THE GATE below.
+4. **GATE before any tour goes live (auction/draft/bot):** `python3 wwc-points-bot/identity_healthcheck.py "<tour>"`.
+   It BLOCKs on dup-cricsheet + exact-name-record-exists-but-unanchored, lists unmapped (triage:
+   uncapped or add a bridge), and prints a name-mismatch REVIEW list to eyeball for a wrong namesake.
+5. **Never key identity ops on `squad_number`** (it's edited lineup order, not squad-file index —
+   a re-map keyed on it scrambles picks). Anchor on cricsheet_id / the row's own name. Dry-run bulk
+   identity mutations. Builders must dedup on cricsheet_id (phantom-duplicate rows break anchoring:
+   two "Wanindu Hasaranga" rows → the matcher's tie-breaker rejects both → star left unanchored).
+
 ## ⛔ CRITICAL — never break a live auction
 - **NEVER `DELETE`/rebuild `auction_pool` or run the ETL on an auction that has
   sales.** Purses live on `auction_participants` and are NOT reset by a pool
