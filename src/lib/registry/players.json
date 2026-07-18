@@ -1,6 +1,6 @@
 {
  "anchor": "cricsheet_id (pid); espn:/slug: fallback when unknown",
- "count": 372,
+ "count": 498,
  "players": {
   "5d2eda89": {
    "aliases": [
@@ -1099,7 +1099,8 @@
     "hk matthews"
    ],
    "tours": [
-    "Women's T20 WC 2026"
+    "Women's T20 WC 2026",
+    "Ireland vs West Indies Women's ODI 2026"
    ],
    "display": "Hayley Matthews",
    "cricsheet_id": "d32cf49a",
@@ -1113,7 +1114,8 @@
     "qiana joseph"
    ],
    "tours": [
-    "Women's T20 WC 2026"
+    "Women's T20 WC 2026",
+    "Ireland vs West Indies Women's ODI 2026"
    ],
    "display": "Qiana Joseph",
    "cricsheet_id": "d6164dc0",
@@ -1128,7 +1130,8 @@
     "jkc claxton"
    ],
    "tours": [
-    "Women's T20 WC 2026"
+    "Women's T20 WC 2026",
+    "Ireland vs West Indies Women's ODI 2026"
    ],
    "display": "Jahzara Claxton",
    "cricsheet_id": "e22f8ec1",
@@ -1143,7 +1146,8 @@
     "stafanie taylor"
    ],
    "tours": [
-    "Women's T20 WC 2026"
+    "Women's T20 WC 2026",
+    "Ireland vs West Indies Women's ODI 2026"
    ],
    "display": "Stafanie Taylor",
    "cricsheet_id": "92cf79a8",
@@ -1158,7 +1162,8 @@
     "djs dottin"
    ],
    "tours": [
-    "Women's T20 WC 2026"
+    "Women's T20 WC 2026",
+    "Ireland vs West Indies Women's ODI 2026"
    ],
    "display": "Deandra Dottin",
    "cricsheet_id": "53bee17f",
@@ -1188,7 +1193,8 @@
     "shemaine campbelle"
    ],
    "tours": [
-    "Women's T20 WC 2026"
+    "Women's T20 WC 2026",
+    "Ireland vs West Indies Women's ODI 2026"
    ],
    "display": "Shemaine Campbelle",
    "cricsheet_id": "a7cd72b2",
@@ -1202,7 +1208,8 @@
     "jannillea glasgow"
    ],
    "tours": [
-    "Women's T20 WC 2026"
+    "Women's T20 WC 2026",
+    "Ireland vs West Indies Women's ODI 2026"
    ],
    "display": "Jannillea Glasgow",
    "cricsheet_id": "a2632c7c",
@@ -1217,7 +1224,8 @@
     "aaliyah alleyne"
    ],
    "tours": [
-    "Women's T20 WC 2026"
+    "Women's T20 WC 2026",
+    "Ireland vs West Indies Women's ODI 2026"
    ],
    "display": "Aaliyah Alleyne",
    "cricsheet_id": "4b0e3049",
@@ -1232,7 +1240,8 @@
     "ass fletcher"
    ],
    "tours": [
-    "Women's T20 WC 2026"
+    "Women's T20 WC 2026",
+    "Ireland vs West Indies Women's ODI 2026"
    ],
    "display": "Afy Fletcher",
    "cricsheet_id": "42d9dd09",
@@ -1246,7 +1255,8 @@
     "karishma ramharack"
    ],
    "tours": [
-    "Women's T20 WC 2026"
+    "Women's T20 WC 2026",
+    "Ireland vs West Indies Women's ODI 2026"
    ],
    "display": "Karishma Ramharack",
    "cricsheet_id": "321c980e",
@@ -1260,7 +1270,8 @@
     "ashmini munisar"
    ],
    "tours": [
-    "Women's T20 WC 2026"
+    "Women's T20 WC 2026",
+    "Ireland vs West Indies Women's ODI 2026"
    ],
    "display": "Ashmini Munisar",
    "cricsheet_id": "a811cb83",
@@ -1275,7 +1286,8 @@
     "zaida james"
    ],
    "tours": [
-    "Women's T20 WC 2026"
+    "Women's T20 WC 2026",
+    "Ireland vs West Indies Women's ODI 2026"
    ],
    "display": "Zaida James",
    "cricsheet_id": "816af623",
@@ -1289,11 +1301,12 @@
     "mandy mangru"
    ],
    "tours": [
-    "Women's T20 WC 2026"
+    "Women's T20 WC 2026",
+    "Ireland vs West Indies Women's ODI 2026"
    ],
    "display": "Mandy Mangru",
    "cricsheet_id": "b9fec7a5",
-   "espn_id": null,
+   "espn_id": "907733",
    "draft_id": 3051,
    "auction_id": 3051
   },
@@ -1303,7 +1316,8 @@
     "shawnisha hector"
    ],
    "tours": [
-    "Women's T20 WC 2026"
+    "Women's T20 WC 2026",
+    "Ireland vs West Indies Women's ODI 2026"
    ],
    "display": "Shawnisha Hector",
    "cricsheet_id": "3faa312e",
@@ -1918,7 +1932,8 @@
     "amy hunter"
    ],
    "tours": [
-    "Women's T20 WC 2026"
+    "Women's T20 WC 2026",
+    "Ireland vs West Indies Women's ODI 2026"
    ],
    "display": "Amy Hunter",
    "cricsheet_id": "e8fa03ed",
@@ -1933,7 +1948,8 @@
     "gh lewis"
    ],
    "tours": [
-    "Women's T20 WC 2026"
+    "Women's T20 WC 2026",
+    "Ireland vs West Indies Women's ODI 2026"
    ],
    "display": "Gaby Lewis",
    "cricsheet_id": "1b9d1579",
@@ -1947,7 +1963,8 @@
     "orla prendergast"
    ],
    "tours": [
-    "Women's T20 WC 2026"
+    "Women's T20 WC 2026",
+    "Ireland vs West Indies Women's ODI 2026"
    ],
    "display": "Orla Prendergast",
    "cricsheet_id": "d8f20ba5",
@@ -1961,7 +1978,8 @@
     "leah paul"
    ],
    "tours": [
-    "Women's T20 WC 2026"
+    "Women's T20 WC 2026",
+    "Ireland vs West Indies Women's ODI 2026"
    ],
    "display": "Leah Paul",
    "cricsheet_id": "07248d8e",
@@ -1975,7 +1993,8 @@
     "rebecca stokell"
    ],
    "tours": [
-    "Women's T20 WC 2026"
+    "Women's T20 WC 2026",
+    "Ireland vs West Indies Women's ODI 2026"
    ],
    "display": "Rebecca Stokell",
    "cricsheet_id": "def7b1bb",
@@ -2018,7 +2037,8 @@
     "cara murray"
    ],
    "tours": [
-    "Women's T20 WC 2026"
+    "Women's T20 WC 2026",
+    "Ireland vs West Indies Women's ODI 2026"
    ],
    "display": "Cara Murray",
    "cricsheet_id": "5a50471c",
@@ -2032,11 +2052,12 @@
     "georgina dempsey"
    ],
    "tours": [
-    "Women's T20 WC 2026"
+    "Women's T20 WC 2026",
+    "Ireland vs West Indies Women's ODI 2026"
    ],
    "display": "Georgina Dempsey",
    "cricsheet_id": "940feccc",
-   "espn_id": null,
+   "espn_id": "1229017",
    "draft_id": 3252,
    "auction_id": 3252
   },
@@ -2061,7 +2082,8 @@
     "ak maguire"
    ],
    "tours": [
-    "Women's T20 WC 2026"
+    "Women's T20 WC 2026",
+    "Ireland vs West Indies Women's ODI 2026"
    ],
    "display": "Aimee Maguire",
    "cricsheet_id": null,
@@ -2074,7 +2096,8 @@
     "louise little"
    ],
    "tours": [
-    "Women's T20 WC 2026"
+    "Women's T20 WC 2026",
+    "Ireland vs West Indies Women's ODI 2026"
    ],
    "display": "Louise Little",
    "cricsheet_id": null,
@@ -2088,7 +2111,8 @@
     "alana dalzell"
    ],
    "tours": [
-    "Women's T20 WC 2026"
+    "Women's T20 WC 2026",
+    "Ireland vs West Indies Women's ODI 2026"
    ],
    "display": "Alana Dalzell",
    "cricsheet_id": "66498395",
@@ -2098,14 +2122,16 @@
   },
   "slug:christina-coulter-reilly": {
    "aliases": [
-    "christina coulter reilly"
+    "christina coulter reilly",
+    "christina e coulter reilly"
    ],
    "tours": [
-    "Women's T20 WC 2026"
+    "Women's T20 WC 2026",
+    "Ireland vs West Indies Women's ODI 2026"
    ],
    "display": "Christina Coulter Reilly",
    "cricsheet_id": null,
-   "espn_id": null,
+   "espn_id": "1232213",
    "draft_id": 4847,
    "auction_id": null
   },
@@ -2930,7 +2956,8 @@
     "litton kumer das"
    ],
    "tours": [
-    "Australia tour of Bangladesh 2026 (Men T20I)"
+    "Australia tour of Bangladesh 2026 (Men T20I)",
+    "Lanka Premier League 2026"
    ],
    "display": "Litton Das",
    "cricsheet_id": null,
@@ -2943,7 +2970,8 @@
     "taskin ahmed"
    ],
    "tours": [
-    "Australia tour of Bangladesh 2026 (Men T20I)"
+    "Australia tour of Bangladesh 2026 (Men T20I)",
+    "Lanka Premier League 2026"
    ],
    "display": "Taskin Ahmed",
    "cricsheet_id": "ef18b66e",
@@ -3297,7 +3325,8 @@
     "ms chapman"
    ],
    "tours": [
-    "Major League Cricket 2026"
+    "Major League Cricket 2026",
+    "New Zealand vs West Indies Men's ODI 2026"
    ],
    "display": "Mark Chapman",
    "cricsheet_id": "7fa12533",
@@ -4098,13 +4127,15 @@
   "espn:437316": {
    "aliases": [
     "dasun shanaka",
-    "madagamagamage dasun shanaka"
+    "madagamagamage dasun shanaka",
+    "md shanaka"
    ],
    "tours": [
-    "Major League Cricket 2026"
+    "Major League Cricket 2026",
+    "Lanka Premier League 2026"
    ],
    "display": "Dasun Shanaka",
-   "cricsheet_id": null,
+   "cricsheet_id": "3ff033bb",
    "espn_id": "437316",
    "draft_id": 10116,
    "auction_id": 7269
@@ -4251,7 +4282,8 @@
     "sherfane rutherford"
    ],
    "tours": [
-    "Major League Cricket 2026"
+    "Major League Cricket 2026",
+    "New Zealand vs West Indies Men's ODI 2026"
    ],
    "display": "Sherfane Rutherford",
    "cricsheet_id": null,
@@ -4295,7 +4327,8 @@
     "shadley van schalkwyk"
    ],
    "tours": [
-    "Major League Cricket 2026"
+    "Major League Cricket 2026",
+    "Lanka Premier League 2026"
    ],
    "display": "Shadley van Schalkwyk",
    "cricsheet_id": "97b0e4ff",
@@ -4517,7 +4550,8 @@
     "ld chandimal"
    ],
    "tours": [
-    "Major League Cricket 2026"
+    "Major League Cricket 2026",
+    "Lanka Premier League 2026"
    ],
    "display": "Dinesh Chandimal",
    "cricsheet_id": "8dd02a98",
@@ -5032,6 +5066,7 @@
   },
   "slug:varun-chakravarthy": {
    "aliases": [
+    "cv varun",
     "varun chakaravarthy",
     "varun chakravarthy"
    ],
@@ -5278,6 +5313,1732 @@
    "espn_id": null,
    "draft_id": null,
    "auction_id": 6729
+  },
+  "5ecfab18": {
+   "aliases": [
+    "s forbes",
+    "sarah forbes"
+   ],
+   "tours": [
+    "Ireland vs West Indies Women's ODI 2026"
+   ],
+   "display": "Sarah Forbes",
+   "cricsheet_id": "5ecfab18",
+   "espn_id": "1229023",
+   "draft_id": 10198,
+   "auction_id": 3710
+  },
+  "espn:1229018": {
+   "aliases": [
+    "jane maguire"
+   ],
+   "tours": [
+    "Ireland vs West Indies Women's ODI 2026"
+   ],
+   "display": "Jane Maguire",
+   "cricsheet_id": null,
+   "espn_id": "1229018",
+   "draft_id": 10201,
+   "auction_id": null
+  },
+  "771b44ed": {
+   "aliases": [
+    "kia mccartney",
+    "kj mccartney"
+   ],
+   "tours": [
+    "Ireland vs West Indies Women's ODI 2026"
+   ],
+   "display": "Kia McCartney",
+   "cricsheet_id": "771b44ed",
+   "espn_id": null,
+   "draft_id": 10204,
+   "auction_id": 8602
+  },
+  "espn:1352170": {
+   "aliases": [
+    "realeanna grimmond",
+    "realeanna margot ann u grimmond"
+   ],
+   "tours": [
+    "Ireland vs West Indies Women's ODI 2026"
+   ],
+   "display": "Realeanna Grimmond",
+   "cricsheet_id": null,
+   "espn_id": "1352170",
+   "draft_id": 10218,
+   "auction_id": null
+  },
+  "8afe73e2": {
+   "aliases": [
+    "wa young",
+    "will young"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Will Young",
+   "cricsheet_id": "8afe73e2",
+   "espn_id": null,
+   "draft_id": 10222,
+   "auction_id": 3779
+  },
+  "e824e6ee": {
+   "aliases": [
+    "tom latham",
+    "twm latham"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Tom Latham",
+   "cricsheet_id": "e824e6ee",
+   "espn_id": null,
+   "draft_id": 10223,
+   "auction_id": 2682
+  },
+  "97f437ed": {
+   "aliases": [
+    "nf kelly",
+    "nick kelly"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Nick Kelly",
+   "cricsheet_id": "97f437ed",
+   "espn_id": null,
+   "draft_id": 10224,
+   "auction_id": 7374
+  },
+  "slug:daryl-mitchell": {
+   "aliases": [
+    "daryl mitchell"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Daryl Mitchell",
+   "cricsheet_id": null,
+   "espn_id": null,
+   "draft_id": 10225,
+   "auction_id": null
+  },
+  "03521fd3": {
+   "aliases": [
+    "henry nicholls",
+    "hm nicholls"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Henry Nicholls",
+   "cricsheet_id": "03521fd3",
+   "espn_id": null,
+   "draft_id": 10226,
+   "auction_id": 2684
+  },
+  "slug:michael-bracewell": {
+   "aliases": [
+    "michael bracewell"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Michael Bracewell",
+   "cricsheet_id": null,
+   "espn_id": null,
+   "draft_id": 10228,
+   "auction_id": null
+  },
+  "e4a0deae": {
+   "aliases": [
+    "mitchell santner",
+    "mj santner"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Mitchell Santner",
+   "cricsheet_id": "e4a0deae",
+   "espn_id": null,
+   "draft_id": 10229,
+   "auction_id": 217
+  },
+  "05b1aef8": {
+   "aliases": [
+    "nathan smith",
+    "ng smith"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Nathan Smith",
+   "cricsheet_id": "05b1aef8",
+   "espn_id": null,
+   "draft_id": 10230,
+   "auction_id": 7375
+  },
+  "dadbdb68": {
+   "aliases": [
+    "ja duffy",
+    "jacob duffy"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Jacob Duffy",
+   "cricsheet_id": "dadbdb68",
+   "espn_id": null,
+   "draft_id": 10231,
+   "auction_id": 1696
+  },
+  "79f5bc26": {
+   "aliases": [
+    "ben lister",
+    "bg lister"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Ben Lister",
+   "cricsheet_id": "79f5bc26",
+   "espn_id": null,
+   "draft_id": 10232,
+   "auction_id": 3989
+  },
+  "732f711b": {
+   "aliases": [
+    "mitch hay",
+    "mj hay"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Mitch Hay",
+   "cricsheet_id": "732f711b",
+   "espn_id": null,
+   "draft_id": 10233,
+   "auction_id": 3788
+  },
+  "ed6894af": {
+   "aliases": [
+    "d foxcroft",
+    "dean foxcroft"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Dean Foxcroft",
+   "cricsheet_id": "ed6894af",
+   "espn_id": null,
+   "draft_id": 10234,
+   "auction_id": 6240
+  },
+  "slug:kristian-clarke": {
+   "aliases": [
+    "kristian clarke"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Kristian Clarke",
+   "cricsheet_id": null,
+   "espn_id": null,
+   "draft_id": 10235,
+   "auction_id": null
+  },
+  "slug:matthew-fisher": {
+   "aliases": [
+    "matthew fisher"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Matthew Fisher",
+   "cricsheet_id": null,
+   "espn_id": null,
+   "draft_id": 10236,
+   "auction_id": null
+  },
+  "07793daf": {
+   "aliases": [
+    "jayden lennox",
+    "jr lennox"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Jayden Lennox",
+   "cricsheet_id": "07793daf",
+   "espn_id": null,
+   "draft_id": 10237,
+   "auction_id": 7575
+  },
+  "slug:john-campbell": {
+   "aliases": [
+    "john campbell"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "John Campbell",
+   "cricsheet_id": null,
+   "espn_id": null,
+   "draft_id": 10238,
+   "auction_id": 8605
+  },
+  "6020a3c6": {
+   "aliases": [
+    "keacy carty",
+    "ku carty"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Keacy Carty",
+   "cricsheet_id": "6020a3c6",
+   "espn_id": null,
+   "draft_id": 10239,
+   "auction_id": 1687
+  },
+  "4b167ede": {
+   "aliases": [
+    "ackeem auguste",
+    "awj auguste"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Ackeem Auguste",
+   "cricsheet_id": "4b167ede",
+   "espn_id": null,
+   "draft_id": 10240,
+   "auction_id": 1686
+  },
+  "c59d8f8a": {
+   "aliases": [
+    "ka hope",
+    "shai hope"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Shai Hope",
+   "cricsheet_id": "c59d8f8a",
+   "espn_id": null,
+   "draft_id": 10241,
+   "auction_id": 8188
+  },
+  "3feda4fa": {
+   "aliases": [
+    "rl chase",
+    "roston chase"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Roston Chase",
+   "cricsheet_id": "3feda4fa",
+   "espn_id": null,
+   "draft_id": 10243,
+   "auction_id": 1892
+  },
+  "74d12124": {
+   "aliases": [
+    "jp greaves",
+    "justin greaves"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Justin Greaves",
+   "cricsheet_id": "74d12124",
+   "espn_id": null,
+   "draft_id": 10244,
+   "auction_id": 4707
+  },
+  "slug:keemo-paul": {
+   "aliases": [
+    "keemo paul"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Keemo Paul",
+   "cricsheet_id": null,
+   "espn_id": null,
+   "draft_id": 10245,
+   "auction_id": null
+  },
+  "97bdec3d": {
+   "aliases": [
+    "g motie",
+    "gudakesh motie"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Gudakesh Motie",
+   "cricsheet_id": "97bdec3d",
+   "espn_id": null,
+   "draft_id": 10246,
+   "auction_id": 1893
+  },
+  "slug:alzarri-joseph": {
+   "aliases": [
+    "alzarri joseph"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Alzarri Joseph",
+   "cricsheet_id": null,
+   "espn_id": null,
+   "draft_id": 10247,
+   "auction_id": null
+  },
+  "ded9ff1e": {
+   "aliases": [
+    "jayden seales",
+    "jnt seales"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Jayden Seales",
+   "cricsheet_id": "ded9ff1e",
+   "espn_id": null,
+   "draft_id": 10248,
+   "auction_id": 4282
+  },
+  "88626ed2": {
+   "aliases": [
+    "aa jangoo",
+    "amir jangoo"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Amir Jangoo",
+   "cricsheet_id": "88626ed2",
+   "espn_id": null,
+   "draft_id": 10249,
+   "auction_id": 1685
+  },
+  "83d17bbc": {
+   "aliases": [
+    "matthew forde",
+    "mw forde"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Matthew Forde",
+   "cricsheet_id": "83d17bbc",
+   "espn_id": null,
+   "draft_id": 10250,
+   "auction_id": 4280
+  },
+  "slug:shamar-joseph": {
+   "aliases": [
+    "shamar joseph"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Shamar Joseph",
+   "cricsheet_id": null,
+   "espn_id": null,
+   "draft_id": 10251,
+   "auction_id": null
+  },
+  "slug:vitel-lawes": {
+   "aliases": [
+    "vitel lawes"
+   ],
+   "tours": [
+    "New Zealand vs West Indies Men's ODI 2026"
+   ],
+   "display": "Vitel Lawes",
+   "cricsheet_id": null,
+   "espn_id": null,
+   "draft_id": 10252,
+   "auction_id": null
+  },
+  "slug:avishka-fernando": {
+   "aliases": [
+    "avishka fernando",
+    "wia fernando"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Avishka Fernando",
+   "cricsheet_id": "9550470d",
+   "espn_id": null,
+   "draft_id": 10284,
+   "auction_id": 1386
+  },
+  "65cebd5d": {
+   "aliases": [
+    "k mishara",
+    "kamil mishara"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Kamil Mishara",
+   "cricsheet_id": "65cebd5d",
+   "espn_id": null,
+   "draft_id": 10285,
+   "auction_id": 2468
+  },
+  "d4550956": {
+   "aliases": [
+    "ibrahim zadran"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Ibrahim Zadran",
+   "cricsheet_id": "d4550956",
+   "espn_id": null,
+   "draft_id": 10286,
+   "auction_id": 8650
+  },
+  "slug:bhanuka-rajapaksa": {
+   "aliases": [
+    "bhanuka rajapaksa",
+    "pbb rajapaksa"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Bhanuka Rajapaksa",
+   "cricsheet_id": "6c882e9a",
+   "espn_id": null,
+   "draft_id": 10287,
+   "auction_id": 548
+  },
+  "7dc35884": {
+   "aliases": [
+    "shakib al hasan"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Shakib Al Hasan",
+   "cricsheet_id": "7dc35884",
+   "espn_id": null,
+   "draft_id": 10288,
+   "auction_id": 290
+  },
+  "736123bb": {
+   "aliases": [
+    "dn wellalage",
+    "dunith wellalage"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Dunith Wellalage",
+   "cricsheet_id": "736123bb",
+   "espn_id": null,
+   "draft_id": 10289,
+   "auction_id": 2470
+  },
+  "slug:chamindu-wickramasinghe": {
+   "aliases": [
+    "c wickramasinghe",
+    "chamindu wickramasinghe"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Chamindu Wickramasinghe",
+   "cricsheet_id": "a5c48ed1",
+   "espn_id": null,
+   "draft_id": 10290,
+   "auction_id": 774
+  },
+  "slug:traveen-mathews": {
+   "aliases": [
+    "traveen mathews"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Traveen Mathews",
+   "cricsheet_id": null,
+   "espn_id": null,
+   "draft_id": 10291,
+   "auction_id": 8712
+  },
+  "aa8d28ae": {
+   "aliases": [
+    "d wiese",
+    "david wiese"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "David Wiese",
+   "cricsheet_id": "aa8d28ae",
+   "espn_id": null,
+   "draft_id": 10293,
+   "auction_id": 45
+  },
+  "slug:kugathas-mathulan": {
+   "aliases": [
+    "kugathas mathulan"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Kugathas Mathulan",
+   "cricsheet_id": null,
+   "espn_id": null,
+   "draft_id": 10294,
+   "auction_id": 8713
+  },
+  "slug:dilshan-madushanka": {
+   "aliases": [
+    "d madushanka",
+    "dilshan madushanka"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Dilshan Madushanka",
+   "cricsheet_id": "de7d833e",
+   "espn_id": null,
+   "draft_id": 10295,
+   "auction_id": 2253
+  },
+  "slug:nishan-madushka": {
+   "aliases": [
+    "knm fernando",
+    "nishan madushka"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Nishan Madushka",
+   "cricsheet_id": "d2a2bb1a",
+   "espn_id": null,
+   "draft_id": 10296,
+   "auction_id": 8714
+  },
+  "b410bd3d": {
+   "aliases": [
+    "s lamichhane",
+    "sandeep lamichhane"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Sandeep Lamichhane",
+   "cricsheet_id": "b410bd3d",
+   "espn_id": null,
+   "draft_id": 10297,
+   "auction_id": 406
+  },
+  "98ae73b1": {
+   "aliases": [
+    "piyush chawla",
+    "pp chawla"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Piyush Chawla",
+   "cricsheet_id": "98ae73b1",
+   "espn_id": null,
+   "draft_id": 10298,
+   "auction_id": 120
+  },
+  "f0e293b0": {
+   "aliases": [
+    "zahoor khan"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Zahoor Khan",
+   "cricsheet_id": "f0e293b0",
+   "espn_id": null,
+   "draft_id": 10299,
+   "auction_id": 1145
+  },
+  "slug:lizaad-williams": {
+   "aliases": [
+    "lb williams",
+    "lizaad williams"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Lizaad Williams",
+   "cricsheet_id": "a1d95bd8",
+   "espn_id": null,
+   "draft_id": 10300,
+   "auction_id": 718
+  },
+  "slug:nuwanidu-fernando": {
+   "aliases": [
+    "mnk fernando",
+    "nuwanidu fernando"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Nuwanidu Fernando",
+   "cricsheet_id": "ba603555",
+   "espn_id": null,
+   "draft_id": 10301,
+   "auction_id": 8715
+  },
+  "cdac5a3d": {
+   "aliases": [
+    "m shiraz",
+    "mohommed shiraz"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Mohommed Shiraz",
+   "cricsheet_id": "cdac5a3d",
+   "espn_id": null,
+   "draft_id": 10302,
+   "auction_id": 8567
+  },
+  "slug:praveen-manisha": {
+   "aliases": [
+    "praveen manisha"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Praveen Manisha",
+   "cricsheet_id": null,
+   "espn_id": null,
+   "draft_id": 10303,
+   "auction_id": 8716
+  },
+  "slug:sharujan-shanmuganathan": {
+   "aliases": [
+    "sharujan shanmuganathan"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Sharujan Shanmuganathan",
+   "cricsheet_id": null,
+   "espn_id": null,
+   "draft_id": 10304,
+   "auction_id": 8717
+  },
+  "slug:kusal-mendis": {
+   "aliases": [
+    "bkg mendis",
+    "kusal mendis"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Kusal Mendis",
+   "cricsheet_id": "5d1e7582",
+   "espn_id": null,
+   "draft_id": 10305,
+   "auction_id": 660
+  },
+  "slug:sadeera-samarawickrama": {
+   "aliases": [
+    "s samarawickrama",
+    "sadeera samarawickrama"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Sadeera Samarawickrama",
+   "cricsheet_id": "9ab2914d",
+   "espn_id": null,
+   "draft_id": 10306,
+   "auction_id": 1388
+  },
+  "slug:kamindu-mendis": {
+   "aliases": [
+    "kamindu mendis"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Kamindu Mendis",
+   "cricsheet_id": "08548b13",
+   "espn_id": null,
+   "draft_id": 10307,
+   "auction_id": 563
+  },
+  "c41043e6": {
+   "aliases": [
+    "ben mcdermott",
+    "br mcdermott"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Ben McDermott",
+   "cricsheet_id": "c41043e6",
+   "espn_id": null,
+   "draft_id": 10308,
+   "auction_id": 2975
+  },
+  "slug:janith-liyanage": {
+   "aliases": [
+    "j liyanage",
+    "janith liyanage"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Janith Liyanage",
+   "cricsheet_id": "84212ffb",
+   "espn_id": null,
+   "draft_id": 10309,
+   "auction_id": 3185
+  },
+  "9219eff0": {
+   "aliases": [
+    "jds neesham",
+    "jimmy neesham"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Jimmy Neesham",
+   "cricsheet_id": "9219eff0",
+   "espn_id": null,
+   "draft_id": 10310,
+   "auction_id": 261
+  },
+  "slug:milan-ratnayake": {
+   "aliases": [
+    "kth ratnayake",
+    "milan ratnayake"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Milan Ratnayake",
+   "cricsheet_id": "4eb02f2e",
+   "espn_id": null,
+   "draft_id": 10311,
+   "auction_id": 8646
+  },
+  "80ad39ac": {
+   "aliases": [
+    "hasan mahmud"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Hasan Mahmud",
+   "cricsheet_id": "80ad39ac",
+   "espn_id": null,
+   "draft_id": 10312,
+   "auction_id": 3751
+  },
+  "aceb7654": {
+   "aliases": [
+    "jdf vandersay",
+    "jeffrey vandersay"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Jeffrey Vandersay",
+   "cricsheet_id": "aceb7654",
+   "espn_id": null,
+   "draft_id": 10313,
+   "auction_id": 4332
+  },
+  "slug:mujeeb-ur-rahman": {
+   "aliases": [
+    "mujeeb ur rahman"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Mujeeb Ur Rahman",
+   "cricsheet_id": null,
+   "espn_id": null,
+   "draft_id": 10314,
+   "auction_id": null
+  },
+  "slug:binura-fernando": {
+   "aliases": [
+    "b fernando",
+    "binura fernando"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Binura Fernando",
+   "cricsheet_id": "dabbd0ae",
+   "espn_id": null,
+   "draft_id": 10315,
+   "auction_id": 8718
+  },
+  "slug:rubin-hermann": {
+   "aliases": [
+    "ra herman",
+    "rubin hermann"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Rubin Hermann",
+   "cricsheet_id": "9c821d2e",
+   "espn_id": null,
+   "draft_id": 10316,
+   "auction_id": 5026
+  },
+  "e3386c8a": {
+   "aliases": [
+    "k bhurtel",
+    "kushal bhurtel"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Kushal Bhurtel",
+   "cricsheet_id": "e3386c8a",
+   "espn_id": null,
+   "draft_id": 10317,
+   "auction_id": 1674
+  },
+  "7ccbb09f": {
+   "aliases": [
+    "shahnawaz dahani",
+    "shahnawaz dhani"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Shahnawaz Dahani",
+   "cricsheet_id": "7ccbb09f",
+   "espn_id": null,
+   "draft_id": 10318,
+   "auction_id": 2022
+  },
+  "slug:thanuka-dabare": {
+   "aliases": [
+    "ptm dabare",
+    "thanuka dabare"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Thanuka Dabare",
+   "cricsheet_id": "a97fbc2c",
+   "espn_id": null,
+   "draft_id": 10319,
+   "auction_id": 8621
+  },
+  "5d499f67": {
+   "aliases": [
+    "m subasingha",
+    "movin subasingha"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Movin Subasingha",
+   "cricsheet_id": "5d499f67",
+   "espn_id": null,
+   "draft_id": 10320,
+   "auction_id": 8622
+  },
+  "d86d276e": {
+   "aliases": [
+    "w sahan",
+    "wanuja sahan"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Wanuja Sahan",
+   "cricsheet_id": "d86d276e",
+   "espn_id": null,
+   "draft_id": 10321,
+   "auction_id": 8637
+  },
+  "slug:anthony-pragasam": {
+   "aliases": [
+    "anthony pragasam"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Anthony Pragasam",
+   "cricsheet_id": null,
+   "espn_id": null,
+   "draft_id": 10322,
+   "auction_id": 8719
+  },
+  "ec0b9258": {
+   "aliases": [
+    "m tharupathi",
+    "malsha tharupathi"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Malsha Tharupathi",
+   "cricsheet_id": "ec0b9258",
+   "espn_id": null,
+   "draft_id": 10323,
+   "auction_id": 8647
+  },
+  "3c28853f": {
+   "aliases": [
+    "sediqullah atal"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Sediqullah Atal",
+   "cricsheet_id": "3c28853f",
+   "espn_id": null,
+   "draft_id": 10324,
+   "auction_id": 707
+  },
+  "slug:vishen-halambage": {
+   "aliases": [
+    "vishen halambage",
+    "vs halambage"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Vishen Halambage",
+   "cricsheet_id": "9531d48f",
+   "espn_id": null,
+   "draft_id": 10325,
+   "auction_id": 8720
+  },
+  "slug:kusal-perera": {
+   "aliases": [
+    "kusal perera",
+    "mdkj perera"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Kusal Perera",
+   "cricsheet_id": "f21043a5",
+   "espn_id": null,
+   "draft_id": 10326,
+   "auction_id": 682
+  },
+  "slug:wanindu-hasaranga": {
+   "aliases": [
+    "wanindu hasaranga"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Wanindu Hasaranga",
+   "cricsheet_id": null,
+   "espn_id": null,
+   "draft_id": 10327,
+   "auction_id": null
+  },
+  "slug:angelo-mathews": {
+   "aliases": [
+    "ad mathews",
+    "angelo mathews"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Angelo Mathews",
+   "cricsheet_id": "896d78ad",
+   "espn_id": null,
+   "draft_id": 10328,
+   "auction_id": 297
+  },
+  "0994d0ae": {
+   "aliases": [
+    "v shankar",
+    "vijay shankar"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Vijay Shankar",
+   "cricsheet_id": "0994d0ae",
+   "espn_id": null,
+   "draft_id": 10329,
+   "auction_id": 405
+  },
+  "slug:moeen-ali": {
+   "aliases": [
+    "mm ali",
+    "moeen ali"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Moeen Ali",
+   "cricsheet_id": "bb351c23",
+   "espn_id": null,
+   "draft_id": 10330,
+   "auction_id": 32
+  },
+  "slug:pawan-sandesh": {
+   "aliases": [
+    "pawan sandesh"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Pawan Sandesh",
+   "cricsheet_id": null,
+   "espn_id": null,
+   "draft_id": 10331,
+   "auction_id": 8721
+  },
+  "caf69bf7": {
+   "aliases": [
+    "daniel sams",
+    "dr sams"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Daniel Sams",
+   "cricsheet_id": "caf69bf7",
+   "espn_id": null,
+   "draft_id": 10332,
+   "auction_id": 255
+  },
+  "slug:asitha-fernando": {
+   "aliases": [
+    "am fernando",
+    "asitha fernando"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Asitha Fernando",
+   "cricsheet_id": "de3d549a",
+   "espn_id": null,
+   "draft_id": 10333,
+   "auction_id": 8722
+  },
+  "40db4769": {
+   "aliases": [
+    "g sanketh",
+    "garuka sanketh"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Garuka Sanketh",
+   "cricsheet_id": "40db4769",
+   "espn_id": null,
+   "draft_id": 10334,
+   "auction_id": 8658
+  },
+  "slug:nuwan-thushara": {
+   "aliases": [
+    "n thushara",
+    "nuwan thushara"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Nuwan Thushara",
+   "cricsheet_id": "ee1b6c27",
+   "espn_id": null,
+   "draft_id": 10335,
+   "auction_id": 321
+  },
+  "slug:zahir-khan": {
+   "aliases": [
+    "zahir khan"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Zahir Khan",
+   "cricsheet_id": null,
+   "espn_id": null,
+   "draft_id": 10336,
+   "auction_id": 8723
+  },
+  "436c763a": {
+   "aliases": [
+    "bj mcmullen",
+    "brandon mcmullen"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Brandon McMullen",
+   "cricsheet_id": "436c763a",
+   "espn_id": null,
+   "draft_id": 10337,
+   "auction_id": 2909
+  },
+  "slug:lahiru-udara": {
+   "aliases": [
+    "lahiru udara",
+    "lu igalagamage"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Lahiru Udara",
+   "cricsheet_id": "07b6c3c1",
+   "espn_id": null,
+   "draft_id": 10338,
+   "auction_id": 8724
+  },
+  "slug:dushan-hemantha": {
+   "aliases": [
+    "dushan hemantha",
+    "madi hemantha"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Dushan Hemantha",
+   "cricsheet_id": "58431ca0",
+   "espn_id": null,
+   "draft_id": 10339,
+   "auction_id": 2471
+  },
+  "slug:muditha-lakshan": {
+   "aliases": [
+    "m lakshan",
+    "muditha lakshan"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Muditha Lakshan",
+   "cricsheet_id": "aa844d38",
+   "espn_id": null,
+   "draft_id": 10340,
+   "auction_id": 8663
+  },
+  "9a46c4e5": {
+   "aliases": [
+    "dale phillips",
+    "gd phillips"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Dale Phillips",
+   "cricsheet_id": "9a46c4e5",
+   "espn_id": null,
+   "draft_id": 10341,
+   "auction_id": 402
+  },
+  "slug:sahan-mihira": {
+   "aliases": [
+    "sahan mihira"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Sahan Mihira",
+   "cricsheet_id": null,
+   "espn_id": null,
+   "draft_id": 10342,
+   "auction_id": 8725
+  },
+  "be620896": {
+   "aliases": [
+    "i wijesundera",
+    "isitha wijesundera"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Isitha Wijesundera",
+   "cricsheet_id": "be620896",
+   "espn_id": null,
+   "draft_id": 10343,
+   "auction_id": 8638
+  },
+  "e30c9b2d": {
+   "aliases": [
+    "l croospulle",
+    "lasith croospulle"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Lasith Croospulle",
+   "cricsheet_id": "e30c9b2d",
+   "espn_id": null,
+   "draft_id": 10344,
+   "auction_id": 7768
+  },
+  "slug:chris-lynn": {
+   "aliases": [
+    "ca lynn",
+    "chris lynn"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Chris Lynn",
+   "cricsheet_id": "45eda7c8",
+   "espn_id": null,
+   "draft_id": 10345,
+   "auction_id": 358
+  },
+  "slug:charith-asalanka": {
+   "aliases": [
+    "charith asalanka",
+    "kic asalanka"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Charith Asalanka",
+   "cricsheet_id": "732c038e",
+   "espn_id": null,
+   "draft_id": 10347,
+   "auction_id": 772
+  },
+  "3086f7a4": {
+   "aliases": [
+    "mohammad nawaz"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Mohammad Nawaz",
+   "cricsheet_id": "3086f7a4",
+   "espn_id": null,
+   "draft_id": 10348,
+   "auction_id": 2020
+  },
+  "slug:chamika-karunaratne": {
+   "aliases": [
+    "c karunaratne",
+    "chamika karunaratne"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Chamika Karunaratne",
+   "cricsheet_id": "fb3e0d39",
+   "espn_id": null,
+   "draft_id": 10350,
+   "auction_id": 1390
+  },
+  "slug:dinura-kalupahana": {
+   "aliases": [
+    "dinura kalupahana"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Dinura Kalupahana",
+   "cricsheet_id": null,
+   "espn_id": null,
+   "draft_id": 10351,
+   "auction_id": 8726
+  },
+  "slug:pramod-madushan": {
+   "aliases": [
+    "pm liyanagamage",
+    "pramod madushan"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Pramod Madushan",
+   "cricsheet_id": "3ee0050f",
+   "espn_id": null,
+   "draft_id": 10352,
+   "auction_id": 8727
+  },
+  "slug:eshan-malinga": {
+   "aliases": [
+    "e malinga",
+    "eshan malinga"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Eshan Malinga",
+   "cricsheet_id": "5750bcb4",
+   "espn_id": null,
+   "draft_id": 10353,
+   "auction_id": 243
+  },
+  "03a83c50": {
+   "aliases": [
+    "v viyaskanth",
+    "vijayakanth viyaskanth"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Vijayakanth Viyaskanth",
+   "cricsheet_id": "03a83c50",
+   "espn_id": null,
+   "draft_id": 10354,
+   "auction_id": 582
+  },
+  "slug:mehidy-hasan-miraz": {
+   "aliases": [
+    "mehedi hasan miraz",
+    "mehidy hasan miraz"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Mehidy Hasan Miraz",
+   "cricsheet_id": "c58b0108",
+   "espn_id": null,
+   "draft_id": 10355,
+   "auction_id": 4331
+  },
+  "slug:sam-harper": {
+   "aliases": [
+    "sam harper",
+    "sb harper"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Sam Harper",
+   "cricsheet_id": "a756e61a",
+   "espn_id": null,
+   "draft_id": 10356,
+   "auction_id": 8728
+  },
+  "415d30b6": {
+   "aliases": [
+    "virandeep singh"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Virandeep Singh",
+   "cricsheet_id": "415d30b6",
+   "espn_id": null,
+   "draft_id": 10357,
+   "auction_id": 1984
+  },
+  "slug:akif-javed": {
+   "aliases": [
+    "akif javed"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Akif Javed",
+   "cricsheet_id": null,
+   "espn_id": null,
+   "draft_id": 10358,
+   "auction_id": null
+  },
+  "slug:kasun-rajitha": {
+   "aliases": [
+    "cak rajitha",
+    "kasun rajitha"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Kasun Rajitha",
+   "cricsheet_id": "8012d0b8",
+   "espn_id": null,
+   "draft_id": 10359,
+   "auction_id": 2252
+  },
+  "slug:sahan-arachchige": {
+   "aliases": [
+    "sahan arachchige",
+    "ssd arachchige"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Sahan Arachchige",
+   "cricsheet_id": "c05f9d20",
+   "espn_id": null,
+   "draft_id": 10360,
+   "auction_id": 8471
+  },
+  "slug:tharindu-rathnayake": {
+   "aliases": [
+    "tharindu rathnayake"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Tharindu Rathnayake",
+   "cricsheet_id": null,
+   "espn_id": null,
+   "draft_id": 10361,
+   "auction_id": 8730
+  },
+  "4b6f6b73": {
+   "aliases": [
+    "s colombage",
+    "sachindu colombage"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Sachindu Colombage",
+   "cricsheet_id": "4b6f6b73",
+   "espn_id": null,
+   "draft_id": 10362,
+   "auction_id": 8635
+  },
+  "slug:uri-koththigoda": {
+   "aliases": [
+    "uri koththigoda"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Uri Koththigoda",
+   "cricsheet_id": null,
+   "espn_id": null,
+   "draft_id": 10363,
+   "auction_id": 8731
+  },
+  "1aba45cd": {
+   "aliases": [
+    "sahibzada farhan"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Sahibzada Farhan",
+   "cricsheet_id": "1aba45cd",
+   "espn_id": null,
+   "draft_id": 10364,
+   "auction_id": 2800
+  },
+  "45963d9e": {
+   "aliases": [
+    "n dickwella",
+    "niroshan dickwella"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Niroshan Dickwella",
+   "cricsheet_id": "45963d9e",
+   "espn_id": null,
+   "draft_id": 10365,
+   "auction_id": 2089
+  },
+  "slug:reeza-hendricks": {
+   "aliases": [
+    "reeza hendricks",
+    "rr hendricks"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Reeza Hendricks",
+   "cricsheet_id": "b8cc58c9",
+   "espn_id": null,
+   "draft_id": 10366,
+   "auction_id": 779
+  },
+  "slug:pavan-rathnayake": {
+   "aliases": [
+    "p rathnayake",
+    "pavan rathnayake"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Pavan Rathnayake",
+   "cricsheet_id": "c1fdfb46",
+   "espn_id": null,
+   "draft_id": 10368,
+   "auction_id": 2469
+  },
+  "slug:marques-ackerman": {
+   "aliases": [
+    "marques ackerman",
+    "mj ackerman"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Marques Ackerman",
+   "cricsheet_id": "6287d981",
+   "espn_id": null,
+   "draft_id": 10369,
+   "auction_id": 8732
+  },
+  "slug:ramesh-mendis": {
+   "aliases": [
+    "ramesh mendis",
+    "rtm mendis"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Ramesh Mendis",
+   "cricsheet_id": "1be67d37",
+   "espn_id": null,
+   "draft_id": 10370,
+   "auction_id": 773
+  },
+  "slug:gayana-weerasinghe": {
+   "aliases": [
+    "gayana weerasinghe"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Gayana Weerasinghe",
+   "cricsheet_id": null,
+   "espn_id": null,
+   "draft_id": 10371,
+   "auction_id": 8733
+  },
+  "f24c6701": {
+   "aliases": [
+    "m theekshana",
+    "maheesh theekshana"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Maheesh Theekshana",
+   "cricsheet_id": "f24c6701",
+   "espn_id": null,
+   "draft_id": 10372,
+   "auction_id": 36
+  },
+  "5b16a806": {
+   "aliases": [
+    "a dananjaya",
+    "akila dananjaya"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Akila Dananjaya",
+   "cricsheet_id": "5b16a806",
+   "espn_id": null,
+   "draft_id": 10373,
+   "auction_id": 746
+  },
+  "slug:dushmantha-chameera": {
+   "aliases": [
+    "dushmantha chameera"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Dushmantha Chameera",
+   "cricsheet_id": null,
+   "espn_id": null,
+   "draft_id": 10374,
+   "auction_id": null
+  },
+  "9f77963a": {
+   "aliases": [
+    "gulbadin naib"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Gulbadin Naib",
+   "cricsheet_id": "9f77963a",
+   "espn_id": null,
+   "draft_id": 10375,
+   "auction_id": 527
+  },
+  "9e9af5f2": {
+   "aliases": [
+    "mohammad wasim"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Mohammad Wasim",
+   "cricsheet_id": "9e9af5f2",
+   "espn_id": null,
+   "draft_id": 10376,
+   "auction_id": 2021
+  },
+  "e9c7f0d0": {
+   "aliases": [
+    "fazalhaq farooqi"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Fazalhaq Farooqi",
+   "cricsheet_id": "e9c7f0d0",
+   "espn_id": null,
+   "draft_id": 10378,
+   "auction_id": 367
+  },
+  "slug:dhananjaya-lakshan": {
+   "aliases": [
+    "d lakshan",
+    "dhananjaya lakshan"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Dhananjaya Lakshan",
+   "cricsheet_id": "0a2184d9",
+   "espn_id": null,
+   "draft_id": 10379,
+   "auction_id": 8543
+  },
+  "slug:sachitha-jayatilake": {
+   "aliases": [
+    "s jayathilake",
+    "sachitha jayatilake"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Sachitha Jayatilake",
+   "cricsheet_id": "6ba6ca1f",
+   "espn_id": null,
+   "draft_id": 10380,
+   "auction_id": 8734
+  },
+  "slug:vishva-kumara": {
+   "aliases": [
+    "cbrls kumara",
+    "vishva kumara"
+   ],
+   "tours": [
+    "Lanka Premier League 2026"
+   ],
+   "display": "Vishva Kumara",
+   "cricsheet_id": "4751caa3",
+   "espn_id": null,
+   "draft_id": 10381,
+   "auction_id": 1653
   }
  }
 }

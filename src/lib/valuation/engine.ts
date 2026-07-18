@@ -33,7 +33,7 @@ import {
 } from "@/lib/squads/the-hundred-2026";
 import {
   LPL_2026_NAME,
-  lplExpectedMatches,
+  lplExpectedMatchesFor,
   LPL_VENUES,
   LPL_TEAM_SCHEDULE,
 } from "@/lib/squads/lpl-2026";
@@ -84,6 +84,7 @@ interface PoolPlayer {
   player_id: number;
   status: string;
   role: string;
+  name: string;
   squad_number: number;
   ipl_team: string;
   price_manual: number;
@@ -381,7 +382,12 @@ function computeConditionsFactor(
 
   if (totalGames === 0) return 1.0;
   const scheduleFP = weightedFP / totalGames;
-  return scheduleFP / overallFP;
+  // Venue conditions are a MODEST modifier — clamp to ±30%. The raw ratio is unbounded and
+  // explodes when overallFP is tiny (e.g. a player whose only recent quality game scored ~2 FP)
+  // against a normal venue history: scheduleFP/overallFP can hit 10x+, which is noise, not a real
+  // venue effect. Any legit, well-sampled player already sits well inside this band.
+  const factor = scheduleFP / overallFP;
+  return Math.max(0.7, Math.min(1.3, factor));
 }
 
 // ==================== MAIN VALUATION ====================
@@ -453,13 +459,33 @@ export function recalculateValuations(
     : isHundredWomen
     ? "'HUN','WPL','T20'"
     : isLpl
-    ? "'LPL','IPL'"
+    // Franchise-T20 league: LPL squads are full of journeymen whose form lives in OTHER franchise
+    // leagues, not LPL/IPL. Count ALL marquee franchise leagues as quality (incl. HUN — The Hundred,
+    // mirroring what the Hundred build does in reverse with 'LPL') — else a BBL regular like Sam
+    // Harper (all BBL/PSL) sits at baseline 20, and 29/100 of the pool did. Only BLAST (county
+    // T20, a tier below — would swamp the sample) is excluded.
+    ? "'LPL','IPL','BBL','PSL','CPL','SA20','ILT20','MLC','HUN'"
     : isMLC || isBilateral
     ? "'MLC','IPL'"
     : "'IPL','WPL'";
   // Bilateral (T20I) AND both ODI archetypes have no league season → recent-form-heavy.
+  // LPL: no 2025 edition, and its last real seasons (2024/2023) are ~1–2 yrs old, so lean recency —
+  // 45% last-15 form, 20% most-recent LPL season (2024), 10% prior season (2023), 25% all-quality.
   const score1Weights =
-    isBilateral || isWomensOdi || isMensOdi ? [0.60, 0, 0, 0.40] : undefined;
+    isBilateral || isWomensOdi || isMensOdi
+      ? [0.60, 0, 0, 0.40]
+      : isLpl
+      ? [0.45, 0.20, 0.10, 0.25]
+      : undefined;
+
+  // "League season" bucket boundaries. Default = calendar 2025 (recent) / 2024 (prior). LPL ran NO
+  // 2025 edition, so the two season buckets SLIDE BACK to the two most recent ACTUAL seasons —
+  // 2024 (B) and 2023 (C) — instead of leaving B empty and blindly redistributing its weight onto
+  // the (often single-game) recency bucket. This anchors form on real LPL seasons, not a void.
+  const seasonRecentStart = isLpl ? "2024-01-01" : "2025-01-01";
+  const seasonRecentEnd = isLpl ? "2025-01-01" : "2026-01-01";
+  const seasonPriorStart = isLpl ? "2023-01-01" : "2024-01-01";
+  const seasonPriorEnd = isLpl ? "2024-01-01" : "2025-01-01";
 
   const purse = auctionConfig.purse_per_friend;
   const numFriends = auctionConfig.num_friends || 1;
@@ -476,7 +502,7 @@ export function recalculateValuations(
   // --- Pool ---
   const pool = sqlite
     .prepare(
-      `SELECT ap.id, ap.player_id, ap.status, ap.squad_number, ap.ipl_team, p.role, COALESCE(ap.price_manual, 0) as price_manual, COALESCE(ap.efppm, 0) as efppm, COALESCE(ap.sold_price, 0) as sold_price
+      `SELECT ap.id, ap.player_id, ap.status, ap.squad_number, ap.ipl_team, p.role, p.name AS name, COALESCE(ap.price_manual, 0) as price_manual, COALESCE(ap.efppm, 0) as efppm, COALESCE(ap.sold_price, 0) as sold_price
        FROM auction_pool ap
        JOIN players p ON ap.player_id = p.id
        WHERE ap.tournament_id = ?`
@@ -530,13 +556,13 @@ export function recalculateValuations(
   }>;
   const last15Map = new Map(last15Rows.map((r) => [r.player_id, r]));
 
-  // B: IPL 2025 avg FP
+  // B: most-recent league season avg FP (default 2025; LPL → 2024)
   const ipl2025Rows = sqlite
     .prepare(
       `SELECT player_id, AVG(fantasy_points) as avg_fp, COUNT(*) as cnt
        FROM match_performances
        WHERE player_id IN (${placeholders})
-         AND format = '${leagueFmt}' AND match_date >= '2025-01-01' AND match_date < '2026-01-01'
+         AND format = '${leagueFmt}' AND match_date >= '${seasonRecentStart}' AND match_date < '${seasonRecentEnd}'
        GROUP BY player_id`
     )
     .all(...playerIds) as Array<{
@@ -546,13 +572,13 @@ export function recalculateValuations(
   }>;
   const ipl2025Map = new Map(ipl2025Rows.map((r) => [r.player_id, r]));
 
-  // C: IPL 2024 avg FP
+  // C: prior league season avg FP (default 2024; LPL → 2023)
   const ipl2024Rows = sqlite
     .prepare(
       `SELECT player_id, AVG(fantasy_points) as avg_fp, COUNT(*) as cnt
        FROM match_performances
        WHERE player_id IN (${placeholders})
-         AND format = '${leagueFmt}' AND match_date >= '2024-01-01' AND match_date < '2025-01-01'
+         AND format = '${leagueFmt}' AND match_date >= '${seasonPriorStart}' AND match_date < '${seasonPriorEnd}'
        GROUP BY player_id`
     )
     .all(...playerIds) as Array<{
@@ -736,14 +762,39 @@ export function recalculateValuations(
       t20_2_5yrCount: t20All?.cnt ?? 0,
     }, score1Weights);
 
-    // Hundred small-sample shrinkage (empirical-Bayes: k=5 pseudo-games toward a prior of 40).
-    // Regresses the form estimate when a player has few quality games, so thin-sample fliers
-    // (e.g. an uncapped bowler with ~0 Hundred games) don't top the board; large-n players
-    // (Rashid/Buttler/Marsh) barely move. Hundred-only; all other tours use the raw estimate.
-    const score1 = isHundred
-      ? ((qualNMap.get(p.player_id) ?? 0) * rawScore1 + 5 * 40) /
-        ((qualNMap.get(p.player_id) ?? 0) + 5)
-      : rawScore1;
+    // Small-sample shrinkage (empirical-Bayes: regress form toward a prior of 40 — ~the LPL pool
+    // median EFPPM, a real "league-average" anchor — by k=5 pseudo-games).
+    //  - Hundred: total-N shrinkage on qualNMap (unchanged; statless → 40).
+    //  - LPL: PER-BUCKET shrinkage. The distortion here is NOT "few total games" (Samarawickrama
+    //    has 10 quality games in 30mo) — it's that with no 2025 LPL season the recency bucket (A)
+    //    carries 57% of the weight on a SINGLE 116-FP game. Shrinking each bucket by ITS OWN count
+    //    (a 1-game bucket collapses toward 40: (1·116+5·40)/6 ≈ 53; a 9/10-game bucket barely
+    //    moves) deflates exactly that lone-game bucket, then re-blends with the same weights and
+    //    zero-count redistribution as the raw score. Well-sampled stars (high count in every
+    //    bucket) are left intact. Statless players stay at the baseline (all buckets excluded → 20).
+    // All other tours use the raw estimate.
+    const SHRINK_K = 5;
+    const SHRINK_PRIOR = 40;
+    const shrinkAvg = (avg: number, cnt: number) =>
+      cnt > 0 ? (cnt * avg + SHRINK_K * SHRINK_PRIOR) / (cnt + SHRINK_K) : avg;
+    let score1: number;
+    if (isHundred) {
+      const n = qualNMap.get(p.player_id) ?? 0;
+      score1 = (n * rawScore1 + SHRINK_K * SHRINK_PRIOR) / (n + SHRINK_K);
+    } else if (isLpl) {
+      score1 = computeScore1({
+        last15Avg: shrinkAvg(last15?.avg_fp ?? 0, last15?.cnt ?? 0),
+        last15Count: last15?.cnt ?? 0,
+        ipl2025Avg: shrinkAvg(ipl2025?.avg_fp ?? 0, ipl2025?.cnt ?? 0),
+        ipl2025Count: ipl2025?.cnt ?? 0,
+        ipl2024Avg: shrinkAvg(ipl2024?.avg_fp ?? 0, ipl2024?.cnt ?? 0),
+        ipl2024Count: ipl2024?.cnt ?? 0,
+        t20_2_5yrAvg: shrinkAvg(t20All?.avg_fp ?? 0, t20All?.cnt ?? 0),
+        t20_2_5yrCount: t20All?.cnt ?? 0,
+      }, score1Weights);
+    } else {
+      score1 = rawScore1;
+    }
 
     // Hundred: convert the (mostly non-Hundred) proxy form to the D11 Hundred scale, weighted
     // by how much of the player's recent quality history is actually Hundred. normMult=1 else.
@@ -755,12 +806,15 @@ export function recalculateValuations(
     }
     const normScore1 = score1 * normMult;
 
-    // Score 2: conditions factor. The venue multiplier is a scale-invariant ratio, so compute
-    // it from the raw score1, then apply it to the normalized score1.
+    // Score 2: conditions factor. The venue multiplier is a scale-invariant RATIO of schedule-
+    // weighted venue form to overall form, so it MUST be computed at the raw form scale (where the
+    // venue averages live) and then applied to the shrunk/normalized score — otherwise shrinking
+    // score1 drifts the ratio toward 1 and silently undoes the shrinkage. (Hundred keeps its prior
+    // behaviour of passing its shrunk score1; for every non-shrunk tour raw === score1.)
     const schedule = teamSchedules.get(p.ipl_team);
     const conditionsFactor = computeConditionsFactor(
       p.player_id,
-      score1,
+      isLpl ? rawScore1 : score1,
       schedule ?? [],
       playerVenueFP.get(p.player_id),
       playerVenueTypeFP.get(p.player_id),
@@ -779,7 +833,7 @@ export function recalculateValuations(
       : isMLC
       ? mlcExpectedMatches(p.ipl_team, p.squad_number)
       : isLpl
-      ? lplExpectedMatches(p.squad_number)
+      ? lplExpectedMatchesFor(p.name, p.squad_number)
       : isWomensWC
       ? getWomensExpectedMatches(p.squad_number, WC_TEAM_TIERS[p.ipl_team] ?? "C")
       : getExpectedMatches(p.squad_number);

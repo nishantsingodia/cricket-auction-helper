@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sqlite } from "@/db";
 import { getTourVenueContext, buildTeamVenueSummaries } from "@/lib/venues/tour-venues";
 import { getTourStatScope, computeTourConsensus } from "@/lib/venues/consensus";
+import { LPL_2026_NAME, LPL_DISPLAY_NAMES } from "@/lib/squads/lpl-2026";
 
 export async function GET(
   _request: NextRequest,
@@ -55,6 +56,19 @@ export async function GET(
          ORDER BY ap.ipl_team, ap.squad_number`
       )
       .all(auctionId);
+
+    // LPL: render friendly announced names instead of unreadable cricsheet initials-forms
+    // ("BKG Mendis" -> "Kusal Mendis"). Display-only; stats still come from player_id. Keep the
+    // raw cricsheet name on `cricsheet_name` for reference. Other tours are unaffected.
+    if ((auction as { tournament_name?: string }).tournament_name === LPL_2026_NAME) {
+      for (const row of pool as Array<{ name: string; cricsheet_name?: string }>) {
+        const friendly = LPL_DISPLAY_NAMES[row.name];
+        if (friendly) {
+          row.cricsheet_name = row.name;
+          row.name = friendly;
+        }
+      }
+    }
 
     // Get watchlist
     const watchlistItems = sqlite

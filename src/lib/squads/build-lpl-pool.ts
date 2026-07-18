@@ -100,8 +100,13 @@ export function buildLPLPool(
     .all() as DbPlayer[];
   const broadPool = sqlite
     .prepare(
+      // Candidate pool = any male with marquee-franchise-T20 or T20I history. Must include the
+      // OTHER franchise leagues (BBL/PSL/CPL/SA20/ILT20/MLC/HUN), not just LPL/IPL/T20 — many LPL
+      // signings are franchise journeymen (e.g. SB Harper, all BBL/PSL) who otherwise aren't even
+      // candidates and get created as statless phantoms. Mirrors the valuation quality set.
       `SELECT DISTINCT p.id, p.name, p.cricsheet_id AS cricsheetId FROM players p
-       JOIN career_stats cs ON cs.player_id = p.id AND cs.format IN ('LPL','IPL','T20')
+       JOIN career_stats cs ON cs.player_id = p.id
+         AND cs.format IN ('LPL','IPL','T20','BBL','PSL','CPL','SA20','ILT20','MLC','HUN')
        WHERE p.gender != 'female' OR p.gender IS NULL`
     )
     .all() as DbPlayer[];
