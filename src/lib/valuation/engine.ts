@@ -255,6 +255,71 @@ function classifyHundredVenuesWomen(): Map<string, VenueType> {
   return out;
 }
 
+// ---- Hundred per-role scale normalization (DATA-DRIVEN, auto-updates each season) ----
+// The Hundred is scored on its own 100-ball D11 scale (no SR/econ/maiden), so a player's
+// non-Hundred (T20I/WPL/WBBL) proxy form must be converted onto it. `normMult` is a PURE
+// format-scale factor: it is MEASURED as the outlier-robust ratio of Hundred FP to T20I FP AT
+// THE SAME Hundred grounds over a recent window — venue and scoring-era held constant, so the
+// England venue effect is NOT baked in (the conditions factor handles England separately → no
+// double count). It self-updates as each new season's HUN + T20I data is ingested; no hardcoded
+// numbers to maintain. Falls back to HUNDRED_ROLE_NORM per role when a role has too little data.
+const HUNDRED_NORM_MONTHS = 72; // measurement window (covers the full Hundred era; grows each yr)
+const HUNDRED_NORM_MIN_N = 20; // per role & format: min performances to trust the computed factor
+const HUNDRED_NORM_MIN_FACTOR = 0.6; // clamp band — guards against a data glitch
+const HUNDRED_NORM_MAX_FACTOR = 1.15;
+
+// 10% trimmed mean — drops the top & bottom 10% (big hauls / ducks) before averaging.
+function trimmedMean(xs: number[], p = 0.1): number {
+  if (xs.length === 0) return NaN;
+  const s = [...xs].sort((a, b) => a - b);
+  const k = Math.floor(s.length * p);
+  const core = s.length - 2 * k >= 1 ? s.slice(k, s.length - k) : s;
+  return core.reduce((a, b) => a + b, 0) / core.length;
+}
+
+function computeHundredRoleNorm(
+  gender: "male" | "female"
+): Record<HundredRole, number> {
+  const variants = HUNDRED_VENUES.flatMap((v) => v.variants);
+  const ph = variants.map(() => "?").join(",");
+  const rows = sqlite
+    .prepare(
+      `SELECT mp.format AS fmt, p.role AS role, mp.fantasy_points AS fp
+       FROM match_performances mp JOIN players p ON p.id = mp.player_id
+       WHERE p.gender = ? AND mp.format IN ('HUN','T20')
+         AND mp.match_date >= date('now', ?)
+         AND mp.venue_name IN (${ph})`
+    )
+    .all(gender, `-${HUNDRED_NORM_MONTHS} months`, ...variants) as Array<{
+    fmt: string;
+    role: string;
+    fp: number | null;
+  }>;
+
+  const bucket: Record<string, { HUN: number[]; T20: number[] }> = {};
+  for (const r of rows) {
+    if (r.fp == null) continue;
+    (bucket[r.role] ??= { HUN: [], T20: [] });
+    if (r.fmt === "HUN") bucket[r.role].HUN.push(r.fp);
+    else bucket[r.role].T20.push(r.fp);
+  }
+
+  const out: Record<HundredRole, number> = { ...HUNDRED_ROLE_NORM };
+  for (const role of ["BAT", "WK", "AR", "BOWL"] as HundredRole[]) {
+    const b = bucket[role];
+    if (!b || b.HUN.length < HUNDRED_NORM_MIN_N || b.T20.length < HUNDRED_NORM_MIN_N)
+      continue; // too little data → keep the hardcoded fallback for this role
+    const t20 = trimmedMean(b.T20);
+    if (!(t20 > 0)) continue;
+    const ratio = trimmedMean(b.HUN) / t20;
+    out[role] = Math.max(
+      HUNDRED_NORM_MIN_FACTOR,
+      Math.min(HUNDRED_NORM_MAX_FACTOR, ratio)
+    );
+  }
+  return out;
+}
+
 function getTeamSchedules(): Map<string, Array<{ venue: string; games: number }>> {
   // IPL 2026 Full League Stage Schedule (70 matches, 28 Mar – 24 May 2026)
   // Each entry: [team1, team2, venueDBName]
@@ -820,6 +885,12 @@ export function recalculateValuations(
     bowlOversAvg: number | null;
   }> = [];
 
+  // Data-driven per-role scale factors for the Hundred (measured this run from HUN vs T20I at the
+  // Hundred grounds — see computeHundredRoleNorm). null for non-Hundred tours (normMult stays 1).
+  const hundredRoleNorm = isHundred
+    ? computeHundredRoleNorm(isHundredWomen ? "female" : "male")
+    : null;
+
   for (const p of availPool) {
     // Score 1
     const last15 = last15Map.get(p.player_id);
@@ -877,7 +948,10 @@ export function recalculateValuations(
     let normMult = 1.0;
     if (isHundred) {
       const hf = hunFracMap.get(p.player_id) ?? 0;
-      const rf = HUNDRED_ROLE_NORM[p.role as HundredRole] ?? 1.0;
+      const rf =
+        hundredRoleNorm?.[p.role as HundredRole] ??
+        HUNDRED_ROLE_NORM[p.role as HundredRole] ??
+        1.0;
       normMult = hf + (1 - hf) * rf;
     }
     const normScore1 = score1 * normMult;
