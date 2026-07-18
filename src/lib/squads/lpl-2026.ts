@@ -275,7 +275,6 @@ export const LPL_DISPLAY_NAMES: Record<string, string> = {
   "C Wickramasinghe": "Chamindu Wickramasinghe",
   "KIC Asalanka": "Charith Asalanka",
   "CA Lynn": "Chris Lynn",
-  "GD Phillips": "Dale Phillips",
   "MD Shanaka": "Dasun Shanaka",
   "D Wiese": "David Wiese",
   "D Lakshan": "Dhananjaya Lakshan",
