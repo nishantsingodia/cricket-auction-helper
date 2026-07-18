@@ -23,6 +23,7 @@ ARCHIVES = {
     # Marquee T20 franchise leagues — bucketed by folder in etl_cricsheet.py (FOLDER_FORMAT),
     # so they feed the "quality" recency blend (last-15) for T20 tours like The Hundred.
     "bbl": "https://cricsheet.org/downloads/bbl_json.zip",    # Big Bash League
+    "wbbl": "https://cricsheet.org/downloads/wbb_json.zip",   # Women's Big Bash League
     "blast": "https://cricsheet.org/downloads/ntb_json.zip",  # Vitality Blast (English domestic T20)
     "psl": "https://cricsheet.org/downloads/psl_json.zip",    # Pakistan Super League
     "sa20": "https://cricsheet.org/downloads/sat_json.zip",   # SA20

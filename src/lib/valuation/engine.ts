@@ -158,31 +158,101 @@ function computeScore1(
 
 // ==================== SCORE 2: Venue Conditions Factor ====================
 
+// Shared venue-classification recency rule — applies to EVERY data-driven venue read (the global
+// men's classifier and the women's-Hundred classifier alike). Classify a ground on the last
+// VENUE_RECENT_MONTHS; if it has < VENUE_MIN_RECENT matches in that window, widen THAT ground to
+// VENUE_EXTENDED_MONTHS so a thin recent sample never mis-classifies. A ground needs at least
+// VENUE_MIN_CLASSIFY matches in the chosen window to be classified at all (else no type → neutral
+// in the conditions factor). Fresh-first, extend-only-when-sparse — one rule for all tours.
+const VENUE_RECENT_MONTHS = 36; // 3 years
+const VENUE_EXTENDED_MONTHS = 72; // 6 years
+const VENUE_MIN_RECENT = 5; // <5 in the recent window → fall back to the extended window
+const VENUE_MIN_CLASSIFY = 3; // absolute floor to classify at all
+
+// bat÷bowl FP ratio → venue character (>1.10 bat_road / ≥0.95 balanced / else bowl_friendly).
+function ratioToVenueType(batFp: number, bowlFp: number): VenueType {
+  const ratio = batFp / bowlFp;
+  return ratio > 1.1 ? "bat_road" : ratio >= 0.95 ? "balanced" : "bowl_friendly";
+}
+
 function classifyVenues(): Map<string, VenueType> {
+  // Per-ground stats for BOTH windows in one pass (outer bound = the extended window). The
+  // `_r` columns cover only the recent window; the `_e` columns cover the full extended window.
   const rows = sqlite
     .prepare(
       `SELECT mp.venue_name,
-        AVG(CASE WHEN p.role IN ('BAT','WK') THEN mp.fantasy_points END) as bat_fp,
-        AVG(CASE WHEN p.role = 'BOWL' THEN mp.fantasy_points END) as bowl_fp
+        AVG(CASE WHEN p.role IN ('BAT','WK') AND mp.match_date >= date('now', ?) THEN mp.fantasy_points END) as bat_r,
+        AVG(CASE WHEN p.role = 'BOWL'        AND mp.match_date >= date('now', ?) THEN mp.fantasy_points END) as bowl_r,
+        COUNT(DISTINCT CASE WHEN mp.match_date >= date('now', ?) THEN mp.match_id END) as m_r,
+        AVG(CASE WHEN p.role IN ('BAT','WK') THEN mp.fantasy_points END) as bat_e,
+        AVG(CASE WHEN p.role = 'BOWL'        THEN mp.fantasy_points END) as bowl_e,
+        COUNT(DISTINCT mp.match_id) as m_e
       FROM match_performances mp
       JOIN players p ON mp.player_id = p.id
-      WHERE mp.match_date >= '2020-01-01'
+      WHERE mp.match_date >= date('now', ?)
         AND mp.format IN ('IPL', 'T20')
         AND p.gender = 'male'
-      GROUP BY mp.venue_name
-      HAVING COUNT(DISTINCT mp.match_id) >= 3`
+      GROUP BY mp.venue_name`
     )
-    .all() as Array<{ venue_name: string; bat_fp: number; bowl_fp: number }>;
+    .all(
+      `-${VENUE_RECENT_MONTHS} months`,
+      `-${VENUE_RECENT_MONTHS} months`,
+      `-${VENUE_RECENT_MONTHS} months`,
+      `-${VENUE_EXTENDED_MONTHS} months`
+    ) as Array<{
+    venue_name: string;
+    bat_r: number | null;
+    bowl_r: number | null;
+    m_r: number;
+    bat_e: number | null;
+    bowl_e: number | null;
+    m_e: number;
+  }>;
 
   const map = new Map<string, VenueType>();
   for (const r of rows) {
-    if (!r.bat_fp || !r.bowl_fp) continue;
-    const ratio = r.bat_fp / r.bowl_fp;
-    if (ratio > 1.1) map.set(r.venue_name, "bat_road");
-    else if (ratio >= 0.95) map.set(r.venue_name, "balanced");
-    else map.set(r.venue_name, "bowl_friendly");
+    const useRecent = r.m_r >= VENUE_MIN_RECENT;
+    const bat = useRecent ? r.bat_r : r.bat_e;
+    const bowl = useRecent ? r.bowl_r : r.bowl_e;
+    const cnt = useRecent ? r.m_r : r.m_e;
+    if (cnt < VENUE_MIN_CLASSIFY || !bat || !bowl) continue;
+    map.set(r.venue_name, ratioToVenueType(bat, bowl));
   }
   return map;
+}
+
+// Women's Hundred: classify the 8 grounds on WOMEN's bat/bowl history (women's T20Is + The
+// Hundred women), NOT the men's curated reads in HUNDRED_VENUES.type. Uses the SAME shared
+// recency rule as classifyVenues (VENUE_RECENT_MONTHS, widen to VENUE_EXTENDED_MONTHS if
+// <VENUE_MIN_RECENT) and the same ratio thresholds. Falls back to the curated men's type only
+// if a ground has no usable women's sample at all. Data-driven → self-sharpens each season.
+function classifyHundredVenuesWomen(): Map<string, VenueType> {
+  const out = new Map<string, VenueType>();
+  for (const v of HUNDRED_VENUES) {
+    const ph = v.variants.map(() => "?").join(",");
+    const stmt = sqlite.prepare(
+      `SELECT AVG(CASE WHEN p.role IN ('BAT','WK') THEN mp.fantasy_points END) AS bat_fp,
+              AVG(CASE WHEN p.role = 'BOWL' THEN mp.fantasy_points END) AS bowl_fp,
+              COUNT(DISTINCT mp.match_id) AS matches
+       FROM match_performances mp JOIN players p ON p.id = mp.player_id
+       WHERE p.gender = 'female' AND mp.format IN ('T20','HUN')
+         AND mp.venue_name IN (${ph}) AND mp.match_date >= date('now', ?)`
+    );
+    let row = stmt.get(...v.variants, `-${VENUE_RECENT_MONTHS} months`) as {
+      bat_fp: number | null;
+      bowl_fp: number | null;
+      matches: number;
+    };
+    if (!row || (row.matches ?? 0) < VENUE_MIN_RECENT) {
+      row = stmt.get(...v.variants, `-${VENUE_EXTENDED_MONTHS} months`) as typeof row;
+    }
+    let type: VenueType = v.type; // fallback = curated men's read
+    if (row && row.bat_fp && row.bowl_fp) {
+      type = ratioToVenueType(row.bat_fp, row.bowl_fp);
+    }
+    out.set(v.canonical, type);
+  }
+  return out;
 }
 
 function getTeamSchedules(): Map<string, Array<{ venue: string; games: number }>> {
@@ -457,7 +527,9 @@ export function recalculateValuations(
     // would let county form dominate the last-15 window — the opposite of reducing single-tour bias.
     ? "'HUN','T20','IPL','MLC','BBL','PSL','SA20','ILT20','CPL','LPL'"
     : isHundredWomen
-    ? "'HUN','WPL','T20'"
+    // WBBL now ingested (women's Big Bash, format 'WBBL') → counts as marquee franchise form
+    // alongside The Hundred, WPL and all women's T20.
+    ? "'HUN','WPL','T20','WBBL'"
     : isLpl
     // Franchise-T20 league: LPL squads are full of journeymen whose form lives in OTHER franchise
     // leagues, not LPL/IPL. Count ALL marquee franchise leagues as quality (incl. HUN — The Hundred,
@@ -632,10 +704,14 @@ export function recalculateValuations(
   const venueClassification = classifyVenues();
   let teamSchedules = getTeamSchedules();
   if (isHundred) {
-    // Override the 8 English grounds' classification (consolidated men's bat/bowl read) and
-    // build each team's 8-game schedule: home ground x4 + the other 7 grounds spread (~4/7).
+    // Override the 8 English grounds' classification and build each team's 8-game schedule:
+    // home ground x4 + the other 7 grounds spread (~4/7). MEN use the curated consolidated
+    // men's bat/bowl read (HUNDRED_VENUES.type); WOMEN classify on their OWN ground history
+    // (women's T20Is + The Hundred women) via classifyHundredVenuesWomen().
+    const womensTypes = isHundredWomen ? classifyHundredVenuesWomen() : null;
     for (const v of HUNDRED_VENUES) {
-      for (const variant of v.variants) venueClassification.set(variant, v.type);
+      const t = womensTypes?.get(v.canonical) ?? v.type;
+      for (const variant of v.variants) venueClassification.set(variant, t);
     }
     const grounds = HUNDRED_VENUES.map((v) => v.canonical);
     teamSchedules = new Map(
