@@ -11,8 +11,10 @@ accumulation).
   - ⚠️ `data/wc_fps_to_csv.py` is a **STALE copy** — the live points generator now lives in the
     standalone **wwc-points-bot** repo (runs in CI, writes the Google Sheet). Delete or re-sync it;
     don't edit this copy expecting it to take effect.
-- **Player identity:** `src/lib/registry/players.json` is the shared global identity (cricsheet_id-anchored)
-  used by the pool builders (registry-first). It is PRODUCED by `wwc-points-bot/build_registry.py`. To
+- **Player identity:** `src/lib/registry/players.json` is the shared global identity (**cricinfo-id-anchored**,
+  `ci:<cricinfoId>`; migrated 25 Jul 2026 — `cricsheet_id` is now derived from the crosswalk, not the anchor).
+  The `players.cricinfo_id` DB column is populated from the crosswalk. Used by the pool builders
+  (registry-first). PRODUCED by `wwc-points-bot/build_registry.py`. To
   refresh, run **`npm run sync-registry`** (pulls the canonical file straight from the wwc-points-bot
   GitHub repo) — no more manual `cp` from a local checkout (which silently went stale).
 - **Fuzzy matcher:** `src/lib/fuzzy-name-match.ts` is now a thin re-export shim of the shared
@@ -38,15 +40,15 @@ The LPL 2026 saga (18 Jul) burned a full day on this. Rules, in order:
    Kusal Perera→KKV Perera, Avishka→Asitha's AM Fernando). Same-surname ≠ same person.
 3. **SL names hide the go-by name in initials** (Nishan Madushka = KNM Fernando) and collide on
    initials (Avishka & Vishwa = W.I.A.). Local data has NO full/common name → you cannot auto-tell
-   a correct SL match from a wrong namesake. Resolve full-name→cricsheet_id at SETUP (web-verify
-   the hard ones), and RUN THE GATE below.
+   a correct SL match from a wrong namesake. Resolve full-name→**cricinfo id** at SETUP (web-verify the
+   hard ones, add a `manual_ci_bridges.json` entry — the crosswalk then derives cricsheet_id), + RUN THE GATE.
 4. **GATE before any tour goes live (auction/draft/bot):** `python3 wwc-points-bot/identity_healthcheck.py "<tour>"`.
-   It BLOCKs on dup-cricsheet + exact-name-record-exists-but-unanchored, lists unmapped (triage:
-   uncapped or add a bridge), and prints a name-mismatch REVIEW list to eyeball for a wrong namesake.
+   It BLOCKs on dup-cricinfo + exact-name-record-exists-but-unanchored, lists needs-review (the id exists on
+   cricinfo.com but not our register → fill it in the "Needs Cricinfo ID" tab), and prints a name-mismatch REVIEW list.
 5. **Never key identity ops on `squad_number`** (it's edited lineup order, not squad-file index —
-   a re-map keyed on it scrambles picks). Anchor on cricsheet_id / the row's own name. Dry-run bulk
-   identity mutations. Builders must dedup on cricsheet_id (phantom-duplicate rows break anchoring:
-   two "Wanindu Hasaranga" rows → the matcher's tie-breaker rejects both → star left unanchored).
+   a re-map keyed on it scrambles picks). Anchor on the stable id (**cricinfo id** / cricsheet_id) / the row's
+   own name. Dry-run bulk identity mutations. Builders must dedup on the stable id (phantom-duplicate rows break
+   anchoring: two "Wanindu Hasaranga" rows → the matcher's tie-breaker rejects both → star left unanchored).
 
 ## ⛔ CRITICAL — never break a live auction
 - **NEVER `DELETE`/rebuild `auction_pool` or run the ETL on an auction that has
@@ -120,9 +122,10 @@ The LPL 2026 saga (18 Jul) burned a full day on this. Rules, in order:
    - `strengthTier` (A/B/C) for strength-weighted expected matches.
    - `groupVenues`, tournament name constant, derived `*_TEAM_TIERS`.
    - **Name matching is now registry-FIRST.** The pool builders (`build-*-pool.ts`)
-     resolve each announced name to a DB player by stable `cricsheet_id` via the shared
-     global registry (`src/lib/registry/` — a copy of `wwc-points-bot/registry/players.json`,
-     the SAME identity the points sheet & draft use), before any fuzzy logic. So a new tour
+     resolve each announced name to a DB player via the shared global registry — now keyed on the
+     stable **cricinfo id** (`ci:`), with `cricsheet_id` derived from the crosswalk
+     (`src/lib/registry/` — a copy of `wwc-points-bot/registry/players.json`, the SAME identity the
+     points sheet & draft use), before any fuzzy logic. So a new tour
      is mostly auto-resolved. Per-builder `NAME_ALIASES` / `MLC_NAME_ALIASES` + `SEARCH_ALIASES`
      remain as a FALLBACK for players the registry doesn't cover yet.
    - To fix a genuinely-unlinkable name (e.g. Chamari Athapaththu = "AC Jayangani"), prefer
