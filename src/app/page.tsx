@@ -61,6 +61,12 @@ export default function HomePage() {
       note: "5 Sri Lanka franchises · valued on LPL + IPL/T20I form (venue-neutral)",
     },
     {
+      id: "CPL 2026",
+      label: "CPL 2026",
+      format: "T20",
+      note: "7 Caribbean franchises · valued on CPL 2025/24 + franchise-T20 form, bowl-leaning venues",
+    },
+    {
       id: "India vs England Men's T20 2026",
       label: "India vs England Men's T20 2026",
       format: "T20",

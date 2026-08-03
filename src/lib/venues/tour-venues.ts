@@ -20,6 +20,13 @@ import {
   LPL_VENUES,
   LPL_TEAM_SCHEDULE,
 } from "@/lib/squads/lpl-2026";
+import {
+  CPL_2026_NAME,
+  CPL_VENUES,
+  CPL_TEAM_SCHEDULE,
+  CPL_TOURNAMENT_SCHEDULE,
+  CPL_VENUE_BASIS,
+} from "@/lib/squads/cpl-2026";
 
 export type VenueType = "bat_road" | "balanced" | "bowl_friendly";
 
@@ -134,6 +141,7 @@ export function getTourVenueContext(tournamentName: string): TourVenueContext | 
   const isHundredMen = tournamentName === THE_HUNDRED_MEN_2026_NAME;
   const isHundredWomen = tournamentName === THE_HUNDRED_WOMEN_2026_NAME;
   const isLpl = tournamentName === LPL_2026_NAME;
+  const isCpl = tournamentName === CPL_2026_NAME;
 
   if (isHundredMen || isHundredWomen) {
     const teams = isHundredMen ? HUNDRED_MEN_2026 : HUNDRED_WOMEN_2026;
@@ -173,6 +181,36 @@ export function getTourVenueContext(tournamentName: string): TourVenueContext | 
       venues: LPL_VENUES.map((v) => ({ canonical: v.canonical, variants: v.variants, type: v.type })),
       teamSchedule: LPL_TEAM_SCHEDULE,
       homeOf,
+    };
+  }
+
+  if (isCpl) {
+    // Unlike LPL this is NOT a neutral festival: CPL's legs are regional, so each franchise plays
+    // 4–5 of its 10 league games at its own ground. Home grounds are therefore real.
+    const homeOf: TourVenueContext["homeOf"] = {
+      ABF: "Sir Vivian Richards Stadium, North Sound, Antigua",
+      BAR: "Kensington Oval, Bridgetown, Barbados",
+      GAW: "Providence Stadium, Guyana",
+      JAM: "Sabina Park, Kingston, Jamaica",
+      SKN: "Warner Park, Basseterre, St Kitts",
+      SLK: "Daren Sammy National Cricket Stadium, Gros Islet, St Lucia",
+      TKR: "Queen's Park Oval, Port of Spain, Trinidad",
+    };
+    return {
+      tour: tournamentName,
+      neutral: false,
+      gender: "male",
+      venueFormats: ["CPL", "T20"],
+      venueWindowMonths: 60,
+      venues: CPL_VENUES.map((v) => ({ canonical: v.canonical, variants: v.variants, type: v.type })),
+      // Mirror the engine: honour CPL_VENUE_BASIS so the header chip never disagrees with valuations.
+      teamSchedule:
+        CPL_VENUE_BASIS === "tournament"
+          ? Object.fromEntries(Object.keys(CPL_TEAM_SCHEDULE).map((t) => [t, CPL_TOURNAMENT_SCHEDULE]))
+          : CPL_TEAM_SCHEDULE,
+      homeOf: CPL_VENUE_BASIS === "tournament"
+        ? Object.fromEntries(Object.keys(CPL_TEAM_SCHEDULE).map((t) => [t, null]))
+        : homeOf,
     };
   }
 

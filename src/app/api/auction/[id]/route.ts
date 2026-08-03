@@ -3,6 +3,7 @@ import { sqlite } from "@/db";
 import { getTourVenueContext, buildTeamVenueSummaries } from "@/lib/venues/tour-venues";
 import { getTourStatScope, computeTourConsensus } from "@/lib/venues/consensus";
 import { LPL_2026_NAME, LPL_DISPLAY_NAMES } from "@/lib/squads/lpl-2026";
+import { CPL_2026_NAME, CPL_DISPLAY_NAMES } from "@/lib/squads/cpl-2026";
 
 export async function GET(
   _request: NextRequest,
@@ -60,9 +61,16 @@ export async function GET(
     // LPL: render friendly announced names instead of unreadable cricsheet initials-forms
     // ("BKG Mendis" -> "Kusal Mendis"). Display-only; stats still come from player_id. Keep the
     // raw cricsheet name on `cricsheet_name` for reference. Other tours are unaffected.
-    if ((auction as { tournament_name?: string }).tournament_name === LPL_2026_NAME) {
+    // CPL has the same problem ("JNT Seales" -> "Jayden Seales"), so both tours share one pass.
+    const displayMap =
+      (auction as { tournament_name?: string }).tournament_name === LPL_2026_NAME
+        ? LPL_DISPLAY_NAMES
+        : (auction as { tournament_name?: string }).tournament_name === CPL_2026_NAME
+        ? CPL_DISPLAY_NAMES
+        : null;
+    if (displayMap) {
       for (const row of pool as Array<{ name: string; cricsheet_name?: string }>) {
-        const friendly = LPL_DISPLAY_NAMES[row.name];
+        const friendly = displayMap[row.name];
         if (friendly) {
           row.cricsheet_name = row.name;
           row.name = friendly;

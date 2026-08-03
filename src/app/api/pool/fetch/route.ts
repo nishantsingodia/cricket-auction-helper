@@ -39,6 +39,8 @@ import {
 import { buildHundredPool } from "@/lib/squads/build-hundred-pool";
 import { LPL_2026, LPL_2026_NAME } from "@/lib/squads/lpl-2026";
 import { buildLPLPool } from "@/lib/squads/build-lpl-pool";
+import { CPL_2026, CPL_2026_NAME } from "@/lib/squads/cpl-2026";
+import { buildCPLPool } from "@/lib/squads/build-cpl-pool";
 import { eq } from "drizzle-orm";
 
 export async function POST(request: NextRequest) {
@@ -352,6 +354,47 @@ export async function POST(request: NextRequest) {
         : undefined;
 
       const built = buildLPLPool(sqlite, { auctionId, tournamentId, teams });
+      if (isFirstBuild)
+        carryOverPreviousLineups({
+          tournamentName: auctionRow.tournament_name,
+          tournamentId,
+          auctionId,
+        });
+      initializeValuations(tournamentId);
+
+      return NextResponse.json({
+        success: true,
+        teams: built.teams,
+        players: built.players,
+        matched: built.matched,
+        created: built.created,
+        unmatched: built.unmatched,
+        teamBreakdown: built.teamBreakdown,
+      });
+    }
+
+    // ---- CPL 2026 (Caribbean Premier League) — franchise T20, modelled like LPL/MLC ----
+    if (auctionRow.tournament_name === CPL_2026_NAME) {
+      let tournamentId = auctionRow.tournament_id;
+      if (!tournamentId) {
+        const t = sqlite
+          .prepare(
+            // 7 franchises, squads of 17–19 (JAM carry 19), CPL caps the XI at 4 overseas.
+            `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size, max_overseas)
+             VALUES (?, 'CUSTOM', 'T20', 100, 19, 4)`
+          )
+          .run(CPL_2026_NAME);
+        tournamentId = Number(t.lastInsertRowid);
+        sqlite
+          .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
+          .run(tournamentId, auctionId);
+      }
+
+      const teams = Array.isArray(teamsFilter) && teamsFilter.length
+        ? CPL_2026.filter((t) => teamsFilter.includes(t.short))
+        : undefined;
+
+      const built = buildCPLPool(sqlite, { auctionId, tournamentId, teams });
       if (isFirstBuild)
         carryOverPreviousLineups({
           tournamentName: auctionRow.tournament_name,

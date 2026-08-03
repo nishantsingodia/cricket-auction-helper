@@ -13,6 +13,7 @@ import {
   THE_HUNDRED_WOMEN_2026_NAME,
 } from "@/lib/squads/the-hundred-2026";
 import { LPL_2026_NAME } from "@/lib/squads/lpl-2026";
+import { CPL_2026_NAME } from "@/lib/squads/cpl-2026";
 import { MLC_2026_NAME } from "@/lib/squads/mlc-2026";
 
 export interface TourStatScope {
@@ -27,6 +28,7 @@ export function getTourStatScope(name: string): TourStatScope | null {
     case THE_HUNDRED_MEN_2026_NAME: return { formats: ["HUN"], gender: "male" };
     case THE_HUNDRED_WOMEN_2026_NAME: return { formats: ["HUN"], gender: "female" };
     case LPL_2026_NAME: return { formats: ["LPL"], gender: "male" };
+    case CPL_2026_NAME: return { formats: ["CPL"], gender: "male" };
     case MLC_2026_NAME: return { formats: ["MLC"], gender: "male" };
     case WOMENS_T20_WC_2026_NAME: return { formats: ["T20"], gender: "female" };
     case IND_VS_ENG_T20_2026_NAME: return { formats: ["T20"], gender: "male" };

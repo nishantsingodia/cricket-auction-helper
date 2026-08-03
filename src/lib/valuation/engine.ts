@@ -37,6 +37,14 @@ import {
   LPL_VENUES,
   LPL_TEAM_SCHEDULE,
 } from "@/lib/squads/lpl-2026";
+import {
+  CPL_2026_NAME,
+  CPL_VENUES,
+  CPL_TEAM_SCHEDULE,
+  CPL_TOURNAMENT_SCHEDULE,
+  CPL_VENUE_BASIS,
+  cplExpectedMatches,
+} from "@/lib/squads/cpl-2026";
 
 /**
  * IPL Auction Valuation Engine — 2-Score Model
@@ -577,6 +585,13 @@ export function recalculateValuations(
   // computeScore1). No scale-normalization / no shrinkage (that is Hundred-only). Venue ON: all
   // 2026 grounds read bowl_friendly on ingested LPL+SL-T20I history — see the isLpl venue block.
   const isLpl = tournamentRow?.name === LPL_2026_NAME;
+  // CPL 2026: standard 20-over franchise T20, modelled like LPL/MLC but WITHOUT the LPL season
+  // slide-back — CPL ran a real 2025 season (Aug–Sep) and a 2024 one, so the default calendar
+  // 2025/2024 league-season buckets are genuinely populated and the DEFAULT 40/30/10/20 weights
+  // apply. Own 'CPL' league bucket; quality = every marquee franchise T20 + top-8 T20Is; per-bucket
+  // small-sample shrinkage ON (franchise league, same reasoning as LPL). Venue ON — the Caribbean
+  // is a bowler's league: 4 of the 8 grounds read bowl_friendly and none read bat_road.
+  const isCpl = tournamentRow?.name === CPL_2026_NAME;
   // For MLC, the "primary league season" buckets are MLC (not IPL), and the quality pool is
   // MLC + IPL + T20I (vs WPL for the women's path). A bilateral T20I series has NO league
   // season: Score 1 drops the season buckets, weights Last-10 60% + all-quality-30mo 40%.
@@ -585,7 +600,7 @@ export function recalculateValuations(
   // non-Hundred proxy form is normalized to the Hundred scale per role (normMult below).
   // LPL: venue ON — all 2026 grounds read bowl_friendly on LPL+SL-T20I history (subcontinent);
   // venueClassification + per-team schedule overridden in the isLpl block below.
-  const leagueFmt = isHundred ? "HUN" : isMLC ? "MLC" : isLpl ? "LPL" : "IPL";
+  const leagueFmt = isHundred ? "HUN" : isMLC ? "MLC" : isLpl ? "LPL" : isCpl ? "CPL" : "IPL";
   const qualityList = isHundredMen
     // Marquee franchise leagues only — Vitality Blast ('BLAST') is EXCLUDED: it's domestic
     // county T20 (a tier below), and at 1,557 matches it's the largest bucket, so counting it
@@ -602,6 +617,12 @@ export function recalculateValuations(
     // Harper (all BBL/PSL) sits at baseline 20, and 29/100 of the pool did. Only BLAST (county
     // T20, a tier below — would swamp the sample) is excluded.
     ? "'LPL','IPL','BBL','PSL','CPL','SA20','ILT20','MLC','HUN'"
+    : isCpl
+    // Same reasoning as LPL, and it bites harder here: a CPL squad is 5 overseas players per team
+    // whose form lives entirely OUTSIDE the Caribbean (Moeen/Hales in HUN+BLAST, Shadab/Naseem in
+    // PSL, de Kock in SA20/ILT20, Gurbaz/Nabi in everything). Counting only CPL+IPL would park most
+    // of the marquee overseas talent at baseline. BLAST stays excluded (county tier, would swamp).
+    ? "'CPL','IPL','BBL','PSL','LPL','SA20','ILT20','MLC','HUN'"
     : isMLC || isBilateral
     ? "'MLC','IPL'"
     : "'IPL','WPL'";
@@ -822,11 +843,36 @@ export function recalculateValuations(
     }
     teamSchedules = new Map(Object.entries(LPL_TEAM_SCHEDULE));
   }
+  if (isCpl) {
+    // CPL: override the 8 Caribbean grounds' classification with the consolidated, men's-only
+    // CPL+T20I bat/bowl read (classifyVenues would fragment them — cricsheet appended the territory
+    // to nearly every one of these names ~2021/2022, so "Providence Stadium" and "Providence
+    // Stadium, Guyana" are separate keys and each ground shows up at half its true sample).
+    // Set EVERY variant so a player's ground history under either spelling buckets correctly.
+    for (const v of CPL_VENUES) {
+      for (const variant of v.variants) venueClassification.set(variant, v.type);
+    }
+    // Replace the IPL-keyed schedule with either each franchise's actual 10-game venue split or the
+    // pooled tournament-level mix, per CPL_VENUE_BASIS.
+    teamSchedules =
+      CPL_VENUE_BASIS === "tournament"
+        ? new Map(Object.keys(CPL_TEAM_SCHEDULE).map((t) => [t, CPL_TOURNAMENT_SCHEDULE]))
+        : new Map(Object.entries(CPL_TEAM_SCHEDULE));
+  }
   // Men's ODI reads venue history from ODI matches (wider window — fewer ODIs per ground);
   // LPL reads its own league + SL-T20I ground history over a wider (60mo) window (5 seasons,
   // 2020–2024); every other tour keeps the T20-family default (byte-identical).
-  const venueFormats = isMensOdi ? ["ODI"] : isLpl ? ["LPL", "T20"] : ["IPL", "T20"];
-  const venueWindow = isMensOdi ? 60 : isLpl ? 60 : 30;
+  // CPL, like LPL, reads its own league + regional-T20I ground history over a wider 60mo window —
+  // a Caribbean ground hosts ~5–10 CPL games a season, so 30mo leaves several of them under the
+  // minimum sample (Sabina Park and Queen's Park Oval especially).
+  const venueFormats = isMensOdi
+    ? ["ODI"]
+    : isLpl
+    ? ["LPL", "T20"]
+    : isCpl
+    ? ["CPL", "T20"]
+    : ["IPL", "T20"];
+  const venueWindow = isMensOdi ? 60 : isLpl || isCpl ? 60 : 30;
   const playerVenueFP = batchPlayerVenueFP(playerIds, venueFormats, venueWindow);
   const playerVenueTypeFP = batchPlayerVenueTypeFP(
     playerIds,
@@ -928,7 +974,11 @@ export function recalculateValuations(
     if (isHundred) {
       const n = qualNMap.get(p.player_id) ?? 0;
       score1 = (n * rawScore1 + SHRINK_K * SHRINK_PRIOR) / (n + SHRINK_K);
-    } else if (isLpl) {
+    } else if (isLpl || isCpl) {
+      // CPL uses the same PER-BUCKET shrinkage as LPL. The trigger differs slightly: CPL's season
+      // buckets are populated, but a squad of 122 is full of players with a 1–3 game CPL season
+      // (uncapped domestics, breakout picks, overseas cameos), and a single big score in a 1-game
+      // bucket carrying 30% weight is exactly the artifact that sent S Samarawickrama to 68 EFPPM.
       score1 = computeScore1({
         last15Avg: shrinkAvg(last15?.avg_fp ?? 0, last15?.cnt ?? 0),
         last15Count: last15?.cnt ?? 0,
@@ -964,7 +1014,7 @@ export function recalculateValuations(
     const schedule = teamSchedules.get(p.ipl_team);
     const conditionsFactor = computeConditionsFactor(
       p.player_id,
-      isLpl ? rawScore1 : score1,
+      isLpl || isCpl ? rawScore1 : score1,
       schedule ?? [],
       playerVenueFP.get(p.player_id),
       playerVenueTypeFP.get(p.player_id),
@@ -984,6 +1034,8 @@ export function recalculateValuations(
       ? mlcExpectedMatches(p.ipl_team, p.squad_number)
       : isLpl
       ? lplExpectedMatchesFor(p.name, p.squad_number)
+      : isCpl
+      ? cplExpectedMatches(p.squad_number)
       : isWomensWC
       ? getWomensExpectedMatches(p.squad_number, WC_TEAM_TIERS[p.ipl_team] ?? "C")
       : getExpectedMatches(p.squad_number);
