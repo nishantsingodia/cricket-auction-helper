@@ -1,4 +1,5 @@
 import { sqlite } from "@/db";
+import { canonicalVenue } from "@/lib/registry/venues";
 import {
   WOMENS_T20_WC_2026_NAME,
   WC_TEAM_TIERS,
@@ -186,14 +187,24 @@ function ratioToVenueType(batFp: number, bowlFp: number): VenueType {
 function classifyVenues(): Map<string, VenueType> {
   // Per-ground stats for BOTH windows in one pass (outer bound = the extended window). The
   // `_r` columns cover only the recent window; the `_e` columns cover the full extended window.
+  //
+  // ⚠️ SUMS, not AVGs, and grouped by the RAW spelling — because the rows are then re-aggregated in
+  // JS onto the CANONICAL ground (see the venue registry). cricsheet stores one ground under up to
+  // four names, so grouping straight to an average per raw string silently computed every famous
+  // ground on a fraction of its history and dropped many for being "too thin". Averaging can't be
+  // re-combined without the counts, hence SUM + COUNT here.
   const rows = sqlite
     .prepare(
       `SELECT mp.venue_name,
-        AVG(CASE WHEN p.role IN ('BAT','WK') AND mp.match_date >= date('now', ?) THEN mp.fantasy_points END) as bat_r,
-        AVG(CASE WHEN p.role = 'BOWL'        AND mp.match_date >= date('now', ?) THEN mp.fantasy_points END) as bowl_r,
+        SUM(CASE WHEN p.role IN ('BAT','WK') AND mp.match_date >= date('now', ?) THEN mp.fantasy_points ELSE 0 END) as bat_sum_r,
+        SUM(CASE WHEN p.role IN ('BAT','WK') AND mp.match_date >= date('now', ?) THEN 1 ELSE 0 END) as bat_n_r,
+        SUM(CASE WHEN p.role = 'BOWL'        AND mp.match_date >= date('now', ?) THEN mp.fantasy_points ELSE 0 END) as bowl_sum_r,
+        SUM(CASE WHEN p.role = 'BOWL'        AND mp.match_date >= date('now', ?) THEN 1 ELSE 0 END) as bowl_n_r,
         COUNT(DISTINCT CASE WHEN mp.match_date >= date('now', ?) THEN mp.match_id END) as m_r,
-        AVG(CASE WHEN p.role IN ('BAT','WK') THEN mp.fantasy_points END) as bat_e,
-        AVG(CASE WHEN p.role = 'BOWL'        THEN mp.fantasy_points END) as bowl_e,
+        SUM(CASE WHEN p.role IN ('BAT','WK') THEN mp.fantasy_points ELSE 0 END) as bat_sum_e,
+        SUM(CASE WHEN p.role IN ('BAT','WK') THEN 1 ELSE 0 END) as bat_n_e,
+        SUM(CASE WHEN p.role = 'BOWL'        THEN mp.fantasy_points ELSE 0 END) as bowl_sum_e,
+        SUM(CASE WHEN p.role = 'BOWL'        THEN 1 ELSE 0 END) as bowl_n_e,
         COUNT(DISTINCT mp.match_id) as m_e
       FROM match_performances mp
       JOIN players p ON mp.player_id = p.id
@@ -206,25 +217,43 @@ function classifyVenues(): Map<string, VenueType> {
       `-${VENUE_RECENT_MONTHS} months`,
       `-${VENUE_RECENT_MONTHS} months`,
       `-${VENUE_RECENT_MONTHS} months`,
+      `-${VENUE_RECENT_MONTHS} months`,
+      `-${VENUE_RECENT_MONTHS} months`,
       `-${VENUE_EXTENDED_MONTHS} months`
     ) as Array<{
     venue_name: string;
-    bat_r: number | null;
-    bowl_r: number | null;
-    m_r: number;
-    bat_e: number | null;
-    bowl_e: number | null;
-    m_e: number;
+    bat_sum_r: number; bat_n_r: number; bowl_sum_r: number; bowl_n_r: number; m_r: number;
+    bat_sum_e: number; bat_n_e: number; bowl_sum_e: number; bowl_n_e: number; m_e: number;
   }>;
 
-  const map = new Map<string, VenueType>();
+  // Re-aggregate every spelling onto its canonical ground before any ratio is taken.
+  type Acc = {
+    batSumR: number; batNR: number; bowlSumR: number; bowlNR: number; mR: number;
+    batSumE: number; batNE: number; bowlSumE: number; bowlNE: number; mE: number;
+  };
+  const byGround = new Map<string, Acc>();
   for (const r of rows) {
-    const useRecent = r.m_r >= VENUE_MIN_RECENT;
-    const bat = useRecent ? r.bat_r : r.bat_e;
-    const bowl = useRecent ? r.bowl_r : r.bowl_e;
-    const cnt = useRecent ? r.m_r : r.m_e;
+    const g = canonicalVenue(r.venue_name);
+    const a =
+      byGround.get(g) ??
+      { batSumR: 0, batNR: 0, bowlSumR: 0, bowlNR: 0, mR: 0, batSumE: 0, batNE: 0, bowlSumE: 0, bowlNE: 0, mE: 0 };
+    a.batSumR += r.bat_sum_r; a.batNR += r.bat_n_r;
+    a.bowlSumR += r.bowl_sum_r; a.bowlNR += r.bowl_n_r; a.mR += r.m_r;
+    a.batSumE += r.bat_sum_e; a.batNE += r.bat_n_e;
+    a.bowlSumE += r.bowl_sum_e; a.bowlNE += r.bowl_n_e; a.mE += r.m_e;
+    byGround.set(g, a);
+  }
+
+  const map = new Map<string, VenueType>();
+  for (const [ground, a] of byGround) {
+    const useRecent = a.mR >= VENUE_MIN_RECENT;
+    const batN = useRecent ? a.batNR : a.batNE;
+    const bowlN = useRecent ? a.bowlNR : a.bowlNE;
+    const bat = batN > 0 ? (useRecent ? a.batSumR : a.batSumE) / batN : 0;
+    const bowl = bowlN > 0 ? (useRecent ? a.bowlSumR : a.bowlSumE) / bowlN : 0;
+    const cnt = useRecent ? a.mR : a.mE;
     if (cnt < VENUE_MIN_CLASSIFY || !bat || !bowl) continue;
-    map.set(r.venue_name, ratioToVenueType(bat, bowl));
+    map.set(ground, ratioToVenueType(bat, bowl));
   }
   return map;
 }
@@ -403,9 +432,13 @@ function batchPlayerVenueFP(
 
   const placeholders = playerIds.map(() => "?").join(",");
   const fmtIn = formats.map((f) => `'${f}'`).join(",");
+  // SUM + COUNT (not AVG) so the per-spelling rows can be re-aggregated onto the canonical ground.
+  // Without this a player's record at, say, Providence was split between "Providence Stadium" and
+  // "Providence Stadium, Guyana", so NEITHER half reached the 5-innings bar the conditions factor
+  // needs — and the schedule (which names one canonical spelling) only ever matched one of them.
   const rows = sqlite
     .prepare(
-      `SELECT player_id, venue_name, AVG(fantasy_points) as avg_fp, COUNT(*) as cnt
+      `SELECT player_id, venue_name, SUM(fantasy_points) as sum_fp, COUNT(*) as cnt
        FROM match_performances
        WHERE player_id IN (${placeholders})
          AND format IN (${fmtIn})
@@ -415,14 +448,28 @@ function batchPlayerVenueFP(
     .all(...playerIds) as Array<{
     player_id: number;
     venue_name: string;
-    avg_fp: number;
+    sum_fp: number;
     cnt: number;
   }>;
 
-  const map = new Map<number, Map<string, { avg: number; cnt: number }>>();
+  const acc = new Map<number, Map<string, { sum: number; cnt: number }>>();
   for (const r of rows) {
-    if (!map.has(r.player_id)) map.set(r.player_id, new Map());
-    map.get(r.player_id)!.set(r.venue_name, { avg: r.avg_fp, cnt: r.cnt });
+    const ground = canonicalVenue(r.venue_name);
+    let inner = acc.get(r.player_id);
+    if (!inner) acc.set(r.player_id, (inner = new Map()));
+    const cur = inner.get(ground) ?? { sum: 0, cnt: 0 };
+    cur.sum += r.sum_fp;
+    cur.cnt += r.cnt;
+    inner.set(ground, cur);
+  }
+
+  const map = new Map<number, Map<string, { avg: number; cnt: number }>>();
+  for (const [pid, inner] of acc) {
+    const out = new Map<string, { avg: number; cnt: number }>();
+    for (const [ground, v] of inner) {
+      if (v.cnt > 0) out.set(ground, { avg: v.sum / v.cnt, cnt: v.cnt });
+    }
+    map.set(pid, out);
   }
   return map;
 }
@@ -457,7 +504,9 @@ function batchPlayerVenueTypeFP(
     Map<VenueType, { total: number; cnt: number }>
   >();
   for (const r of rows) {
-    const vt = venueClassification.get(r.venue_name);
+    // venueClassification is keyed by CANONICAL ground, so the raw spelling must be mapped first —
+    // otherwise a performance recorded under an older spelling finds no type and is dropped.
+    const vt = venueClassification.get(canonicalVenue(r.venue_name));
     if (!vt) continue;
 
     if (!accum.has(r.player_id)) accum.set(r.player_id, new Map());
@@ -495,8 +544,10 @@ function computeConditionsFactor(
   let totalGames = 0;
   let weightedFP = 0;
 
-  for (const { venue, games } of teamSchedule) {
+  for (const { venue: rawVenue, games } of teamSchedule) {
     totalGames += games;
+    // Both the player's venue map and the classification are keyed by canonical ground.
+    const venue = canonicalVenue(rawVenue);
 
     // Try venue-specific FP (blended with overall — venue never fully overrides)
     const venueStat = playerVenueFP?.get(venue);
@@ -797,7 +848,7 @@ export function recalculateValuations(
     const womensTypes = isHundredWomen ? classifyHundredVenuesWomen() : null;
     for (const v of HUNDRED_VENUES) {
       const t = womensTypes?.get(v.canonical) ?? v.type;
-      for (const variant of v.variants) venueClassification.set(variant, t);
+      venueClassification.set(canonicalVenue(v.canonical), t);
     }
     const grounds = HUNDRED_VENUES.map((v) => v.canonical);
     teamSchedules = new Map(
@@ -816,7 +867,7 @@ export function recalculateValuations(
     // spellings so a player's history under either buckets into the right venue type.
     // (b) Replace the IPL-keyed schedule with a 5-ground one keyed by IND/ENG.
     for (const v of IND_VS_ENG_VENUES) {
-      for (const variant of v.variants) venueClassification.set(variant, v.type);
+      venueClassification.set(canonicalVenue(v.canonical), v.type);
     }
     const ground5 = IND_VS_ENG_VENUES.map((v) => ({ venue: v.canonical, games: 1 }));
     teamSchedules = new Map(IND_VS_ENG_T20_2026.map((t) => [t.short, ground5]));
@@ -826,7 +877,7 @@ export function recalculateValuations(
     // x2), both bowl_friendly on men's ODI bat/bowl history. Set both name variants so a
     // player's ODI history under either spelling buckets into the right venue type.
     for (const v of NZ_WI_MEN_ODI_VENUES) {
-      for (const variant of v.variants) venueClassification.set(variant, v.type);
+      venueClassification.set(canonicalVenue(v.canonical), v.type);
     }
     const grounds = [
       { venue: NZ_WI_MEN_ODI_VENUES[0].canonical, games: 3 },
@@ -839,7 +890,7 @@ export function recalculateValuations(
     // history — set every cricsheet name variant so a player's ground history buckets correctly.
     // Replace the IPL-keyed schedule with each franchise's actual 8-game venue split.
     for (const v of LPL_VENUES) {
-      for (const variant of v.variants) venueClassification.set(variant, v.type);
+      venueClassification.set(canonicalVenue(v.canonical), v.type);
     }
     teamSchedules = new Map(Object.entries(LPL_TEAM_SCHEDULE));
   }
@@ -850,7 +901,7 @@ export function recalculateValuations(
     // Stadium, Guyana" are separate keys and each ground shows up at half its true sample).
     // Set EVERY variant so a player's ground history under either spelling buckets correctly.
     for (const v of CPL_VENUES) {
-      for (const variant of v.variants) venueClassification.set(variant, v.type);
+      venueClassification.set(canonicalVenue(v.canonical), v.type);
     }
     // Replace the IPL-keyed schedule with either each franchise's actual 10-game venue split or the
     // pooled tournament-level mix, per CPL_VENUE_BASIS.
