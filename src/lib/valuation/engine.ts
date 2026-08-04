@@ -43,7 +43,7 @@ import {
   CPL_TEAM_SCHEDULE,
   CPL_TOURNAMENT_SCHEDULE,
   CPL_VENUE_BASIS,
-  cplExpectedMatches,
+  cplExpectedMatchesFor,
 } from "@/lib/squads/cpl-2026";
 
 /**
@@ -1035,7 +1035,9 @@ export function recalculateValuations(
       : isLpl
       ? lplExpectedMatchesFor(p.name, p.squad_number)
       : isCpl
-      ? cplExpectedMatches(p.squad_number)
+      // Name-keyed, because CPL 2026's phased overseas rotation makes squad_number a bad proxy:
+      // a "bench" number can be a first-3-games specialist and an XI number a 7-of-10 player.
+      ? cplExpectedMatchesFor(p.name, p.squad_number)
       : isWomensWC
       ? getWomensExpectedMatches(p.squad_number, WC_TEAM_TIERS[p.ipl_team] ?? "C")
       : getExpectedMatches(p.squad_number);
