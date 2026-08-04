@@ -53,15 +53,20 @@ def compute_fantasy_points(perf: dict, role: str) -> float:
         # Six bonus: +6 per six (total 12 per six = 6 run + 6 bonus)
         pts += bat_6s * 6
 
-        # Milestone bonuses (century replaces all lower)
+        # Milestone bonus — HIGHEST SLAB ONLY. Dream11 does NOT stack these: a 75 earns +12,
+        # not 12+8+4, and a 50 earns +8, not 8+4. This was cumulative for the 50-99 bands, which
+        # over-awarded 12,474 stored performances (+4 on a 50-74, +12 on a 75-99) and inflated
+        # every T20-family fantasy_points and therefore every EFPPM built on them. The 100+ and
+        # 25-49 bands were already right, and compute_fantasy_points_hundred / _odi below were
+        # already highest-only — so this brings the T20 scorer in line with the other two.
         if bat_runs >= 100:
-            pts += 16  # Century only
+            pts += 16
         elif bat_runs >= 75:
-            pts += 12 + 8 + 4  # 75 + 50 + 25
+            pts += 12
         elif bat_runs >= 50:
-            pts += 8 + 4  # 50 + 25
+            pts += 8
         elif bat_runs >= 25:
-            pts += 4  # 25
+            pts += 4
 
         # Duck penalty (for BAT, WK, AR — not pure bowlers)
         if bat_dismissed and bat_runs == 0 and role in ("BAT", "WK", "AR"):
