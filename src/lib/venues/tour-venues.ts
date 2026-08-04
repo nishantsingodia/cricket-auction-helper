@@ -20,6 +20,8 @@ import {
   LPL_VENUES,
   LPL_TEAM_SCHEDULE,
 } from "@/lib/squads/lpl-2026";
+import { computeBatIndex, describeBatIndex } from "./bat-index";
+import { canonicalVenue } from "@/lib/registry/venues";
 import {
   CPL_2026_NAME,
   CPL_VENUES,
@@ -120,6 +122,17 @@ export interface TourVenue {
   canonical: string;
   variants: string[];
   type: VenueType;
+  // Bat Index — reporting only, never priced (see src/lib/venues/bat-index.ts). >median favours
+  // batting, <median favours bowling. `batIndexMatches` is the sample; a 5-match read is weak.
+  batIndex?: number;
+  batIndexMatches?: number;
+  batIndexSource?: "2yr" | "4yr" | "neutral";
+  batIndexLabel?: string;
+}
+
+/** League median Bat Index, so a ground can be read RELATIVE to it (the median is ~0.90, not 1.0). */
+export interface TourVenueContextExtras {
+  batIndexMedian?: number;
 }
 
 export interface TourVenueContext {
@@ -134,6 +147,34 @@ export interface TourVenueContext {
   teamSchedule: Record<string, Array<{ venue: string; games: number }>>;
   // teamShort -> home ground canonical (null for neutral festivals).
   homeOf: Record<string, string | null>;
+  // League median Bat Index — read every ground RELATIVE to this (it is ~0.90, not 1.0, because a
+  // wicket is worth 30 points so bowlers out-earn batters on average).
+  batIndexMedian?: number;
+}
+
+// Decorates each venue with its Bat Index (reporting only — it never affects a price).
+function withBatIndex(
+  venues: TourVenue[],
+  gender: "male" | "female"
+): { venues: TourVenue[]; batIndexMedian: number } {
+  const { byGround, median } = computeBatIndex(gender);
+  return {
+    median,
+    batIndexMedian: median,
+    venues: venues.map((v) => {
+      // The tour files' canonical spelling may differ from the registry's, so map it first.
+      const e = byGround.get(canonicalVenue(v.canonical));
+      if (!e) return v;
+      return {
+        ...v,
+        batIndex: e.batIndex,
+        batIndexMatches: e.matches,
+        batIndexSource: e.source,
+        batIndexLabel:
+          e.source === "neutral" ? "No usable sample" : describeBatIndex(e.batIndex, median).label,
+      };
+    }),
+  } as { venues: TourVenue[]; batIndexMedian: number; median: number };
 }
 
 // Returns the venue context for a tour name, or null if the tour has no home/venue model here yet.
@@ -162,7 +203,7 @@ export function getTourVenueContext(tournamentName: string): TourVenueContext | 
       gender: isHundredMen ? "male" : "female",
       venueFormats: ["HUN", "T20"],
       venueWindowMonths: 30,
-      venues: HUNDRED_VENUES.map((v) => ({ canonical: v.canonical, variants: v.variants, type: v.type })),
+      ...(() => { const d = withBatIndex(HUNDRED_VENUES.map((v) => ({ canonical: v.canonical, variants: v.variants, type: v.type })), isHundredWomen ? "female" : "male"); return { venues: d.venues, batIndexMedian: d.batIndexMedian }; })(),
       teamSchedule,
       homeOf,
     };
@@ -178,7 +219,7 @@ export function getTourVenueContext(tournamentName: string): TourVenueContext | 
       venueFormats: ["LPL", "T20"],
       venueWindowMonths: 60,
       // Only the 3 league grounds carry a per-team schedule; Premadasa is a playoffs-only venue.
-      venues: LPL_VENUES.map((v) => ({ canonical: v.canonical, variants: v.variants, type: v.type })),
+      ...(() => { const d = withBatIndex(LPL_VENUES.map((v) => ({ canonical: v.canonical, variants: v.variants, type: v.type })), "male"); return { venues: d.venues, batIndexMedian: d.batIndexMedian }; })(),
       teamSchedule: LPL_TEAM_SCHEDULE,
       homeOf,
     };
@@ -202,7 +243,7 @@ export function getTourVenueContext(tournamentName: string): TourVenueContext | 
       gender: "male",
       venueFormats: ["CPL", "T20"],
       venueWindowMonths: 60,
-      venues: CPL_VENUES.map((v) => ({ canonical: v.canonical, variants: v.variants, type: v.type })),
+      ...(() => { const d = withBatIndex(CPL_VENUES.map((v) => ({ canonical: v.canonical, variants: v.variants, type: v.type })), "male"); return { venues: d.venues, batIndexMedian: d.batIndexMedian }; })(),
       // Mirror the engine: honour CPL_VENUE_BASIS so the header chip never disagrees with valuations.
       teamSchedule:
         CPL_VENUE_BASIS === "tournament"

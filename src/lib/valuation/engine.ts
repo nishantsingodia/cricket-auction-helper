@@ -1,5 +1,4 @@
 import { sqlite } from "@/db";
-import { canonicalVenue } from "@/lib/registry/venues";
 import {
   WOMENS_T20_WC_2026_NAME,
   WC_TEAM_TIERS,
@@ -8,9 +7,7 @@ import {
 } from "@/lib/squads/womens-t20-wc-2026";
 import { MLC_2026_NAME, mlcExpectedMatches } from "@/lib/squads/mlc-2026";
 import {
-  IND_VS_ENG_T20_2026,
   IND_VS_ENG_T20_2026_NAME,
-  IND_VS_ENG_VENUES,
   bilateralExpectedMatches,
 } from "@/lib/squads/ind-vs-eng-t20-2026";
 import {
@@ -18,15 +15,12 @@ import {
   odiExpectedMatches,
 } from "@/lib/squads/ire-wi-w-odi-2026";
 import {
-  NZ_VS_WI_MEN_ODI_2026,
   NZ_VS_WI_MEN_ODI_2026_NAME,
-  NZ_WI_MEN_ODI_VENUES,
   mensOdiExpectedMatches,
 } from "@/lib/squads/nz-wi-men-odi-2026";
 import {
   THE_HUNDRED_MEN_2026_NAME,
   THE_HUNDRED_WOMEN_2026_NAME,
-  HUNDRED_MEN_2026,
   HUNDRED_VENUES,
   HUNDRED_ROLE_NORM,
   hundredExpectedMatches,
@@ -35,15 +29,9 @@ import {
 import {
   LPL_2026_NAME,
   lplExpectedMatchesFor,
-  LPL_VENUES,
-  LPL_TEAM_SCHEDULE,
 } from "@/lib/squads/lpl-2026";
 import {
   CPL_2026_NAME,
-  CPL_VENUES,
-  CPL_TEAM_SCHEDULE,
-  CPL_TOURNAMENT_SCHEDULE,
-  CPL_VENUE_BASIS,
   cplExpectedMatchesFor,
 } from "@/lib/squads/cpl-2026";
 
@@ -100,8 +88,6 @@ interface PoolPlayer {
   efppm: number;
   sold_price: number;
 }
-
-type VenueType = "bat_road" | "balanced" | "bowl_friendly";
 
 function getExpectedMatches(squadNumber: number): number {
   if (squadNumber >= 1 && squadNumber <= 12) return 14;
@@ -165,147 +151,6 @@ function computeScore1(
   return score;
 }
 
-// ==================== SCORE 2: Venue Conditions Factor ====================
-
-// Shared venue-classification recency rule — applies to EVERY data-driven venue read (the global
-// men's classifier and the women's-Hundred classifier alike). Classify a ground on the last
-// VENUE_RECENT_MONTHS; if it has < VENUE_MIN_RECENT matches in that window, widen THAT ground to
-// VENUE_EXTENDED_MONTHS so a thin recent sample never mis-classifies. A ground needs at least
-// VENUE_MIN_CLASSIFY matches in the chosen window to be classified at all (else no type → neutral
-// in the conditions factor). Fresh-first, extend-only-when-sparse — one rule for all tours.
-const VENUE_RECENT_MONTHS = 36; // 3 years
-const VENUE_EXTENDED_MONTHS = 72; // 6 years
-const VENUE_MIN_RECENT = 5; // <5 in the recent window → fall back to the extended window
-const VENUE_MIN_CLASSIFY = 3; // absolute floor to classify at all
-
-// bat÷bowl FP ratio → venue character (>1.10 bat_road / ≥0.95 balanced / else bowl_friendly).
-function ratioToVenueType(batFp: number, bowlFp: number): VenueType {
-  const ratio = batFp / bowlFp;
-  return ratio > 1.1 ? "bat_road" : ratio >= 0.95 ? "balanced" : "bowl_friendly";
-}
-
-function classifyVenues(): Map<string, VenueType> {
-  // Per-ground stats for BOTH windows in one pass (outer bound = the extended window). The
-  // `_r` columns cover only the recent window; the `_e` columns cover the full extended window.
-  //
-  // ⚠️ SUMS, not AVGs, and grouped by the RAW spelling — because the rows are then re-aggregated in
-  // JS onto the CANONICAL ground (see the venue registry). cricsheet stores one ground under up to
-  // four names, so grouping straight to an average per raw string silently computed every famous
-  // ground on a fraction of its history and dropped many for being "too thin". Averaging can't be
-  // re-combined without the counts, hence SUM + COUNT here.
-  const rows = sqlite
-    .prepare(
-      `SELECT mp.venue_name,
-        SUM(CASE WHEN p.role IN ('BAT','WK') AND mp.match_date >= date('now', ?) THEN mp.fantasy_points ELSE 0 END) as bat_sum_r,
-        SUM(CASE WHEN p.role IN ('BAT','WK') AND mp.match_date >= date('now', ?) THEN 1 ELSE 0 END) as bat_n_r,
-        SUM(CASE WHEN p.role = 'BOWL'        AND mp.match_date >= date('now', ?) THEN mp.fantasy_points ELSE 0 END) as bowl_sum_r,
-        SUM(CASE WHEN p.role = 'BOWL'        AND mp.match_date >= date('now', ?) THEN 1 ELSE 0 END) as bowl_n_r,
-        COUNT(DISTINCT CASE WHEN mp.match_date >= date('now', ?) THEN mp.match_id END) as m_r,
-        SUM(CASE WHEN p.role IN ('BAT','WK') THEN mp.fantasy_points ELSE 0 END) as bat_sum_e,
-        SUM(CASE WHEN p.role IN ('BAT','WK') THEN 1 ELSE 0 END) as bat_n_e,
-        SUM(CASE WHEN p.role = 'BOWL'        THEN mp.fantasy_points ELSE 0 END) as bowl_sum_e,
-        SUM(CASE WHEN p.role = 'BOWL'        THEN 1 ELSE 0 END) as bowl_n_e,
-        COUNT(DISTINCT mp.match_id) as m_e
-      FROM match_performances mp
-      JOIN players p ON mp.player_id = p.id
-      WHERE mp.match_date >= date('now', ?)
-        AND mp.format IN ('IPL', 'T20')
-        AND p.gender = 'male'
-      GROUP BY mp.venue_name`
-    )
-    .all(
-      `-${VENUE_RECENT_MONTHS} months`,
-      `-${VENUE_RECENT_MONTHS} months`,
-      `-${VENUE_RECENT_MONTHS} months`,
-      `-${VENUE_RECENT_MONTHS} months`,
-      `-${VENUE_RECENT_MONTHS} months`,
-      `-${VENUE_EXTENDED_MONTHS} months`
-    ) as Array<{
-    venue_name: string;
-    bat_sum_r: number; bat_n_r: number; bowl_sum_r: number; bowl_n_r: number; m_r: number;
-    bat_sum_e: number; bat_n_e: number; bowl_sum_e: number; bowl_n_e: number; m_e: number;
-  }>;
-
-  // Re-aggregate every spelling onto its canonical ground before any ratio is taken.
-  type Acc = {
-    batSumR: number; batNR: number; bowlSumR: number; bowlNR: number; mR: number;
-    batSumE: number; batNE: number; bowlSumE: number; bowlNE: number; mE: number;
-  };
-  const byGround = new Map<string, Acc>();
-  for (const r of rows) {
-    const g = canonicalVenue(r.venue_name);
-    const a =
-      byGround.get(g) ??
-      { batSumR: 0, batNR: 0, bowlSumR: 0, bowlNR: 0, mR: 0, batSumE: 0, batNE: 0, bowlSumE: 0, bowlNE: 0, mE: 0 };
-    a.batSumR += r.bat_sum_r; a.batNR += r.bat_n_r;
-    a.bowlSumR += r.bowl_sum_r; a.bowlNR += r.bowl_n_r; a.mR += r.m_r;
-    a.batSumE += r.bat_sum_e; a.batNE += r.bat_n_e;
-    a.bowlSumE += r.bowl_sum_e; a.bowlNE += r.bowl_n_e; a.mE += r.m_e;
-    byGround.set(g, a);
-  }
-
-  const map = new Map<string, VenueType>();
-  for (const [ground, a] of byGround) {
-    const useRecent = a.mR >= VENUE_MIN_RECENT;
-    const batN = useRecent ? a.batNR : a.batNE;
-    const bowlN = useRecent ? a.bowlNR : a.bowlNE;
-    const bat = batN > 0 ? (useRecent ? a.batSumR : a.batSumE) / batN : 0;
-    const bowl = bowlN > 0 ? (useRecent ? a.bowlSumR : a.bowlSumE) / bowlN : 0;
-    const cnt = useRecent ? a.mR : a.mE;
-    if (cnt < VENUE_MIN_CLASSIFY || !bat || !bowl) continue;
-    map.set(ground, ratioToVenueType(bat, bowl));
-  }
-  return map;
-}
-
-// Women's Hundred: classify the 8 grounds on WOMEN's bat/bowl history (women's T20Is + The
-// Hundred women), NOT the men's curated reads in HUNDRED_VENUES.type. Uses the SAME shared
-// recency rule as classifyVenues (VENUE_RECENT_MONTHS, widen to VENUE_EXTENDED_MONTHS if
-// <VENUE_MIN_RECENT) and the same ratio thresholds. Falls back to the curated men's type only
-// if a ground has no usable women's sample at all. Data-driven → self-sharpens each season.
-function classifyHundredVenuesWomen(): Map<string, VenueType> {
-  const out = new Map<string, VenueType>();
-  for (const v of HUNDRED_VENUES) {
-    const ph = v.variants.map(() => "?").join(",");
-    const stmt = sqlite.prepare(
-      `SELECT AVG(CASE WHEN p.role IN ('BAT','WK') THEN mp.fantasy_points END) AS bat_fp,
-              AVG(CASE WHEN p.role = 'BOWL' THEN mp.fantasy_points END) AS bowl_fp,
-              COUNT(DISTINCT mp.match_id) AS matches
-       FROM match_performances mp JOIN players p ON p.id = mp.player_id
-       WHERE p.gender = 'female' AND mp.format IN ('T20','HUN')
-         AND mp.venue_name IN (${ph}) AND mp.match_date >= date('now', ?)`
-    );
-    let row = stmt.get(...v.variants, `-${VENUE_RECENT_MONTHS} months`) as {
-      bat_fp: number | null;
-      bowl_fp: number | null;
-      matches: number;
-    };
-    if (!row || (row.matches ?? 0) < VENUE_MIN_RECENT) {
-      row = stmt.get(...v.variants, `-${VENUE_EXTENDED_MONTHS} months`) as typeof row;
-    }
-    let type: VenueType = v.type; // fallback = curated men's read
-    if (row && row.bat_fp && row.bowl_fp) {
-      type = ratioToVenueType(row.bat_fp, row.bowl_fp);
-    }
-    out.set(v.canonical, type);
-  }
-  return out;
-}
-
-// ---- Hundred per-role scale normalization (DATA-DRIVEN, auto-updates each season) ----
-// The Hundred is scored on its own 100-ball D11 scale (no SR/econ/maiden), so a player's
-// non-Hundred (T20I/WPL/WBBL) proxy form must be converted onto it. `normMult` is a PURE
-// format-scale factor: it is MEASURED as the outlier-robust ratio of Hundred FP to T20I FP AT
-// THE SAME Hundred grounds over a recent window — venue and scoring-era held constant, so the
-// England venue effect is NOT baked in (the conditions factor handles England separately → no
-// double count). It self-updates as each new season's HUN + T20I data is ingested; no hardcoded
-// numbers to maintain. Falls back to HUNDRED_ROLE_NORM per role when a role has too little data.
-const HUNDRED_NORM_MONTHS = 72; // measurement window (covers the full Hundred era; grows each yr)
-const HUNDRED_NORM_MIN_N = 20; // per role & format: min performances to trust the computed factor
-const HUNDRED_NORM_MIN_FACTOR = 0.6; // clamp band — guards against a data glitch
-const HUNDRED_NORM_MAX_FACTOR = 1.15;
-
-// 10% trimmed mean — drops the top & bottom 10% (big hauls / ducks) before averaging.
 function trimmedMean(xs: number[], p = 0.1): number {
   if (xs.length === 0) return NaN;
   const s = [...xs].sort((a, b) => a - b);
@@ -313,6 +158,14 @@ function trimmedMean(xs: number[], p = 0.1): number {
   const core = s.length - 2 * k >= 1 ? s.slice(k, s.length - k) : s;
   return core.reduce((a, b) => a + b, 0) / core.length;
 }
+
+// The Hundred is scored on its own 100-ball scale, so non-Hundred form must be converted per role.
+// This is a FORMAT-scale normalisation, not a venue adjustment — it survives the venue removal. It
+// happens to read the Hundred's 8 grounds simply because that is where Hundred cricket is played.
+const HUNDRED_NORM_MONTHS = 72; // measurement window (covers the full Hundred era; grows each yr)
+const HUNDRED_NORM_MIN_N = 20; // per role & format: min performances to trust the computed factor
+const HUNDRED_NORM_MIN_FACTOR = 0.6; // clamp band — guards against a data glitch
+const HUNDRED_NORM_MAX_FACTOR = 1.15;
 
 function computeHundredRoleNorm(
   gender: "male" | "female"
@@ -355,233 +208,6 @@ function computeHundredRoleNorm(
     );
   }
   return out;
-}
-
-function getTeamSchedules(): Map<string, Array<{ venue: string; games: number }>> {
-  // IPL 2026 Full League Stage Schedule (70 matches, 28 Mar – 24 May 2026)
-  // Each entry: [team1, team2, venueDBName]
-  const BEN = "M Chinnaswamy Stadium, Bengaluru";
-  const MUM = "Wankhede Stadium, Mumbai";
-  const CHE = "MA Chidambaram Stadium, Chepauk, Chennai";
-  const KOL = "Eden Gardens, Kolkata";
-  const DEL = "Arun Jaitley Stadium, Delhi";
-  const AHM = "Narendra Modi Stadium, Ahmedabad";
-  const HYD = "Rajiv Gandhi International Stadium, Uppal, Hyderabad";
-  const LUC = "Bharat Ratna Shri Atal Bihari Vajpayee Ekana Cricket Stadium, Lucknow";
-  const JAI = "Sawai Mansingh Stadium, Jaipur";
-  const DHA = "Himachal Pradesh Cricket Association Stadium, Dharamsala";
-  const RAI = "Shaheed Veer Narayan Singh International Stadium, Raipur";
-  const GUW = "Barsapara Cricket Stadium, Guwahati";
-  const NCH = "Maharaja Yadavindra Singh International Cricket Stadium, Mullanpur";
-
-  const IPL_2026_SCHEDULE: Array<[string, string, string]> = [
-    // Phase 1 (matches 1-20, 28 Mar – 12 Apr)
-    ["RCB", "SRH", BEN],  ["MI",  "KKR", MUM],  ["RR",  "CSK", GUW],
-    ["PBKS","GT",  NCH],   ["LSG", "DC",  LUC],  ["KKR", "SRH", KOL],
-    ["CSK", "PBKS",CHE],   ["DC",  "MI",  DEL],  ["GT",  "RR",  AHM],
-    ["SRH", "LSG", HYD],   ["RCB", "CSK", BEN],  ["KKR", "PBKS",KOL],
-    ["RR",  "MI",  GUW],   ["DC",  "GT",  DEL],  ["KKR", "LSG", KOL],
-    ["RR",  "RCB", GUW],   ["PBKS","SRH", NCH],  ["CSK", "DC",  CHE],
-    ["LSG", "GT",  LUC],   ["MI",  "RCB", MUM],
-    // Phase 2 (matches 21-70, 13 Apr – 24 May)
-    ["SRH", "RR",  HYD],   ["MI",  "CSK", MUM],  ["SRH", "RCB", BEN],
-    ["MI",  "GT",  MUM],   ["CSK", "RCB", BEN],  ["RCB", "RR",  KOL],
-    ["SRH", "KKR", NCH],   ["GT",  "PBKS",AHM],  ["KKR", "LSG", HYD],
-    ["PBKS","MI",  NCH],   ["SRH", "MI",  HYD],  ["CSK", "RR",  CHE],
-    ["RCB", "KKR", BEN],   ["DC",  "PBKS",DEL],  ["GT",  "CSK", AHM],
-    ["LSG", "SRH", LUC],   ["MI",  "RCB", MUM],  ["RR",  "DC",  JAI],
-    ["KKR", "GT",  KOL],   ["PBKS","LSG", NCH],  ["SRH", "CSK", HYD],
-    ["RR",  "MI",  JAI],   ["RCB", "DC",  BEN],  ["GT",  "PBKS",AHM],
-    ["KKR", "LSG", KOL],   ["CSK", "MI",  CHE],  ["SRH", "RCB", HYD],
-    ["DC",  "RR",  DEL],   ["LSG", "KKR", LUC],  ["PBKS","GT",  DHA],
-    ["MI",  "SRH", MUM],   ["CSK", "DC",  CHE],  ["RR",  "PBKS",JAI],
-    ["RCB", "GT",  RAI],   ["LSG", "MI",  LUC],  ["KKR", "SRH", KOL],
-    ["DC",  "RCB", DEL],   ["GT",  "RR",  AHM],  ["PBKS","CSK", DHA],
-    ["MI",  "KKR", MUM],   ["SRH", "LSG", HYD],  ["RCB", "PBKS",RAI],
-    ["CSK", "GT",  CHE],   ["RR",  "KKR", JAI],  ["DC",  "LSG", DEL],
-    ["MI",  "GT",  MUM],   ["SRH", "PBKS",HYD],  ["SRH", "RCB", HYD],
-    ["LSG", "PBKS",LUC],   ["MI",  "RR",  MUM],  ["KKR", "DC",  KOL],
-  ];
-
-  // Build venue-grouped schedules per team
-  const teamVenueCount = new Map<string, Map<string, number>>();
-  for (const [t1, t2, venue] of IPL_2026_SCHEDULE) {
-    for (const team of [t1, t2]) {
-      if (!teamVenueCount.has(team)) teamVenueCount.set(team, new Map());
-      const vc = teamVenueCount.get(team)!;
-      vc.set(venue, (vc.get(venue) || 0) + 1);
-    }
-  }
-
-  const schedules = new Map<string, Array<{ venue: string; games: number }>>();
-  for (const [team, venueMap] of teamVenueCount) {
-    schedules.set(
-      team,
-      Array.from(venueMap.entries()).map(([venue, games]) => ({ venue, games }))
-    );
-  }
-  return schedules;
-}
-
-function batchPlayerVenueFP(
-  playerIds: number[],
-  formats: readonly string[] = ["IPL", "T20"],
-  windowMonths = 30
-): Map<number, Map<string, { avg: number; cnt: number }>> {
-  if (playerIds.length === 0) return new Map();
-
-  const placeholders = playerIds.map(() => "?").join(",");
-  const fmtIn = formats.map((f) => `'${f}'`).join(",");
-  // SUM + COUNT (not AVG) so the per-spelling rows can be re-aggregated onto the canonical ground.
-  // Without this a player's record at, say, Providence was split between "Providence Stadium" and
-  // "Providence Stadium, Guyana", so NEITHER half reached the 5-innings bar the conditions factor
-  // needs — and the schedule (which names one canonical spelling) only ever matched one of them.
-  const rows = sqlite
-    .prepare(
-      `SELECT player_id, venue_name, SUM(fantasy_points) as sum_fp, COUNT(*) as cnt
-       FROM match_performances
-       WHERE player_id IN (${placeholders})
-         AND format IN (${fmtIn})
-         AND match_date >= date('now', '-${windowMonths} months')
-       GROUP BY player_id, venue_name`
-    )
-    .all(...playerIds) as Array<{
-    player_id: number;
-    venue_name: string;
-    sum_fp: number;
-    cnt: number;
-  }>;
-
-  const acc = new Map<number, Map<string, { sum: number; cnt: number }>>();
-  for (const r of rows) {
-    const ground = canonicalVenue(r.venue_name);
-    let inner = acc.get(r.player_id);
-    if (!inner) acc.set(r.player_id, (inner = new Map()));
-    const cur = inner.get(ground) ?? { sum: 0, cnt: 0 };
-    cur.sum += r.sum_fp;
-    cur.cnt += r.cnt;
-    inner.set(ground, cur);
-  }
-
-  const map = new Map<number, Map<string, { avg: number; cnt: number }>>();
-  for (const [pid, inner] of acc) {
-    const out = new Map<string, { avg: number; cnt: number }>();
-    for (const [ground, v] of inner) {
-      if (v.cnt > 0) out.set(ground, { avg: v.sum / v.cnt, cnt: v.cnt });
-    }
-    map.set(pid, out);
-  }
-  return map;
-}
-
-function batchPlayerVenueTypeFP(
-  playerIds: number[],
-  venueClassification: Map<string, VenueType>,
-  formats: readonly string[] = ["IPL", "T20"],
-  windowMonths = 30
-): Map<number, Map<VenueType, { avg: number; cnt: number }>> {
-  if (playerIds.length === 0) return new Map();
-
-  const placeholders = playerIds.map(() => "?").join(",");
-  const fmtIn = formats.map((f) => `'${f}'`).join(",");
-  const rows = sqlite
-    .prepare(
-      `SELECT player_id, venue_name, fantasy_points
-       FROM match_performances
-       WHERE player_id IN (${placeholders})
-         AND format IN (${fmtIn})
-         AND match_date >= date('now', '-${windowMonths} months')`
-    )
-    .all(...playerIds) as Array<{
-    player_id: number;
-    venue_name: string;
-    fantasy_points: number;
-  }>;
-
-  // Aggregate by player × venue_type
-  const accum = new Map<
-    number,
-    Map<VenueType, { total: number; cnt: number }>
-  >();
-  for (const r of rows) {
-    // venueClassification is keyed by CANONICAL ground, so the raw spelling must be mapped first —
-    // otherwise a performance recorded under an older spelling finds no type and is dropped.
-    const vt = venueClassification.get(canonicalVenue(r.venue_name));
-    if (!vt) continue;
-
-    if (!accum.has(r.player_id)) accum.set(r.player_id, new Map());
-    const playerMap = accum.get(r.player_id)!;
-    if (!playerMap.has(vt)) playerMap.set(vt, { total: 0, cnt: 0 });
-    const entry = playerMap.get(vt)!;
-    entry.total += r.fantasy_points;
-    entry.cnt += 1;
-  }
-
-  const result = new Map<
-    number,
-    Map<VenueType, { avg: number; cnt: number }>
-  >();
-  for (const [pid, vtMap] of accum) {
-    const rMap = new Map<VenueType, { avg: number; cnt: number }>();
-    for (const [vt, data] of vtMap) {
-      rMap.set(vt, { avg: data.total / data.cnt, cnt: data.cnt });
-    }
-    result.set(pid, rMap);
-  }
-  return result;
-}
-
-function computeConditionsFactor(
-  playerId: number,
-  overallFP: number,
-  teamSchedule: Array<{ venue: string; games: number }>,
-  playerVenueFP: Map<string, { avg: number; cnt: number }> | undefined,
-  playerVenueTypeFP: Map<VenueType, { avg: number; cnt: number }> | undefined,
-  venueClassification: Map<string, VenueType>
-): number {
-  if (!teamSchedule || teamSchedule.length === 0 || overallFP <= 0) return 1.0;
-
-  let totalGames = 0;
-  let weightedFP = 0;
-
-  for (const { venue: rawVenue, games } of teamSchedule) {
-    totalGames += games;
-    // Both the player's venue map and the classification are keyed by canonical ground.
-    const venue = canonicalVenue(rawVenue);
-
-    // Try venue-specific FP (blended with overall — venue never fully overrides)
-    const venueStat = playerVenueFP?.get(venue);
-    if (venueStat && venueStat.cnt >= 5) {
-      const confidence = Math.min(venueStat.cnt / 10, 0.5);
-      const blended = confidence * venueStat.avg + (1 - confidence) * overallFP;
-      weightedFP += blended * games;
-      continue;
-    }
-
-    // Fallback: venue type FP (blended with overall)
-    const venueType = venueClassification.get(venue);
-    if (venueType) {
-      const vtStat = playerVenueTypeFP?.get(venueType);
-      if (vtStat && vtStat.cnt >= 5) {
-        const confidence = Math.min(vtStat.cnt / 10, 0.5);
-        const blended = confidence * vtStat.avg + (1 - confidence) * overallFP;
-        weightedFP += blended * games;
-        continue;
-      }
-    }
-
-    // Final fallback: overall FP (no adjustment for this venue)
-    weightedFP += overallFP * games;
-  }
-
-  if (totalGames === 0) return 1.0;
-  const scheduleFP = weightedFP / totalGames;
-  // Venue conditions are a MODEST modifier — clamp to ±30%. The raw ratio is unbounded and
-  // explodes when overallFP is tiny (e.g. a player whose only recent quality game scored ~2 FP)
-  // against a normal venue history: scheduleFP/overallFP can hit 10x+, which is noise, not a real
-  // venue effect. Any legit, well-sampled player already sits well inside this band.
-  const factor = scheduleFP / overallFP;
-  return Math.max(0.7, Math.min(1.3, factor));
 }
 
 // ==================== MAIN VALUATION ====================
@@ -837,100 +463,21 @@ export function recalculateValuations(
     }
   }
 
-  // --- Batch Query: Score 2 data ---
-  const venueClassification = classifyVenues();
-  let teamSchedules = getTeamSchedules();
-  if (isHundred) {
-    // Override the 8 English grounds' classification and build each team's 8-game schedule:
-    // home ground x4 + the other 7 grounds spread (~4/7). MEN use the curated consolidated
-    // men's bat/bowl read (HUNDRED_VENUES.type); WOMEN classify on their OWN ground history
-    // (women's T20Is + The Hundred women) via classifyHundredVenuesWomen().
-    const womensTypes = isHundredWomen ? classifyHundredVenuesWomen() : null;
-    for (const v of HUNDRED_VENUES) {
-      const t = womensTypes?.get(v.canonical) ?? v.type;
-      venueClassification.set(canonicalVenue(v.canonical), t);
-    }
-    const grounds = HUNDRED_VENUES.map((v) => v.canonical);
-    teamSchedules = new Map(
-      HUNDRED_MEN_2026.map((t) => {
-        const away = grounds
-          .filter((g) => g !== t.home)
-          .map((g) => ({ venue: g, games: 4 / 7 }));
-        return [t.short, [{ venue: t.home, games: 4 }, ...away]];
-      })
-    );
-  }
-  if (isBilateral) {
-    // Bilateral: each side plays all 5 series grounds once. (a) Override the 5 grounds'
-    // classification with the consolidated, full-history, men's-only bat/bowl read —
-    // classifyVenues fragments cricsheet's renamed variants + thin-samples them; set BOTH
-    // spellings so a player's history under either buckets into the right venue type.
-    // (b) Replace the IPL-keyed schedule with a 5-ground one keyed by IND/ENG.
-    for (const v of IND_VS_ENG_VENUES) {
-      venueClassification.set(canonicalVenue(v.canonical), v.type);
-    }
-    const ground5 = IND_VS_ENG_VENUES.map((v) => ({ venue: v.canonical, games: 1 }));
-    teamSchedules = new Map(IND_VS_ENG_T20_2026.map((t) => [t.short, ground5]));
-  }
-  if (isMensOdi) {
-    // Men's ODI: both sides play all 5 ODIs at 2 Caribbean grounds (Providence x3, Kensington
-    // x2), both bowl_friendly on men's ODI bat/bowl history. Set both name variants so a
-    // player's ODI history under either spelling buckets into the right venue type.
-    for (const v of NZ_WI_MEN_ODI_VENUES) {
-      venueClassification.set(canonicalVenue(v.canonical), v.type);
-    }
-    const grounds = [
-      { venue: NZ_WI_MEN_ODI_VENUES[0].canonical, games: 3 },
-      { venue: NZ_WI_MEN_ODI_VENUES[1].canonical, games: 2 },
-    ];
-    teamSchedules = new Map(NZ_VS_WI_MEN_ODI_2026.map((t) => [t.short, grounds]));
-  }
-  if (isLpl) {
-    // LPL: all 3 league venues (SSC / Dambulla / Pallekele) read bowl_friendly on LPL+SL-T20I
-    // history — set every cricsheet name variant so a player's ground history buckets correctly.
-    // Replace the IPL-keyed schedule with each franchise's actual 8-game venue split.
-    for (const v of LPL_VENUES) {
-      venueClassification.set(canonicalVenue(v.canonical), v.type);
-    }
-    teamSchedules = new Map(Object.entries(LPL_TEAM_SCHEDULE));
-  }
-  if (isCpl) {
-    // CPL: override the 8 Caribbean grounds' classification with the consolidated, men's-only
-    // CPL+T20I bat/bowl read (classifyVenues would fragment them — cricsheet appended the territory
-    // to nearly every one of these names ~2021/2022, so "Providence Stadium" and "Providence
-    // Stadium, Guyana" are separate keys and each ground shows up at half its true sample).
-    // Set EVERY variant so a player's ground history under either spelling buckets correctly.
-    for (const v of CPL_VENUES) {
-      venueClassification.set(canonicalVenue(v.canonical), v.type);
-    }
-    // Replace the IPL-keyed schedule with either each franchise's actual 10-game venue split or the
-    // pooled tournament-level mix, per CPL_VENUE_BASIS.
-    teamSchedules =
-      CPL_VENUE_BASIS === "tournament"
-        ? new Map(Object.keys(CPL_TEAM_SCHEDULE).map((t) => [t, CPL_TOURNAMENT_SCHEDULE]))
-        : new Map(Object.entries(CPL_TEAM_SCHEDULE));
-  }
-  // Men's ODI reads venue history from ODI matches (wider window — fewer ODIs per ground);
-  // LPL reads its own league + SL-T20I ground history over a wider (60mo) window (5 seasons,
-  // 2020–2024); every other tour keeps the T20-family default (byte-identical).
-  // CPL, like LPL, reads its own league + regional-T20I ground history over a wider 60mo window —
-  // a Caribbean ground hosts ~5–10 CPL games a season, so 30mo leaves several of them under the
-  // minimum sample (Sabina Park and Queen's Park Oval especially).
-  const venueFormats = isMensOdi
-    ? ["ODI"]
-    : isLpl
-    ? ["LPL", "T20"]
-    : isCpl
-    ? ["CPL", "T20"]
-    : ["IPL", "T20"];
-  const venueWindow = isMensOdi ? 60 : isLpl || isCpl ? 60 : 30;
-  const playerVenueFP = batchPlayerVenueFP(playerIds, venueFormats, venueWindow);
-  const playerVenueTypeFP = batchPlayerVenueTypeFP(
-    playerIds,
-    venueClassification,
-    venueFormats,
-    venueWindow
-  );
+  // --- Score 2 (venue conditions): REMOVED 5 Aug 2026, by decision ---
+  // EFPPM no longer carries ANY venue adjustment. The venue work is kept as pure INFORMATION
+  // (the Bat Index, surfaced in the venue UI) so you can see which grounds favour bat or ball and
+  // by how much — but it never moves a price.
+  //
+  // Why it was dropped rather than improved: the honest effect size did not justify the machinery.
+  // Measured leave-one-out (the player excluded from the ground average he is scored against, since
+  // a batter sits in the index's numerator and a bowler in its denominator), the true venue
+  // elasticity is only +0.21 for batters / -0.23 for bowlers / ~0 for all-rounders — worth about 2%
+  // on a player's value. For comparison, phased overseas availability moved CPL players 30-50% and
+  // the cumulative-milestone scoring bug was worth ~6% on any innings of 50+. Roughly half of every
+  // larger elasticity previously measured (0.72, then 0.36) was that circularity, not signal.
+  //
+  // The venue REGISTRY (src/lib/registry/venues.json) stays and is still worth having — it fixed
+  // genuinely wrong ground data, where 651 cricsheet spellings were really 459 grounds.
 
   // --- Batch Query: Bowling overs avg ---
   const bowlOversRows = sqlite
@@ -1057,22 +604,9 @@ export function recalculateValuations(
     }
     const normScore1 = score1 * normMult;
 
-    // Score 2: conditions factor. The venue multiplier is a scale-invariant RATIO of schedule-
-    // weighted venue form to overall form, so it MUST be computed at the raw form scale (where the
-    // venue averages live) and then applied to the shrunk/normalized score — otherwise shrinking
-    // score1 drifts the ratio toward 1 and silently undoes the shrinkage. (Hundred keeps its prior
-    // behaviour of passing its shrunk score1; for every non-shrunk tour raw === score1.)
-    const schedule = teamSchedules.get(p.ipl_team);
-    const conditionsFactor = computeConditionsFactor(
-      p.player_id,
-      isLpl || isCpl ? rawScore1 : score1,
-      schedule ?? [],
-      playerVenueFP.get(p.player_id),
-      playerVenueTypeFP.get(p.player_id),
-      venueClassification
-    );
-
-    const finalEfppm = normScore1 * conditionsFactor;
+    // NO venue adjustment. EFPPM is form only (see the Score-2 note above) — venue is reported as
+    // information via the Bat Index, never priced in.
+    const finalEfppm = normScore1;
     const expectedMatches = isHundred
       ? hundredExpectedMatches(p.ipl_team, p.squad_number, isHundredWomen)
       : isBilateral
