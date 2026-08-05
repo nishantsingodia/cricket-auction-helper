@@ -129,16 +129,52 @@ export function computeBatIndex(gender: "male" | "female" = "male"): {
   return { byGround, median };
 }
 
-/** Plain-language read of a ground relative to the league median. */
+/**
+ * Two readings of the same number, because they answer different questions and can disagree.
+ *
+ * ABSOLUTE (`whoEarnsMore`) — at this ground, does a batter or a bowler bank more fantasy points?
+ *   Index 0.90 means bowlers out-earn batters by ~11%, and that is genuinely actionable. It is also
+ *   true at 76% of grounds: one wicket is 30 points, so wickets alone give the average bowler ~31 of
+ *   his ~48 points. The gap is mostly the SCORING SYSTEM, not the pitch — it holds across nearly
+ *   every league (BBL 0.87, T20I 0.89, SA20 0.92, LPL 0.96, MLC 0.98, PSL 0.98, CPL 1.00). The IPL
+ *   is the notable exception at 1.12, where flat decks put batters ahead.
+ *
+ * RELATIVE (`vsAverage`) — is this ground UNUSUAL for bat or ball? Only meaningful against the
+ *   median (~0.905), since "bowlers earn more" describes almost everywhere and so distinguishes
+ *   nothing on its own.
+ *
+ * Report both. The grounds worth noticing are the ones where the two disagree — e.g. Providence at
+ * 0.886 pays bowlers more in absolute terms yet is completely ordinary for a ground.
+ */
 export function describeBatIndex(batIndex: number, median: number): {
-  favours: "batting" | "bowling" | "neutral";
-  pct: number; // how far from median, in %
-  label: string;
+  favours: "batting" | "bowling" | "neutral"; // relative to other grounds
+  pct: number; // distance from the median, %
+  whoEarnsMore: "batters" | "bowlers"; // absolute, at this ground
+  earnsMorePct: number; // by how much, %
+  label: string; // relative reading
+  absoluteLabel: string; // absolute reading
 } {
   const rel = batIndex / median - 1;
   const pct = Math.round(Math.abs(rel) * 100);
-  if (pct < 3) return { favours: "neutral", pct, label: "Balanced" };
-  return rel > 0
-    ? { favours: "batting", pct, label: `Favours batting +${pct}%` }
-    : { favours: "bowling", pct, label: `Favours bowling +${pct}%` };
+  const batAhead = batIndex >= 1;
+  const earnsMorePct = Math.round(Math.abs(batAhead ? batIndex - 1 : 1 / batIndex - 1) * 100);
+  const absoluteLabel = batAhead
+    ? `Batters earn ${earnsMorePct}% more here`
+    : `Bowlers earn ${earnsMorePct}% more here`;
+
+  const label =
+    pct < 3
+      ? "Typical for a ground"
+      : rel > 0
+      ? `Unusually good for batting (+${pct}% vs average)`
+      : `Unusually good for bowling (+${pct}% vs average)`;
+
+  return {
+    favours: pct < 3 ? "neutral" : rel > 0 ? "batting" : "bowling",
+    pct,
+    whoEarnsMore: batAhead ? "batters" : "bowlers",
+    earnsMorePct,
+    label,
+    absoluteLabel,
+  };
 }
