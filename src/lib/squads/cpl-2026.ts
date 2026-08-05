@@ -481,18 +481,28 @@ export const CPL_DISPLAY_NAMES: Record<string, string> = {
   "Z Motara": "Zishan Motara",
 };
 
-// CPL venue model — the 8 grounds of the 2026 edition, classified on the ingested CPL + men's-T20I
-// bat-FP ÷ bowl-FP history at each ground (60-month window, name variants consolidated — cricsheet
-// renamed most of these ~2021/2022 by appending the territory, which silently halves each ground's
-// sample if you don't merge them). Measured ratios (60mo / all-time), <0.95 = bowl_friendly:
-//   Arnos Vale     0.55 / 0.56  (n=6)   · Sir Vivian Richards 0.84 / 0.77 (n=23)
-//   Warner Park    0.85 / 0.86  (n=59)  · Providence          0.87 / 0.86 (n=48)
-//   Daren Sammy    0.95 / 0.97  (n=28)  · Kensington Oval     0.95 / 0.89 (n=31)
-//   Sabina Park    0.99 / 0.89  (n=11)  · Queen's Park Oval   1.01 / 0.82 (n=8, all-time n=60)
-// Net: the Caribbean is a BOWLER'S league — not one ground reads bat_road, four are bowl_friendly
-// and the other four sit at the balanced floor. QPO is the one soft read: only 8 matches in the
-// recent window (CPL last played there in 2024) against 0.82 over 60 all-time matches, so it is
-// classified `balanced` per the engine's own recency rule but is arguably bowl_friendly.
+// CPL venue model — the 8 grounds of the 2026 edition.
+//
+// ⚠️ These `type` values are DISPLAY ONLY. Venue no longer affects any price (removed 5 Aug 2026),
+// and the auction UI DERIVES the type live from the measured Bat Index rather than trusting the
+// value below — see venueTypeFromBatIndex in src/lib/venues/bat-index.ts. They are corrected here so
+// the source file is not misleading, but the derived value is the authority.
+//
+// The values were WRONG in 5 of 8 cases until 5 Aug 2026, for two reasons worth remembering:
+//   1. MIS-CALIBRATION. They were classified against 1.0, but bowlers out-earn batters at 76% of
+//      grounds (a wicket is 30 points), so the true neutral is the ~0.906 league MEDIAN. Judging
+//      against 1.0 shoved ordinary grounds into "bowl_friendly".
+//   2. STALE INPUTS. The original read used a 60-month window with INCOMPLETE variant lists — 4 of
+//      these 8 grounds were missing cricsheet spellings — and included Vitality Blast.
+// Worst error: Warner Park, our best-sampled Caribbean ground (24 matches) and St Kitts' home for 4
+// games, was called bowl_friendly when batters actually out-earn bowlers there.
+//
+// Current Bat Index (batting FP / bowling FP; league median 0.906; higher = better for batting):
+//   Queen's Park Oval 1.137 (8m) · Sabina Park 1.104 (11m) · Warner Park 1.068 (24m)
+//   Daren Sammy 0.980 (28m) · Kensington 0.972 (26m) · Providence 0.886 (20m)
+//   Sir Vivian Richards 0.879 (17m) · Arnos Vale 0.617 (6m — thin, treat as directional only)
+// So the Caribbean is NOT the bowler's league an earlier read suggested: measured against the world
+// median, five of these eight grounds are neutral-to-batting-friendly.
 export type VenueType = "bat_road" | "balanced" | "bowl_friendly";
 export const CPL_VENUES: Array<{ canonical: string; variants: string[]; type: VenueType }> = [
   { canonical: "Arnos Vale Ground, Kingstown, St Vincent",
@@ -505,13 +515,13 @@ export const CPL_VENUES: Array<{ canonical: string; variants: string[]; type: Ve
                "Sir Vivian Richards Stadium, North Sound",
                "Sir Vivian Richards Stadium, Antigua",
                "Sir Vivian Richards Stadium"],
-    type: "bowl_friendly" },
+    type: "balanced" },
   { canonical: "Warner Park, Basseterre, St Kitts",
     variants: ["Warner Park, Basseterre, St Kitts", "Warner Park, Basseterre", "Warner Park, St Kitts"],
-    type: "bowl_friendly" },
+    type: "bat_road" },
   { canonical: "Providence Stadium, Guyana",
     variants: ["Providence Stadium, Guyana", "Providence Stadium"],
-    type: "bowl_friendly" },
+    type: "balanced" },
   { canonical: "Daren Sammy National Cricket Stadium, Gros Islet, St Lucia",
     variants: ["Daren Sammy National Cricket Stadium, Gros Islet, St Lucia",
                "Daren Sammy National Cricket Stadium, Gros Islet",
@@ -522,13 +532,13 @@ export const CPL_VENUES: Array<{ canonical: string; variants: string[]; type: Ve
     type: "balanced" },
   { canonical: "Sabina Park, Kingston, Jamaica",
     variants: ["Sabina Park, Kingston, Jamaica", "Sabina Park, Kingston"],
-    type: "balanced" },
+    type: "bat_road" },
   { canonical: "Queen's Park Oval, Port of Spain, Trinidad",
     variants: ["Queen's Park Oval, Port of Spain, Trinidad",
                "Queen's Park Oval, Port of Spain",
                "Queen's Park Oval, Trinidad",
                "Queen's Park Oval"],
-    type: "balanced" },
+    type: "bat_road" },
 ];
 
 // Per-team league schedule (10 games each) derived from the actual 35-match fixture list. CPL 2026

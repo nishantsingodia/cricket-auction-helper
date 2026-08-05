@@ -130,6 +130,23 @@ export function computeBatIndex(gender: "male" | "female" = "male"): {
 }
 
 /**
+ * Venue character from the measured index, calibrated against the MEDIAN (~0.906) rather than 1.0.
+ *
+ * This matters: the app's original thresholds (>1.10 bat_road, >=0.95 balanced) were centred on 1.0,
+ * but bowlers out-earn batters at 76% of grounds because a wicket is 30 points — so a perfectly
+ * ordinary ground scores ~0.906 and got labelled "bowl_friendly". That mis-calibration had 5 of the
+ * 8 CPL grounds wrong, including Warner Park (our best-sampled Caribbean ground) called
+ * bowl_friendly when batters actually out-earn bowlers there.
+ */
+export function venueTypeFromBatIndex(
+  batIndex: number,
+  median: number
+): "bat_road" | "balanced" | "bowl_friendly" {
+  const rel = batIndex / median;
+  return rel > 1.1 ? "bat_road" : rel >= 0.95 ? "balanced" : "bowl_friendly";
+}
+
+/**
  * Two readings of the same number, because they answer different questions and can disagree.
  *
  * ABSOLUTE (`whoEarnsMore`) — at this ground, does a batter or a bowler bank more fantasy points?

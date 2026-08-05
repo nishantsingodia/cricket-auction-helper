@@ -20,7 +20,7 @@ import {
   LPL_VENUES,
   LPL_TEAM_SCHEDULE,
 } from "@/lib/squads/lpl-2026";
-import { computeBatIndex, describeBatIndex } from "./bat-index";
+import { computeBatIndex, describeBatIndex, venueTypeFromBatIndex } from "./bat-index";
 import { canonicalVenue } from "@/lib/registry/venues";
 import {
   CPL_2026_NAME,
@@ -167,6 +167,11 @@ function withBatIndex(
       if (!e) return v;
       return {
         ...v,
+        // DERIVED, not the hand-typed value: the curated `type` fields were mis-calibrated against
+        // 1.0 instead of the ~0.906 median and had 5 of 8 CPL grounds wrong. Deriving it here means
+        // the label can never drift from the data again. Falls back to the curated type only when a
+        // ground has no usable sample.
+        type: e.source === "neutral" ? v.type : venueTypeFromBatIndex(e.batIndex, median),
         batIndex: e.batIndex,
         batIndexMatches: e.matches,
         batIndexSource: e.source,
