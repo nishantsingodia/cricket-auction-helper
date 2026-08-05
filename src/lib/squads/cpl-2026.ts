@@ -284,7 +284,22 @@ export function cplExpectedMatches(squadNumber: number): number {
 //   * Sri Lanka in England, 15-27 Sep -> starts AFTER the CPL league stage ends on 13 Sep. Costs
 //     playoff availability for Hasaranga / Asalanka / Theekshana / Shanaka only, and playoffs are
 //     already excluded from expected matches. No league-phase discount.
-//   * India in Bangladesh, Sep -> no Indian or Bangladeshi players in the CPL 2026 pool.
+//   * India in Sri Lanka, 2 TESTS, 15-19 Aug (Galle) + 23-27 Aug (Colombo) -> ⚠️ THE ONE OPEN RISK.
+//     Sri Lanka's squad is NOT published yet (India's is: Gill captain). If Kusal Perera (ABF) or
+//     Asalanka / Theekshana (SLK) are picked they lose FOUR league games each -- ABF play 20, 22, 23
+//     and 25 Aug; SLK play 16, 19, 21 and 26 Aug. Not priced in, because the read is that they are
+//     safe: ABF's release calls Kusal Perera "fully available for the entire tournament" and
+//     franchises negotiate around known international duty; Asalanka is SL's WHITE-BALL captain and
+//     not a current Test pick; Theekshana is a white-ball specialist; Hasaranga has retired from
+//     Tests. WATCH for the SL squad announcement -- if any of them is in it, set 6 here.
+//   * Full sweep of the window (7 Aug - 20 Sep) for completeness, all checked and clear: Scotland
+//     Tri-Nation ODIs (no Scots in pool), CWC Challenge League B in Tanzania, Namibia T20I
+//     Tri-Nation (no Namibians), Bangladesh in Australia 2 Tests from 13 Aug (no Bangladeshis),
+//     Women's T20 Asia Cup / Ireland women in England / SA women in Zimbabwe (women's), and the
+//     Asian Games 17-24 Sep (playoff window only, and second-string squads).
+//     Sri Lanka's tour of the WEST INDIES was 3 Jun - 7 Jul, i.e. finished before CPL starts.
+//   * Mohammad Nabi is NOT in Afghanistan's 15-man Ireland squad (verified against the full list) --
+//     he is 41 and effectively T20-franchise-only now. Same for Mujeeb, Noor Ahmad, Salamkheil.
 // RE-CHECK if a mid-tour call-up or a newly-announced squad appears; late replacements are normal.
 const CPL_EXPECTED_GAMES: Record<string, number> = {
   // Antigua & Barbuda Falcons
