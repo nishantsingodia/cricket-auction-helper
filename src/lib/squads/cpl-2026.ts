@@ -103,7 +103,7 @@ export const CPL_2026: CPLTeam[] = [
       // 2025 medians: Hope 3, Hetmyer 4, Shepherd 7, Pretorius 7, Sampson 8, Pierre 8, S Joseph 10,
       // Tahir 11. Imran Tahir captains (as in 2025) and was the league's leading wicket-taker with
       // 23 in 12 — hence the bowlers sit high in this order despite batting low.
-      { name: "Rahmanullah Gurbaz", role: "WK", overseas: true }, // 1
+      { name: "Rahmanullah Gurbaz", role: "WK", overseas: true, note: "Vice-captain/keeper on Afghanistan's 5-ODI tour of Ireland (5-15 Aug), so he misses GAW's 13 Aug game — 9 of 10. GAW are lucky here: only one league game falls in that window." }, // 1
       { name: "Shai Hope", role: "WK", overseas: false }, // 2  (2025: pos 3, all 12 games)
       { name: "Glenn Phillips", role: "BAT", overseas: true, note: "Returning from a side injury — reported on track to be fit for the CPL, but worth a second look before you bid." }, // 3
       { name: "Shimron Hetmyer", role: "BAT", overseas: false }, // 4  (2025: pos 4, all 12)
@@ -167,7 +167,7 @@ export const CPL_2026: CPLTeam[] = [
       { name: "Kyle Mayers", role: "AR", overseas: false }, // 4
       { name: "Dasun Shanaka", role: "AR", overseas: true }, // 5
       { name: "Jason Holder", role: "AR", overseas: false }, // 6
-      { name: "Wanindu Hasaranga", role: "AR", overseas: true, note: "Was playing LPL 2026 (Kandy) as of 29 Jul; the LPL knockouts run to ~8 Aug, which is the date of SKN's opener. Minor late-arrival risk — the franchise published no caveat." }, // 7
+      { name: "Wanindu Hasaranga", role: "AR", overseas: true, note: "Two clashes, both checked: LPL knockouts run to ~8 Aug (SKN's opener is 8 Aug) = minor late-arrival risk. Sri Lanka's tour of England is 15-27 Sep, AFTER the CPL league stage ends on 13 Sep — so it costs PLAYOFF availability only, which this model already excludes. No league-phase discount." }, // 7
       { name: "Naseem Shah", role: "BOWL", overseas: true }, // 8  (2025: 10 games, pos 9)
       { name: "Obed McCoy", role: "BOWL", overseas: false }, // 9
       { name: "Ashmead Nedd", role: "BOWL", overseas: false }, // 10
@@ -193,13 +193,13 @@ export const CPL_2026: CPLTeam[] = [
       // at full 10 games — this is the single biggest unpriced availability risk in the pool.
       { name: "Tim Seifert", role: "WK", overseas: true, note: "⚠️ In Manchester Super Giants' Hundred squad (3 games as of 29 Jul); the Hundred runs to ~16 Aug and SLK play 4 league games before then. No franchise caveat published — value NOT discounted, but treat as a real risk." }, // 1
       { name: "Ackeem Auguste", role: "BAT", overseas: false, note: "Breakout pick but a 2025 regular — 10 games at median position 3." }, // 2
-      { name: "Charith Asalanka", role: "BAT", overseas: true, note: "Was playing LPL 2026 (Galle) as of 29 Jul; LPL knockouts run to ~8 Aug and SLK open on 9 Aug. Minor late-arrival risk." }, // 3
+      { name: "Charith Asalanka", role: "BAT", overseas: true, note: "LPL knockouts run to ~8 Aug and SLK open on 9 Aug = minor late-arrival risk. Sri Lanka tour England 15-27 Sep, i.e. after the 13 Sep league finish — playoffs only, not priced." }, // 3
       { name: "Jewel Andrew", role: "WK", overseas: false }, // 4  (2025: pos 1 for Antigua)
       { name: "Roston Chase", role: "AR", overseas: false, note: "CAPTAIN. 2025: 10 games, pos 4, bowled in 9." }, // 5
       { name: "Kamil Pooran", role: "BAT", overseas: false, note: "NOT Nicholas Pooran (TKR) — no shared stats record." }, // 6
       { name: "Matthew Forde", role: "AR", overseas: false }, // 7
       { name: "Noor Ahmad", role: "BOWL", overseas: true, note: "⚠️ In Manchester Super Giants' Hundred squad (3 games as of 29 Jul) — same 4-game exposure as Seifert. No franchise caveat published." }, // 8
-      { name: "Maheesh Theekshana", role: "BOWL", overseas: true, note: "Was playing LPL 2026 (Dambulla) as of 26 Jul; LPL knockouts run to ~8 Aug." }, // 9
+      { name: "Maheesh Theekshana", role: "BOWL", overseas: true, note: "LPL knockouts run to ~8 Aug. Sri Lanka tour England 15-27 Sep — after the league stage ends 13 Sep, so playoffs only." }, // 9
       { name: "Joshua Bishop", role: "BOWL", overseas: false }, // 10
       { name: "McKenny Clarke", role: "BOWL", overseas: false }, // 11
       // Depth
@@ -273,6 +273,19 @@ export function cplExpectedMatches(squadNumber: number): number {
 //              "from 19 August", moving into the places held by Jahangir and Arif.
 // Jamaica play 5 league games before 19 Aug (7, 11, 13, 15, 18 Aug) and 5 from 21 Aug — hence 5/5.
 // The other five franchises published NO availability caveats, so their players default to 10.
+//
+// INTERNATIONAL CALENDAR AUDIT (5 Aug 2026) — franchise releases do NOT mention national duty, so
+// the Aug-Sep fixture list was checked separately. Three tours overlap the CPL window; only one bites:
+//   * Afghanistan in Ireland, 5 ODIs, 5-15 Aug -> ONLY Rahmanullah Gurbaz is in that squad. Nabi,
+//     Mujeeb, Noor Ahmad and Salamkheil are CPL Afghans but are NOT selected. GAW play one league
+//     game in the window (13 Aug) -> Gurbaz 9 of 10.
+//   * Pakistan in England, 3 Tests, 19 Aug-13 Sep -> NONE of the eight CPL Pakistanis are in the Test
+//     squad (Babar, Shan Masood, Rizwan, Abbas, Sajid Khan et al). No impact.
+//   * Sri Lanka in England, 15-27 Sep -> starts AFTER the CPL league stage ends on 13 Sep. Costs
+//     playoff availability for Hasaranga / Asalanka / Theekshana / Shanaka only, and playoffs are
+//     already excluded from expected matches. No league-phase discount.
+//   * India in Bangladesh, Sep -> no Indian or Bangladeshi players in the CPL 2026 pool.
+// RE-CHECK if a mid-tour call-up or a newly-announced squad appears; late replacements are normal.
 const CPL_EXPECTED_GAMES: Record<string, number> = {
   // Antigua & Barbuda Falcons
   milindkumar: 3, // first 3 matches only
@@ -284,6 +297,11 @@ const CPL_EXPECTED_GAMES: Record<string, number> = {
   // reporting on 3 Aug says the Falcons start under interim leadership. ABF play 3 games before the
   // Hundred final (7, 9, 14 Aug), so 7 is the availability-consistent figure. Revise to 10 if he
   // actually lands early.
+  // Guyana Amazon Warriors — INTERNATIONAL clash (checked 5 Aug 2026 against the actual calendar)
+  rahmanullahgurbaz: 9, // Afghanistan's 5-ODI tour of Ireland runs 5-15 Aug and Gurbaz is in that
+  // squad as vice-captain/keeper. GAW play just ONE league game inside that window (13 Aug), so the
+  // hit is small: 1 game, allowing 9 of 10. Nabi, Mujeeb, Noor Ahmad and Salamkheil are all CPL
+  // Afghans but are NOT in the Ireland squad, so they are unaffected.
   // Jamaica Kingsmen — phase 1 (start → 18 Aug) is 5 games, phase 2 (from 19 Aug) is 5 games
   shayanjahangir: 5,
   tayyabarif: 5,
