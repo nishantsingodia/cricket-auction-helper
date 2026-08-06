@@ -3,14 +3,12 @@
 import { useEffect, useState } from "react";
 
 export function ThemeToggle() {
-  const [dark, setDark] = useState(true);
+  // Light is the default; the pre-paint script in layout.tsx has already applied a stored
+  // 'dark' choice to <html> by the time this mounts, so read the class rather than assuming.
+  const [dark, setDark] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem("theme");
-    if (stored === "light") {
-      setDark(false);
-      document.documentElement.classList.remove("dark");
-    }
+    setDark(document.documentElement.classList.contains("dark"));
   }, []);
 
   const toggle = () => {
