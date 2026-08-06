@@ -166,60 +166,107 @@ interface PriceSlab {
   color: string; // key into COLOR_PALETTE
 }
 
+// Colours listed by SALIENCE, GREEN FIRST — the user is tuned to GREEN = highest "most to bid"
+// class. Intensity (dark-mode opacity) fades DOWN the ladder so the TOP band draws the most
+// attention and the cheap bands recede — even the loud hues (amber/orange) are DIALLED DOWN here
+// so they sit quietly on cheap tiers instead of stealing the eye. Keys kept backward-compatible
+// with saved slab configs (localStorage 'auctionPriceSlabs'), so an existing green-top / amber+
+// orange-cheap assignment now renders vivid-green-top → muted-orange-bottom with no remapping.
 const COLOR_PALETTE: Record<string, {
   bgLight: string; bgDark: string;
   textLight: string; textDark: string;
   legendBg: string;
 }> = {
-  emerald: { bgLight: "bg-emerald-200", bgDark: "dark:bg-emerald-900/50", textLight: "text-emerald-700", textDark: "dark:text-emerald-300", legendBg: "bg-emerald-300 dark:bg-emerald-800" },
-  sky:     { bgLight: "bg-sky-200",     bgDark: "dark:bg-sky-900/50",     textLight: "text-sky-700",     textDark: "dark:text-sky-300",     legendBg: "bg-sky-300 dark:bg-sky-800" },
-  violet:  { bgLight: "bg-violet-200",  bgDark: "dark:bg-violet-900/50",  textLight: "text-violet-700",  textDark: "dark:text-violet-300",  legendBg: "bg-violet-300 dark:bg-violet-800" },
-  amber:   { bgLight: "bg-amber-200",   bgDark: "dark:bg-amber-900/50",   textLight: "text-amber-700",   textDark: "dark:text-amber-300",   legendBg: "bg-amber-300 dark:bg-amber-800" },
-  orange:  { bgLight: "bg-orange-200",  bgDark: "dark:bg-orange-900/40",  textLight: "text-orange-700",  textDark: "dark:text-orange-300",  legendBg: "bg-orange-300 dark:bg-orange-800" },
-  rose:    { bgLight: "bg-rose-200",    bgDark: "dark:bg-rose-900/50",    textLight: "text-rose-700",    textDark: "dark:text-rose-300",    legendBg: "bg-rose-300 dark:bg-rose-800" },
+  emerald: { bgLight: "bg-emerald-300", bgDark: "dark:bg-emerald-500/55", textLight: "text-emerald-900", textDark: "dark:text-emerald-50", legendBg: "bg-emerald-400 dark:bg-emerald-500/80" }, // 1 — GREEN, loudest / top bid
+  violet:  { bgLight: "bg-violet-300",  bgDark: "dark:bg-violet-500/48",  textLight: "text-violet-900",  textDark: "dark:text-violet-50",  legendBg: "bg-violet-400 dark:bg-violet-500/75" },  // 2
+  sky:     { bgLight: "bg-sky-300",     bgDark: "dark:bg-sky-500/42",     textLight: "text-sky-900",     textDark: "dark:text-sky-50",     legendBg: "bg-sky-400 dark:bg-sky-500/70" },        // 3
+  fuchsia: { bgLight: "bg-fuchsia-300", bgDark: "dark:bg-fuchsia-500/37", textLight: "text-fuchsia-900", textDark: "dark:text-fuchsia-50", legendBg: "bg-fuchsia-400 dark:bg-fuchsia-500/65" }, // 4
+  rose:    { bgLight: "bg-rose-300",    bgDark: "dark:bg-rose-500/33",    textLight: "text-rose-900",    textDark: "dark:text-rose-50",    legendBg: "bg-rose-400 dark:bg-rose-500/60" },      // 5
+  teal:    { bgLight: "bg-teal-300",    bgDark: "dark:bg-teal-500/28",    textLight: "text-teal-900",    textDark: "dark:text-teal-50",    legendBg: "bg-teal-400 dark:bg-teal-500/55" },      // 6
+  amber:   { bgLight: "bg-amber-200",   bgDark: "dark:bg-amber-500/20",   textLight: "text-amber-800",   textDark: "dark:text-amber-200",  legendBg: "bg-amber-300 dark:bg-amber-500/45" },    // 7 — muted (cheap)
+  orange:  { bgLight: "bg-orange-200",  bgDark: "dark:bg-orange-500/16",  textLight: "text-orange-800",  textDark: "dark:text-orange-200", legendBg: "bg-orange-300 dark:bg-orange-500/40" },  // 8 — most muted (cheapest)
 };
 
+// Default bands (new auctions): GREEN top, fading down; cheap tiers stay muted.
 const DEFAULT_SLABS: PriceSlab[] = [
   { min: 25, color: "emerald" },
-  { min: 20, color: "sky" },
-  { min: 15, color: "violet" },
-  { min: 10, color: "amber" },
-  { min: 5,  color: "orange" },
+  { min: 20, color: "violet" },
+  { min: 15, color: "sky" },
+  { min: 10, color: "fuchsia" },
+  { min: 5,  color: "rose" },
 ];
 
 // Module-level ref — synced from component state each render
 let _activeSlabs: PriceSlab[] = DEFAULT_SLABS;
 
-function getPriceColor(price: number): string {
+// ── Worth ramp: GOLD (top) → WHITE (base) ──────────────────────────
+// A temperature scale, not a rainbow. Shade comes from the tier's RANK (positional), so it can't
+// mis-map. Upper tiers are held DARK enough that the default light row-text stays readable — a
+// gold→blue HUE swing gives a clear gradient without a lightness swing that would glow in dark
+// mode. The base tier is a faint white tint (cheapest, near-neutral); its alpha is kept low so
+// row text still reads over it. Edit PRICE_RAMP to retune (index 0 = top tier).
+const PRICE_RAMP: string[] = [
+  "rgba(245,158,11,0.66)",  // 1 gold — top worth, most premium
+  "rgba(34,197,94,0.62)",   // 2 green — vivid & heavy, clearly the strongest of the green band
+  "rgba(13,148,136,0.54)",  // 3 deep teal — darker/heavier than 4 (a light hue here would read weaker)
+  "rgba(59,130,246,0.36)",  // 4 blue — lighter, recedes clearly below the teal above
+  "rgba(129,140,248,0.24)", // 5 indigo (light)
+  "rgba(255,255,255,0.16)", // 6 white — cheapest, faint near-neutral tint
+];
+const PRICE_BASE: string | null = null; // below the lowest tier → no fill (neutral cell)
+
+function priceRampHex(price: number): string | null {
   const sorted = [..._activeSlabs].sort((a, b) => b.min - a.min);
-  for (const slab of sorted) {
-    if (price >= slab.min) {
-      const c = COLOR_PALETTE[slab.color];
-      return c ? `${c.bgLight} ${c.bgDark}` : "";
-    }
+  for (let i = 0; i < sorted.length; i++) {
+    if (price >= sorted[i].min) return PRICE_RAMP[Math.min(i, PRICE_RAMP.length - 1)];
   }
-  return "bg-gray-100 dark:bg-gray-900/30";
+  return PRICE_BASE;
 }
 
-function getPriceTextColor(price: number): string {
-  const sorted = [..._activeSlabs].sort((a, b) => b.min - a.min);
-  for (const slab of sorted) {
-    if (price >= slab.min) {
-      const c = COLOR_PALETTE[slab.color];
-      return c ? `${c.textLight} ${c.textDark}` : "";
-    }
-  }
-  return "text-muted-foreground";
+// Convert a #RRGGBB hex to an rgba() string at alpha `a` (for owner-colour tints).
+function hexA(hex: string, a: number): string {
+  const h = hex.replace("#", "");
+  if (h.length < 6) return hex;
+  return `rgba(${parseInt(h.slice(0, 2), 16)},${parseInt(h.slice(2, 4), 16)},${parseInt(h.slice(4, 6), 16)},${a})`;
+}
+
+// Inline background for an AVAILABLE player cell. Text stays the default light foreground — every
+// ramp colour is dark enough for it (and the muted secondary text) to read. undefined = base tier.
+function rampStyle(price: number): { backgroundColor: string } | undefined {
+  const hex = priceRampHex(price);
+  return hex ? { backgroundColor: hex } : undefined;
 }
 
 function getSlabLegend(slabs: PriceSlab[]) {
   const sorted = [...slabs].sort((a, b) => b.min - a.min);
-  return sorted.map((s, i) => {
-    const c = COLOR_PALETTE[s.color];
-    const nextMin = i < sorted.length - 1 ? sorted[i + 1].min : null;
-    const label = i === 0 ? `${s.min}+` : nextMin !== null ? `${s.min}-${sorted[i - 1].min}` : `${s.min}-${sorted[i - 1].min}`;
-    return { label: i === 0 ? `${s.min}+` : `${s.min}-${sorted[i - 1].min}`, legendBg: c?.legendBg || "" };
-  });
+  return sorted.map((s, i) => ({
+    label: i === 0 ? `${s.min}+` : `${s.min}-${sorted[i - 1].min}`,
+    hex: PRICE_RAMP[Math.min(i, PRICE_RAMP.length - 1)],
+  }));
+}
+
+// Short role tag for the board cell.
+const ROLE_SHORT: Record<string, string> = { WK: "WK", BAT: "BAT", AR: "AR", BOWL: "BWL" };
+
+// Bowling-type icon. PACE = comet ☄️ (right-arm) / horizontally mirrored (left-arm). SPIN = spiral
+// 🌀 whose handedness shows the ball-turn: default = "clockwise" (off-spin / left-arm wrist-spin
+// 'chinaman' — turns IN to a RH bat); mirrored = "anti-clockwise" (leg-spin / left-arm orthodox —
+// turns AWAY). `mirror` is applied as a CSS scaleX(-1) at render.
+function bowlInfo(style: string | null | undefined): { icon: string; mirror: boolean; title: string; pace: boolean } | null {
+  if (!style) return null;
+  const s = style.toLowerCase();
+  const left = /left[\s-]?arm/.test(s) || /slow left/.test(s);
+  if (/chinaman/.test(s) || (left && /wrist/.test(s)))
+    return { icon: "🌀", mirror: false, title: "Left-arm wrist-spin (chinaman) — turns in to RH bat", pace: false };
+  if (/orthodox/.test(s))
+    return { icon: "🌀", mirror: true, title: "Left-arm orthodox (SLA) — turns away from RH bat", pace: false };
+  if (/off/.test(s))
+    return { icon: "🌀", mirror: false, title: "Off-spin — turns in to RH bat (clockwise)", pace: false };
+  if (/leg/.test(s))
+    return { icon: "🌀", mirror: true, title: "Leg-spin — turns away from RH bat (anti-clockwise)", pace: false };
+  if (/fast|pace|medium|seam|quick/.test(s))
+    return { icon: "☄️", mirror: left, title: (left ? "Left" : "Right") + "-arm pace", pace: true };
+  return null;
 }
 
 // ── Main Page ──────────────────────────────────────────────────────
@@ -241,6 +288,7 @@ export default function AuctionPage() {
   const [showIntel, setShowIntel] = useState(false);
   const [showAdvisor, setShowAdvisor] = useState(false);
   const [showAvailability, setShowAvailability] = useState(false);
+  const [showLeaders, setShowLeaders] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
   // Price slab config
@@ -410,11 +458,24 @@ export default function AuctionPage() {
     );
   }, [pool]);
 
-  const getPlayerBg = useCallback((p: PoolPlayer) => {
-    if (p.status !== "SOLD" || !p.sold_to_participant) return "";
-    if (p.sold_to_participant === myId) return "bg-green-700 dark:bg-green-800";
-    return "bg-muted/40 opacity-60";
-  }, [myId]);
+  const getPlayerBg = useCallback((p: PoolPlayer): { cls: string; style?: { backgroundColor?: string; backgroundImage?: string } } => {
+    if (p.status !== "SOLD" || !p.sold_to_participant) return { cls: "" };
+    // My pick: solid DARK green + white text + ring — distinct from any worth-ramp green.
+    if (p.sold_to_participant === myId) {
+      return { cls: "text-white ring-1 ring-inset ring-green-400/60 font-medium", style: { backgroundColor: "#14532d" } };
+    }
+    // Opponent pick: a RIGHT ACCENT BAR (~25% of the row) in THAT owner's colour → reads "owned by
+    // X" without a full-row wash that looks like a self-marked/watchlist highlight. The strip carries
+    // a higher alpha than the old wash so the smaller area still reads. Uses backgroundImage so the
+    // hover background-color still shows through the transparent left ¾. `to left` anchors the solid
+    // stops to the RIGHT edge.
+    const owner = participants.find((x) => x.id === p.sold_to_participant);
+    const oc = owner ? owner.color : "#787878";
+    return {
+      cls: "",
+      style: { backgroundImage: `linear-gradient(to left, ${hexA(oc, 0.72)} 0%, ${hexA(oc, 0.72)} 20%, ${hexA(oc, 0)} 27%)` },
+    };
+  }, [myId, participants]);
 
   const getWatchlistBorder = useCallback((playerId: number) => {
     if (playerId in watchlist) return "ring-2 ring-amber-500/60";
@@ -440,13 +501,14 @@ export default function AuctionPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Top Bar */}
-      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border px-4 py-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <a href="/" className="text-sm text-muted-foreground hover:text-foreground">
-            &larr; Home
-          </a>
-          <h1 className="font-bold text-lg">{auction.name}</h1>
-          <Badge variant="outline">{auction.tournament_name}</Badge>
+      <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border">
+        {/* Row 1 — identity + live status */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5">
+          <a href="/" className="text-muted-foreground hover:text-foreground shrink-0 text-xl leading-none -mt-0.5" title="Back to home">&larr;</a>
+          <div className="min-w-0">
+            <h1 className="font-semibold text-base leading-tight truncate max-w-[240px]">{auction.name}</h1>
+            <div className="text-[11px] text-muted-foreground leading-tight truncate max-w-[240px]">{auction.tournament_name}</div>
+          </div>
 
           {/* Tour bat/bowl "general stats" chip — always visible; click for the venue breakdown */}
           {tourConsensus && tourConsensus.batFp != null && (() => {
@@ -474,24 +536,24 @@ export default function AuctionPage() {
 
           <div className="flex-1" />
 
-          {/* Purse chips */}
-          <div className="flex flex-wrap gap-2">
-            {participants.map((p) => (
-              <div
-                key={p.id}
-                className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs border"
-                style={{ borderColor: p.color }}
-              >
+          {/* Purse — the live-critical info, given more weight */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {participants.map((p) => {
+              const pct = p.purse > 0 ? Math.max(0, Math.min(1, p.remaining_purse / p.purse)) : 0;
+              const low = pct < 0.2;
+              return (
                 <div
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: p.color }}
-                />
-                <span className="font-medium">{p.short_name}</span>
-                <span className="text-muted-foreground">
-                  {p.remaining_purse.toFixed(1)}/{p.purse}
-                </span>
-              </div>
-            ))}
+                  key={p.id}
+                  className={`flex items-center gap-1.5 pl-2 pr-2.5 py-1 rounded-lg border bg-card ${low ? "border-red-500/60" : "border-border"}`}
+                  title={`${p.short_name}: ${p.remaining_purse.toFixed(1)} of ${p.purse} left`}
+                >
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
+                  <span className="text-xs font-medium">{p.short_name}</span>
+                  <span className={`text-sm font-semibold tabular-nums ${low ? "text-red-500" : ""}`}>{p.remaining_purse.toFixed(1)}</span>
+                  <span className="text-[10px] text-muted-foreground tabular-nums">/{p.purse}</span>
+                </div>
+              );
+            })}
           </div>
 
           {/* Market factor badge */}
@@ -500,8 +562,11 @@ export default function AuctionPage() {
           >
             Mkt {marketFactor.toFixed(2)}x
           </div>
+        </div>{/* end Row 1 */}
 
-          {/* Price legend — click to edit */}
+        {/* Row 2 — controls */}
+        <div className="flex flex-wrap items-center gap-2 px-4 py-1.5 border-t border-border/60">
+          {/* Price tiers — click to edit */}
           <div className="relative">
             <div
               className="flex items-center gap-1 cursor-pointer"
@@ -509,7 +574,7 @@ export default function AuctionPage() {
               title="Click to edit price tiers"
             >
               {getSlabLegend(priceSlabs).map((s) => (
-                <div key={s.label} className={`${s.legendBg} text-[9px] px-1.5 py-0.5 rounded`}>
+                <div key={s.label} style={{ backgroundColor: s.hex }} className="text-[9px] px-1.5 py-0.5 rounded text-white/90">
                   {s.label}
                 </div>
               ))}
@@ -548,53 +613,38 @@ export default function AuctionPage() {
             </button>
           </div>
 
-          <button
-            onClick={() => setShowCalc((v) => !v)}
-            className={`px-3 py-1.5 text-sm rounded-lg border ${showCalc ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
-          >
-            Calc
-          </button>
+          <div className="flex-1" />
 
-          <button
-            onClick={() => setShowIntel((v) => !v)}
-            className={`px-3 py-1.5 text-sm rounded-lg border ${showIntel ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
-          >
-            Intel
-          </button>
+          {/* Panel toggles — grouped, secondary (segmented control) */}
+          <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/40 p-0.5">
+            <HeaderToggle active={showCalc} onClick={() => setShowCalc((v) => !v)}>Calc</HeaderToggle>
+            <HeaderToggle active={showIntel} onClick={() => setShowIntel((v) => !v)}>Intel</HeaderToggle>
+            <HeaderToggle active={showAvailability} onClick={() => setShowAvailability((v) => !v)} alert={pool.some((p) => p.availability && p.availability !== "FIT")}>Availability</HeaderToggle>
+            <HeaderToggle active={showLeaders} onClick={() => setShowLeaders((v) => !v)}>Leaders</HeaderToggle>
+            <HeaderToggle active={showAdvisor} onClick={() => setShowAdvisor((v) => !v)}>Advisor</HeaderToggle>
+          </div>
 
+          {/* Primary action */}
           <button
             onClick={() => setShowChat((v) => !v)}
-            className={`px-3 py-1.5 text-sm rounded-lg border ${showChat ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${showChat ? "bg-primary text-primary-foreground" : "bg-foreground/90 text-background hover:bg-foreground"}`}
           >
             Quick Sell
           </button>
 
-          <button
-            onClick={() => setShowAdvisor((v) => !v)}
-            className={`px-3 py-1.5 text-sm rounded-lg border ${showAdvisor ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
-          >
-            AI Advisor
-          </button>
-
-          <button
-            onClick={() => setShowAvailability((v) => !v)}
-            className={`px-3 py-1.5 text-sm rounded-lg border ${
-              showAvailability ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-            } ${pool.some((p) => p.availability && p.availability !== "FIT") ? "border-red-500/50" : ""}`}
-          >
-            Availability
-          </button>
-
-          <button
-            onClick={() => setShowSettings((v) => !v)}
-            className={`px-3 py-1.5 text-sm rounded-lg border ${showSettings ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
-          >
-            Settings
-          </button>
-
-          <ThemeToggle />
+          {/* Utilities */}
+          <div className="flex items-center gap-1 pl-2 ml-0.5 border-l border-border">
+            <button
+              onClick={() => setShowSettings((v) => !v)}
+              className={`w-8 h-8 flex items-center justify-center rounded-lg text-base transition-colors ${showSettings ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+              title="Settings"
+            >
+              ⚙
+            </button>
+            <ThemeToggle />
+          </div>
         </div>
-      </div>
+      </header>
 
       {/* Auction Settings Panel */}
       {showSettings && (
@@ -623,9 +673,22 @@ export default function AuctionPage() {
         <AvailabilityPanel pool={pool} onUpdate={fetchData} />
       )}
 
+      {/* Budget Planner — docked under the header (persistent strip, never overlays the board) */}
+      {showCalc && (
+        <BudgetCalculator
+          auctionId={auction.id}
+          purse={auction.purse_per_friend}
+          playersPerFriend={auction.players_per_friend}
+          boughtPlayers={pool.filter((p) => p.status === "SOLD" && p.sold_to_participant === myId)}
+        />
+      )}
+
+      {/* Points Leaders — per-season leaderboard of squad players (pick aid) */}
+      {showLeaders && <PointsLeadersPanel tournamentId={auction.tournament_id} />}
+
       {/* Content */}
       <div className="flex">
-        <div className={`flex-1 ${showCalc ? "mr-[320px]" : ""}`}>
+        <div className="flex-1">
           {view === "grid" ? (
             <SquadGrid
               sortedTeams={sortedTeams}
@@ -667,16 +730,6 @@ export default function AuctionPage() {
             />
           )}
         </div>
-
-        {/* Budget Calculator Sidebar */}
-        {showCalc && (
-          <BudgetCalculator
-            auctionId={auction.id}
-            purse={auction.purse_per_friend}
-            playersPerFriend={auction.players_per_friend}
-            boughtPlayers={pool.filter((p) => p.status === "SOLD" && p.sold_to_participant === myId)}
-          />
-        )}
       </div>
 
       {/* Player Detail Modal */}
@@ -686,6 +739,7 @@ export default function AuctionPage() {
           <PlayerDetailModal
             playerId={selectedPlayerId}
             onClose={() => setSelectedPlayerId(null)}
+            tour={auction?.tournament_name}
             riskNote={sp?.risk_note}
             poolId={sp?.pool_id}
             playerStatus={sp?.status}
@@ -772,7 +826,7 @@ function SquadGrid({
   myId: number | undefined;
   participants: Participant[];
   auctionId: number;
-  getPlayerBg: (p: PoolPlayer) => string;
+  getPlayerBg: (p: PoolPlayer) => { cls: string; style?: { backgroundColor?: string; backgroundImage?: string } };
   getWatchlistBorder: (id: number) => string;
   onPlayerClick: (id: number) => void;
   onSellClick: (p: PoolPlayer) => void;
@@ -844,7 +898,7 @@ function TeamColumn({
   players: PoolPlayer[];
   watchlist: Record<number, unknown>;
   myId: number | undefined;
-  getPlayerBg: (p: PoolPlayer) => string;
+  getPlayerBg: (p: PoolPlayer) => { cls: string; style?: { backgroundColor?: string; backgroundImage?: string } };
   getWatchlistBorder: (id: number) => string;
   onPlayerClick: (id: number) => void;
   onSellClick: (p: PoolPlayer) => void;
@@ -951,6 +1005,28 @@ function TeamColumn({
             </button>
           );
         })()}
+        {/* Venue MIX — how many of this team's games fall on each kind of ground.
+            Ba = bat-friendly, Bo = bowl-friendly, Ne = neutral/balanced. Classes come from the
+            measured Bat Index (batting-FP / bowling-FP per ground), reporting only — venue does
+            not affect any price. */}
+        {venueSummary && (venueSummary.batGames + venueSummary.balancedGames + venueSummary.bowlGames) > 0 && (
+          <div
+            className="mt-0.5 w-full flex items-center justify-center gap-1.5 text-[10px] leading-tight"
+            title="Games by ground type — Ba = bat-friendly, Bo = bowl-friendly, Ne = neutral. From the measured Bat Index; reporting only, not priced in."
+          >
+            <span className={venueSummary.batGames ? "text-emerald-300" : "text-white/35"}>
+              {venueSummary.batGames} Ba
+            </span>
+            <span className="text-white/25">·</span>
+            <span className={venueSummary.bowlGames ? "text-rose-300" : "text-white/35"}>
+              {venueSummary.bowlGames} Bo
+            </span>
+            <span className="text-white/25">·</span>
+            <span className={venueSummary.balancedGames ? "text-sky-300" : "text-white/35"}>
+              {venueSummary.balancedGames} Ne
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Players — sortable */}
@@ -970,7 +1046,8 @@ function TeamColumn({
                 player={p}
                 index={idx}
                 totalPlayers={players.length}
-                bgClass={getPlayerBg(p)}
+                bgClass={getPlayerBg(p).cls}
+                soldStyle={getPlayerBg(p).style}
                 watchlistClass={getWatchlistBorder(p.player_id)}
                 isWatched={p.player_id in watchlist}
                 isMine={p.status === "SOLD" && p.sold_to_participant === myId}
@@ -998,6 +1075,7 @@ function SortablePlayerCard({
   index,
   totalPlayers,
   bgClass,
+  soldStyle,
   watchlistClass,
   isWatched,
   isMine,
@@ -1014,6 +1092,7 @@ function SortablePlayerCard({
   index: number;
   totalPlayers: number;
   bgClass: string;
+  soldStyle?: { backgroundColor?: string; backgroundImage?: string };
   watchlistClass: string;
   isWatched: boolean;
   isMine: boolean;
@@ -1046,8 +1125,10 @@ function SortablePlayerCard({
 
   const showBenchSeparator = index === PLAYING_XI_SIZE && totalPlayers > PLAYING_XI_SIZE;
   const sqNum = index + 1;
-  const priceColorClass = p.status === "AVAILABLE" && adjustedPrice > 0 ? getPriceColor(adjustedPrice) : "";
-  const showBaseDiff = Math.abs(marketFactor - 1) > 0.05 && p.val_expected > 0;
+  const rStyle = !bgClass && p.status === "AVAILABLE" && adjustedPrice > 0 ? rampStyle(adjustedPrice) : undefined;
+  // Show the base (OG) price in brackets whenever the market-adjusted price actually differs from it.
+  const showBaseDiff = p.val_expected > 0 && Math.abs(adjustedPrice - p.val_expected) >= 0.05;
+  const bowl = bowlInfo(p.bowl_style);
 
   return (
     <>
@@ -1058,8 +1139,8 @@ function SortablePlayerCard({
       )}
       <div
         ref={setNodeRef}
-        style={style}
-        className={`group px-2 py-1.5 border-b border-border last:border-b-0 hover:bg-muted/30 transition-colors ${bgClass || priceColorClass} ${watchlistClass} ${
+        style={{ ...style, ...(soldStyle || rStyle || {}) }}
+        className={`group px-2 py-1.5 border-b border-border last:border-b-0 hover:bg-muted/30 transition-colors ${bgClass} ${watchlistClass} ${
           isDragging ? "shadow-lg bg-card" : ""
         }`}
       >
@@ -1104,30 +1185,87 @@ function SortablePlayerCard({
               <span className={`text-[10px] w-3 shrink-0 ${isMine ? "text-white/70" : "text-muted-foreground/60"}`}>
                 {sqNum}
               </span>
-              <span className={`text-xs font-medium group-hover:truncate ${
+              <span className={`text-xs font-medium ${
                 p.status === "SOLD"
                   ? isMine
                     ? "text-white font-bold"
                     : "line-through text-muted-foreground"
                   : ""
               }`}>{p.name}</span>
+              <span className="shrink-0 text-[8px] font-semibold px-1 rounded bg-foreground/10 text-foreground/70 leading-none" title={`Role: ${p.role}`}>{ROLE_SHORT[p.role] ?? p.role}</span>
+              {bowl && p.role !== "BAT" && p.role !== "WK" && (
+                <span className="shrink-0 text-xs leading-none" style={{ display: "inline-block", transform: bowl.mirror ? "scaleX(-1)" : undefined }} title={`${bowl.title}${p.bowl_style ? " · " + p.bowl_style.replace(/\[\[|\]\]/g, "") : ""}`}>{bowl.icon}</span>
+              )}
               {p.is_overseas ? (
                 <span className={`text-lg shrink-0 leading-none ${isMine ? "text-yellow-300" : "text-blue-400"}`} title="Overseas">✈</span>
               ) : null}
               {p.risk_note && (
                 <span className="text-[9px] shrink-0 text-red-500" title={p.risk_note}>⚠</span>
               )}
-              {/* Sold: undo on hover */}
+            </div>
+            {/* Row 2: EFPPM + Price — shown for AVAILABLE **and** SOLD (keeps row height + always
+                shows EFPPM). Sold shows the price it went for; secondary text uses opacity so it
+                stays readable on any cell colour. */}
+            {/* Row 2: batting position + EFPPM + price (left); sell/risk/undo actions (right, on hover) */}
+            <div className="flex items-center gap-1 ml-4 min-h-[15px]">
+              {p.efppm > 0 && (
+                <span className="text-[9px] opacity-70">{p.efppm.toFixed(0)} FP</span>
+              )}
               {p.status === "SOLD" && (
+                <span className="text-xs font-bold" title="Sold price">
+                  {p.sold_price != null ? p.sold_price.toFixed(1) : "—"}
+                </span>
+              )}
+              {p.status !== "SOLD" && adjustedPrice > 0 && !editingPrice && (
+                <span
+                  className="text-xs font-bold cursor-pointer hover:underline"
+                  title={`Base: ${p.val_expected?.toFixed(1)} | Mkt: ${marketFactor.toFixed(2)}x | Floor: ${p.val_floor?.toFixed(1)} | Ceil: ${p.val_ceiling?.toFixed(1)} — Click to edit base`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPriceInput(p.val_expected.toFixed(1));
+                    setEditingPrice(true);
+                  }}
+                >
+                  {adjustedPrice.toFixed(1)}
+                  {showBaseDiff && (
+                    <span className="text-[8px] font-normal opacity-60 ml-0.5">
+                      ({p.val_expected.toFixed(1)})
+                    </span>
+                  )}
+                </span>
+              )}
+              {editingPrice && (
+                <input
+                  type="number"
+                  step="0.5"
+                  className="w-12 text-xs px-1 py-0 h-4 border rounded bg-background text-right font-bold"
+                  value={priceInput}
+                  autoFocus
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => setPriceInput(e.target.value)}
+                  onBlur={() => {
+                    const val = parseFloat(priceInput);
+                    if (!isNaN(val) && val > 0) onPriceChange(val);
+                    setEditingPrice(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const val = parseFloat(priceInput);
+                      if (!isNaN(val) && val > 0) onPriceChange(val);
+                      setEditingPrice(false);
+                    }
+                    if (e.key === "Escape") setEditingPrice(false);
+                  }}
+                />
+              )}
+              {p.status === "SOLD" ? (
                 <button
                   onClick={(e) => { e.stopPropagation(); onUndo(); }}
                   className="ml-auto text-[9px] opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground/60 hover:text-foreground shrink-0"
                 >
                   undo
                 </button>
-              )}
-              {/* Sell + Risk — only on hover, pushed right */}
-              {p.status === "AVAILABLE" && (
+              ) : (
                 <span className="ml-auto flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                   <button
                     onClick={(e) => { e.stopPropagation(); onSell(); }}
@@ -1145,56 +1283,6 @@ function SortablePlayerCard({
                 </span>
               )}
             </div>
-            {/* Row 2: EFPPM + Price (always visible below name) */}
-            {p.status === "AVAILABLE" && (adjustedPrice > 0 || p.efppm > 0) && (
-              <div className="flex items-center gap-1 ml-4">
-                {p.efppm > 0 && (
-                  <span className="text-[9px] text-muted-foreground/70">{p.efppm.toFixed(0)} FP</span>
-                )}
-                {adjustedPrice > 0 && !editingPrice && (
-                  <span
-                    className={`text-xs font-bold cursor-pointer hover:underline ${getPriceTextColor(adjustedPrice)}`}
-                    title={`Base: ${p.val_expected?.toFixed(1)} | Mkt: ${marketFactor.toFixed(2)}x | Floor: ${p.val_floor?.toFixed(1)} | Ceil: ${p.val_ceiling?.toFixed(1)} — Click to edit base`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setPriceInput(p.val_expected.toFixed(1));
-                      setEditingPrice(true);
-                    }}
-                  >
-                    {adjustedPrice.toFixed(1)}
-                    {showBaseDiff && (
-                      <span className="text-[8px] font-normal text-muted-foreground/60 ml-0.5">
-                        ({p.val_expected.toFixed(1)})
-                      </span>
-                    )}
-                  </span>
-                )}
-                {editingPrice && (
-                  <input
-                    type="number"
-                    step="0.5"
-                    className="w-12 text-xs px-1 py-0 h-4 border rounded bg-background text-right font-bold"
-                    value={priceInput}
-                    autoFocus
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => setPriceInput(e.target.value)}
-                    onBlur={() => {
-                      const val = parseFloat(priceInput);
-                      if (!isNaN(val) && val > 0) onPriceChange(val);
-                      setEditingPrice(false);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        const val = parseFloat(priceInput);
-                        if (!isNaN(val) && val > 0) onPriceChange(val);
-                        setEditingPrice(false);
-                      }
-                      if (e.key === "Escape") setEditingPrice(false);
-                    }}
-                  />
-                )}
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -1226,7 +1314,7 @@ function Masterlist({
   watchlist: Record<number, unknown>;
   myId: number | undefined;
   participants: Participant[];
-  getPlayerBg: (p: PoolPlayer) => string;
+  getPlayerBg: (p: PoolPlayer) => { cls: string; style?: { backgroundColor?: string; backgroundImage?: string } };
   onPlayerClick: (id: number) => void;
   onSellClick: (p: PoolPlayer) => void;
   onWatchlistToggle: (id: number) => void;
@@ -1321,7 +1409,8 @@ function Masterlist({
             {filtered.map((p, idx) => (
               <TableRow
                 key={p.player_id}
-                className={`group cursor-pointer hover:bg-muted/30 ${getPlayerBg(p) || (p.status === "AVAILABLE" ? getPriceColor(getAdjustedPrice(p)) : "")}`}
+                className={`group cursor-pointer hover:bg-muted/30 ${getPlayerBg(p).cls}`}
+                style={getPlayerBg(p).style || (p.status === "AVAILABLE" ? rampStyle(getAdjustedPrice(p)) : undefined)}
                 onClick={() => onPlayerClick(p.player_id)}
               >
                 <TableCell className="text-muted-foreground text-xs">
@@ -1368,7 +1457,7 @@ function Masterlist({
                 <TableCell className="text-right font-bold text-amber-600 dark:text-amber-400">
                   {p.efppm?.toFixed(1) || "—"}
                 </TableCell>
-                <TableCell className={`text-right font-bold ${getPriceTextColor(getAdjustedPrice(p))}`}>
+                <TableCell className="text-right font-bold">
                   <div className="flex flex-col items-end">
                     <EditablePrice
                       value={p.val_expected}
@@ -1445,7 +1534,8 @@ function EditablePrice({
   const [input, setInput] = useState("");
 
   const displayPrice = adjustedPrice ?? value;
-  const showBaseDiff = marketFactor !== undefined && Math.abs(marketFactor - 1) > 0.05 && value > 0;
+  // Show the base (OG) price in brackets whenever the market-adjusted price actually differs from it.
+  const showBaseDiff = value > 0 && Math.abs(displayPrice - value) >= 0.05;
 
   if (editing) {
     return (
@@ -1514,7 +1604,6 @@ function SlabEditor({
   onClose: () => void;
 }) {
   const sorted = [...slabs].sort((a, b) => b.min - a.min);
-  const colorNames = Object.keys(COLOR_PALETTE);
 
   const updateSlab = (idx: number, field: "min" | "color", value: string | number) => {
     const next = sorted.map((s, i) =>
@@ -1530,13 +1619,11 @@ function SlabEditor({
 
   const addSlab = () => {
     const lowestMin = sorted.length > 0 ? sorted[sorted.length - 1].min : 10;
-    const usedColors = new Set(sorted.map((s) => s.color));
-    const freeColor = colorNames.find((c) => !usedColors.has(c)) || colorNames[0];
-    onChange([...sorted, { min: Math.max(1, lowestMin - 5), color: freeColor }]);
+    onChange([...sorted, { min: Math.max(1, lowestMin - 5), color: "green" }]);
   };
 
   return (
-    <div className="absolute top-full right-0 mt-1 z-50 bg-card border border-border rounded-lg shadow-lg p-3 w-64">
+    <div className="absolute top-full left-0 mt-1 z-50 bg-card border border-border rounded-lg shadow-lg p-3 w-64 max-w-[calc(100vw-2rem)]">
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-bold">Price Tiers</span>
         <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xs">✕</button>
@@ -1553,16 +1640,8 @@ function SlabEditor({
               onChange={(e) => updateSlab(i, "min", e.target.value)}
               className="w-12 text-xs px-1.5 py-0.5 border rounded bg-background text-right"
             />
-            <select
-              value={slab.color}
-              onChange={(e) => updateSlab(i, "color", e.target.value)}
-              className="flex-1 text-xs px-1.5 py-0.5 border rounded bg-background"
-            >
-              {colorNames.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-            <div className={`w-4 h-4 rounded shrink-0 ${COLOR_PALETTE[slab.color]?.legendBg || ""}`} />
+            <span className="flex-1 text-[10px] text-muted-foreground">tier {i + 1} · Cr</span>
+            <div className="w-5 h-5 rounded shrink-0 border border-border" style={{ backgroundColor: PRICE_RAMP[Math.min(i, PRICE_RAMP.length - 1)] }} title={`tier ${i + 1} shade`} />
             <button
               onClick={() => removeSlab(i)}
               className="text-[10px] text-muted-foreground/50 hover:text-red-500 shrink-0"
@@ -1651,123 +1730,114 @@ function BudgetCalculator({
   };
 
   return (
-    <div className="fixed right-0 top-[57px] bottom-0 w-[320px] border-l border-border bg-card overflow-y-auto p-4 z-20">
-      <h3 className="font-bold text-sm mb-3">Budget Planner</h3>
-      {boughtCount > 0 && (
-        <div className="text-xs mb-2 p-2 rounded bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
-          <span className="text-green-700 dark:text-green-400 font-medium">Bought: {boughtCount} players for {boughtSpend.toFixed(1)}Cr</span>
+    <div className="border-b border-border bg-card px-4 py-2">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        {/* Meta */}
+        <div className="flex items-center gap-3 shrink-0">
+          <h3 className="font-bold text-sm">Budget Planner</h3>
+          {boughtCount > 0 && (
+            <span className="text-xs px-2 py-0.5 rounded bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 font-medium">
+              Bought {boughtCount} · {boughtSpend.toFixed(1)}Cr
+            </span>
+          )}
+          <span className="text-xs text-muted-foreground">
+            Left: {remainingPurse.toFixed(1)}Cr · {remainingSlots} slots
+          </span>
         </div>
-      )}
-      <div className="text-xs text-muted-foreground mb-3">
-        Remaining: {remainingPurse.toFixed(1)}Cr | {remainingSlots} players to go
-      </div>
 
-      <div className="space-y-2">
-        {slabs.map((slab) => (
-          <div key={slab.id} className="flex items-center gap-2">
-            <input
-              type="number"
-              min={0}
-              className="w-12 text-sm px-1.5 py-1 border rounded bg-background text-center"
-              value={slab.count}
-              onChange={(e) =>
-                updateSlab(slab.id, "count", parseInt(e.target.value) || 0)
-              }
-            />
-            <span className="text-xs text-muted-foreground">x</span>
-            <div className="flex items-center gap-0.5">
+        {/* Slabs — horizontal */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {slabs.map((slab) => (
+            <div key={slab.id} className="flex items-center gap-1 rounded border border-border bg-background px-1.5 py-1">
+              <input
+                type="number"
+                min={0}
+                className="w-10 text-sm px-1 py-0.5 border rounded bg-background text-center"
+                value={slab.count}
+                onChange={(e) =>
+                  updateSlab(slab.id, "count", parseInt(e.target.value) || 0)
+                }
+              />
+              <span className="text-xs text-muted-foreground">×</span>
               <input
                 type="number"
                 min={0}
                 step={0.5}
-                className="w-14 text-sm px-1.5 py-1 border rounded bg-background text-right"
+                className="w-12 text-sm px-1 py-0.5 border rounded bg-background text-right"
                 value={slab.price}
                 onChange={(e) =>
-                  updateSlab(
-                    slab.id,
-                    "price",
-                    parseFloat(e.target.value) || 0
-                  )
+                  updateSlab(slab.id, "price", parseFloat(e.target.value) || 0)
                 }
               />
               <span className="text-xs text-muted-foreground">Cr</span>
+              <span className="text-xs text-muted-foreground tabular-nums">= {(slab.count * slab.price).toFixed(1)}</span>
+              <button
+                onClick={() => removeSlab(slab.id)}
+                className="text-xs text-muted-foreground hover:text-destructive ml-0.5"
+              >
+                ×
+              </button>
             </div>
-            <span className="text-xs text-muted-foreground ml-auto">
-              = {(slab.count * slab.price).toFixed(1)}
+          ))}
+          <button
+            onClick={addSlab}
+            className="text-xs text-primary hover:underline px-1"
+          >
+            + Add
+          </button>
+        </div>
+
+        {/* Summary — inline, pushed right */}
+        <div className="flex items-center gap-4 ml-auto shrink-0 text-sm">
+          <span>
+            Players{" "}
+            <span className={totalPlayers === remainingSlots ? "text-green-600 font-bold" : totalPlayers > remainingSlots ? "text-red-500 font-bold" : "font-bold"}>
+              {totalPlayers}/{remainingSlots}
             </span>
-            <button
-              onClick={() => removeSlab(slab.id)}
-              className="text-xs text-muted-foreground hover:text-destructive"
-            >
-              x
-            </button>
-          </div>
-        ))}
-      </div>
-
-      <button
-        onClick={addSlab}
-        className="text-xs text-primary hover:underline mt-2"
-      >
-        + Add slab
-      </button>
-
-      {/* Summary */}
-      <div className="mt-4 pt-3 border-t border-border space-y-1">
-        <div className="flex justify-between text-sm">
-          <span>Players</span>
-          <span className={totalPlayers === remainingSlots ? "text-green-600 font-bold" : totalPlayers > remainingSlots ? "text-red-500 font-bold" : ""}>
-            {totalPlayers} / {remainingSlots}
             {playersRemaining > 0 && (
-              <span className="text-muted-foreground font-normal ml-1">
-                ({playersRemaining} left)
-              </span>
+              <span className="text-muted-foreground ml-1">({playersRemaining} left)</span>
             )}
           </span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span>Total Spend</span>
-          <span className="font-bold">{totalSpend.toFixed(1)}Cr</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span>Remaining</span>
-          <span
-            className={`font-bold ${
-              remaining < 0
-                ? "text-red-500"
-                : remaining < 10
-                  ? "text-amber-500"
-                  : "text-green-600"
-            }`}
-          >
-            {remaining.toFixed(1)}Cr
+          <span>
+            Spend <span className="font-bold">{totalSpend.toFixed(1)}Cr</span>
+          </span>
+          <span>
+            Remaining{" "}
+            <span
+              className={`font-bold ${
+                remaining < 0
+                  ? "text-red-500"
+                  : remaining < 10
+                    ? "text-amber-500"
+                    : "text-green-600"
+              }`}
+            >
+              {remaining.toFixed(1)}Cr
+            </span>
           </span>
         </div>
       </div>
 
       {/* Distribution bar */}
-      <div className="mt-3">
-        <div className="text-[10px] text-muted-foreground mb-1">Distribution</div>
-        <div className="flex h-4 rounded overflow-hidden border border-border">
-          {slabs.filter(s => s.count > 0).map((slab) => {
-            const pct = (slab.count * slab.price / Math.max(remainingPurse, 1)) * 100;
-            return (
-              <div
-                key={slab.id}
-                className={getPriceColor(slab.price) || "bg-muted"}
-                style={{ width: `${Math.max(pct, 2)}%` }}
-                title={`${slab.count} x ${slab.price}Cr = ${(slab.count * slab.price).toFixed(1)}Cr`}
-              />
-            );
-          })}
-          {remaining > 0 && (
+      <div className="flex h-2 rounded overflow-hidden border border-border mt-2">
+        {slabs.filter(s => s.count > 0).map((slab) => {
+          const pct = (slab.count * slab.price / Math.max(remainingPurse, 1)) * 100;
+          return (
             <div
-              className="bg-muted/50"
-              style={{ width: `${(remaining / Math.max(remainingPurse, 1)) * 100}%` }}
-              title={`Unallocated: ${remaining.toFixed(1)}Cr`}
+              key={slab.id}
+              className={priceRampHex(slab.price) ? "" : "bg-muted"}
+              style={{ width: `${Math.max(pct, 2)}%`, backgroundColor: priceRampHex(slab.price) ?? undefined }}
+              title={`${slab.count} x ${slab.price}Cr = ${(slab.count * slab.price).toFixed(1)}Cr`}
             />
-          )}
-        </div>
+          );
+        })}
+        {remaining > 0 && (
+          <div
+            className="bg-muted/50"
+            style={{ width: `${(remaining / Math.max(remainingPurse, 1)) * 100}%` }}
+            title={`Unallocated: ${remaining.toFixed(1)}Cr`}
+          />
+        )}
       </div>
     </div>
   );
@@ -2439,6 +2509,244 @@ function AuctionSettings({
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Header toggle (segmented-control button) ──────────────────────
+function HeaderToggle({ active, onClick, alert, children }: { active: boolean; onClick: () => void; alert?: boolean; children: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`relative px-2.5 py-1 text-xs rounded-md transition-colors ${active ? "bg-background shadow-sm text-foreground font-medium" : "text-muted-foreground hover:text-foreground"}`}
+    >
+      {children}
+      {alert && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-background" />}
+    </button>
+  );
+}
+
+// ── Points Leaders Panel ──────────────────────────────────────────
+
+interface LeaderRow {
+  id: number; name: string; role: string; isOverseas: boolean; team: string | null;
+  total: number; inns: number; avg: number;
+  seasons: Record<number, { inns: number; total: number; avg: number }>;
+}
+interface LeadersData {
+  config: { kind: "franchise" | "international"; format: string; label: string };
+  seasons: number[];
+  leaders: LeaderRow[];
+  poolSize: number;
+}
+
+function PointsLeadersPanel({ tournamentId }: { tournamentId: number }) {
+  const [data, setData] = useState<LeadersData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  // null = the API's default order (latest season's points, tie-break 2-season total).
+  const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" } | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true); setError(false);
+    fetch(`/api/tournaments/${tournamentId}/points-leaders`)
+      .then((r) => r.json())
+      .then((d) => { if (alive) { setData(d); setLoading(false); } })
+      .catch(() => { if (alive) { setError(true); setLoading(false); } });
+    return () => { alive = false; };
+  }, [tournamentId]);
+
+  if (loading) {
+    return <div className="border-b border-border bg-card px-4 py-3 text-sm text-muted-foreground">Loading points leaders…</div>;
+  }
+  if (error || !data) {
+    return <div className="border-b border-border bg-card px-4 py-3 text-sm text-red-500">Couldn’t load points leaders.</div>;
+  }
+  if (data.seasons.length === 0 || data.leaders.length === 0) {
+    return (
+      <div className="border-b border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+        No {data.config.label} points history for these squads yet.
+      </div>
+    );
+  }
+
+  // Latest season FIRST (leftmost). Ranking (from the API) is by latest-season points, so a
+  // strong single season ranks high instead of being buried. Trend = rank movement older → latest.
+  const cols = [...data.seasons].sort((a, b) => b - a);
+  const newest = Math.max(...data.seasons);
+  const oldest = Math.min(...data.seasons);
+
+  // Rank within each season (by that season's total, desc) — drives the trend arrow.
+  const seasonRank: Record<number, Map<number, number>> = {};
+  for (const yr of cols) {
+    const withData = data.leaders
+      .filter((p) => p.seasons[yr])
+      .sort((a, b) => p2(b, yr) - p2(a, yr));
+    const m = new Map<number, number>();
+    withData.forEach((p, i) => m.set(p.id, i + 1));
+    seasonRank[yr] = m;
+  }
+  function p2(p: LeaderRow, yr: number) { return p.seasons[yr]?.total ?? 0; }
+
+  // Rank movement older → latest (also the sort value for the Trend column).
+  function trendOf(p: LeaderRow) {
+    const rNew = seasonRank[newest].get(p.id);
+    const rOld = seasonRank[oldest].get(p.id);
+    return rNew != null && rOld != null ? rOld - rNew : null; // +ve = climbed
+  }
+
+  // Sortable columns. Default (sort === null) is the API order = latest season, desc.
+  const activeKey = sort?.key ?? `y${newest}`;
+  const activeDir = sort?.dir ?? "desc";
+  // A player with no innings in a season has no value for that column — such rows always sink
+  // to the bottom, in BOTH directions (an asc sort on 2024 should surface the lowest real
+  // score, not the players who didn't play).
+  function sortValue(p: LeaderRow): number | string | null {
+    if (activeKey === "name") return p.name.toLowerCase();
+    if (activeKey === "total") return p.inns ? p.total : null;
+    if (activeKey === "avg") return p.inns ? p.avg : null;
+    if (activeKey === "trend") return trendOf(p);
+    const yr = Number(activeKey.slice(1));
+    return p.seasons[yr] ? p2(p, yr) : null;
+  }
+  const rows = [...data.leaders].sort((a, b) => {
+    const va = sortValue(a), vb = sortValue(b);
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    const cmp = typeof va === "string" ? va.localeCompare(vb as string) : (va as number) - (vb as number);
+    const dirCmp = activeDir === "asc" ? cmp : -cmp;
+    // Stable, meaningful tie-break: 2-season total (matches the API's tie-break).
+    return dirCmp !== 0 ? dirCmp : b.total - a.total;
+  });
+
+  function toggleSort(key: string) {
+    setSort((prev) => {
+      const cur = prev ?? { key: `y${newest}`, dir: "desc" as const };
+      if (cur.key === key) return { key, dir: cur.dir === "desc" ? "asc" : "desc" };
+      // First click on a new column: names read best A→Z, numbers best-first.
+      return { key, dir: key === "name" ? "asc" : "desc" };
+    });
+  }
+
+  const sortLabel =
+    activeKey === "name" ? "name" :
+    activeKey === "total" ? "2-season total" :
+    activeKey === "avg" ? "avg" :
+    activeKey === "trend" ? "trend" :
+    activeKey.slice(1);
+
+  const kindLabel = data.config.kind === "franchise" ? "last 2 editions" : "this year + last";
+
+  return (
+    <div className="border-b border-border bg-card">
+      <div className="px-4 py-2 flex items-center gap-2 flex-wrap">
+        <h3 className="font-bold text-sm">Points Leaders</h3>
+        <span className="text-xs text-muted-foreground">
+          {data.config.label} · {cols.join(" & ")} ({kindLabel}) · sorted by {sortLabel} {activeDir === "desc" ? "↓" : "↑"} · squad players only · {data.leaders.length} shown
+        </span>
+        {sort && (
+          <button
+            onClick={() => setSort(null)}
+            className="text-xs text-muted-foreground hover:text-foreground underline"
+          >
+            reset
+          </button>
+        )}
+      </div>
+      <div className="max-h-[62vh] overflow-y-auto">
+        <table className="w-full text-xs">
+          <thead className="sticky top-0 bg-card border-y border-border">
+            <tr className="text-muted-foreground">
+              <th className="text-left font-medium px-3 py-1.5 w-8">#</th>
+              <th className="text-left font-medium px-2 py-1.5">
+                <SortTh label="Player" col="name" activeKey={activeKey} activeDir={activeDir} onSort={toggleSort} />
+              </th>
+              {cols.map((yr) => (
+                <th key={yr} className="text-right font-medium px-2 py-1.5">
+                  <SortTh label={String(yr)} col={`y${yr}`} align="right" activeKey={activeKey} activeDir={activeDir} onSort={toggleSort} />
+                </th>
+              ))}
+              <th className="text-right font-medium px-2 py-1.5">
+                <SortTh label="Trend" col="trend" align="right" activeKey={activeKey} activeDir={activeDir} onSort={toggleSort} />
+              </th>
+              <th className="text-right font-medium px-2 py-1.5">
+                <SortTh label="Total" col="total" align="right" activeKey={activeKey} activeDir={activeDir} onSort={toggleSort} />
+              </th>
+              <th className="text-right font-medium px-3 py-1.5">
+                <SortTh label="Avg" col="avg" align="right" activeKey={activeKey} activeDir={activeDir} onSort={toggleSort} />
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((p, i) => {
+              const delta = trendOf(p);
+              return (
+                <tr key={p.id} className="border-b border-border/50 hover:bg-muted/40">
+                  <td className="px-3 py-1.5 text-muted-foreground tabular-nums">{i + 1}</td>
+                  <td className="px-2 py-1.5">
+                    <span className="font-medium">{p.name}</span>
+                    {p.isOverseas && <span className="text-blue-400 ml-1" title="Overseas">✈</span>}
+                    <span className="text-muted-foreground ml-1">{p.team} · {p.role}</span>
+                  </td>
+                  {cols.map((yr) => {
+                    const s = p.seasons[yr];
+                    return (
+                      <td key={yr} className={`px-2 py-1.5 text-right tabular-nums ${activeKey === `y${yr}` ? "font-semibold" : ""}`}>
+                        {s ? (
+                          <span title={`${s.inns} inns · avg ${s.avg}`}>
+                            {s.total}<span className="text-muted-foreground/60 text-[10px]"> /{s.inns}</span>
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/40">—</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td className="px-2 py-1.5 text-right tabular-nums">
+                    {delta == null ? (
+                      <span className="text-muted-foreground/40">—</span>
+                    ) : delta > 0 ? (
+                      <span className="text-green-500" title={`Up ${delta} places vs ${oldest}`}>▲{delta}</span>
+                    ) : delta < 0 ? (
+                      <span className="text-red-500" title={`Down ${-delta} places vs ${oldest}`}>▼{-delta}</span>
+                    ) : (
+                      <span className="text-muted-foreground">–</span>
+                    )}
+                  </td>
+                  <td className="px-2 py-1.5 text-right font-bold tabular-nums">{p.total}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums">{p.avg}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// Clickable column header for the Points Leaders table: click to sort, click again to flip.
+function SortTh({
+  label, col, align = "left", activeKey, activeDir, onSort,
+}: {
+  label: string; col: string; align?: "left" | "right";
+  activeKey: string; activeDir: "asc" | "desc"; onSort: (col: string) => void;
+}) {
+  const active = activeKey === col;
+  return (
+    <button
+      onClick={() => onSort(col)}
+      title={`Sort by ${label}`}
+      className={`inline-flex items-center gap-0.5 font-medium hover:text-foreground ${
+        active ? "text-foreground" : ""
+      } ${align === "right" ? "flex-row-reverse" : ""}`}
+    >
+      <span>{label}</span>
+      <span className={`text-[9px] ${active ? "" : "opacity-25"}`}>
+        {active ? (activeDir === "desc" ? "▼" : "▲") : "▼"}
+      </span>
+    </button>
   );
 }
 

@@ -1,5 +1,11 @@
 import type Database from "better-sqlite3";
-import { CPL_2026, CPL_NAME_ALIASES, CPL_NO_DB_RECORD, type CPLTeam } from "./cpl-2026";
+import {
+  CPL_2026,
+  CPL_NAME_ALIASES,
+  CPL_NO_DB_RECORD,
+  cplAvailability,
+  type CPLTeam,
+} from "./cpl-2026";
 import { fuzzyMatchName, normName } from "@/lib/fuzzy-name-match";
 import { resolveByName } from "@/lib/registry";
 
@@ -152,9 +158,11 @@ export function buildCPLPool(
   const teams = opts.teams ?? CPL_2026;
 
   const insertPool = sqlite.prepare(
+    // `availability` is written here so the board's Availability panel and per-player badges light
+    // up. Derived from the published phase windows (see cplAvailability), never hand-maintained.
     `INSERT OR IGNORE INTO auction_pool
-       (tournament_id, player_id, base_price, status, auction_id, ipl_team, squad_number, efppm, risk_note)
-     VALUES (?, ?, ?, 'AVAILABLE', ?, ?, ?, ?, ?)`
+       (tournament_id, player_id, base_price, status, auction_id, ipl_team, squad_number, efppm, risk_note, availability)
+     VALUES (?, ?, ?, 'AVAILABLE', ?, ?, ?, ?, ?, ?)`
   );
   const updateIsOverseas = sqlite.prepare(`UPDATE players SET is_overseas = ? WHERE id = ?`);
   const insertPlayer = sqlite.prepare(
@@ -189,9 +197,14 @@ export function buildCPLPool(
         result.unmatched.push({ team: r.team.short, name: r.sp.name });
       }
       const efppmRow = getEfppm.get(playerId) as { avg_fantasy_points: number } | undefined;
+      // Availability keys off the DB spelling, which is what the valuation engine uses too.
+      const dbName =
+        (sqlite.prepare(`SELECT name FROM players WHERE id = ?`).get(playerId) as { name: string })
+          ?.name ?? r.sp.name;
       insertPool.run(
         opts.tournamentId, playerId, 0, opts.auctionId,
-        r.team.short, r.sn, efppmRow?.avg_fantasy_points || 0, r.sp.note ?? ""
+        r.team.short, r.sn, efppmRow?.avg_fantasy_points || 0, r.sp.note ?? "",
+        cplAvailability(dbName)
       );
     }
     for (const team of teams) {

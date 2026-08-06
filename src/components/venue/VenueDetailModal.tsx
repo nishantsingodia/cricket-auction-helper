@@ -38,6 +38,14 @@ interface Venue {
   batFp: number | null;
   bowlFp: number | null;
   ratio: number | null;
+  // Bat Index block — the single source for the class shown above
+  batIndex: number | null;
+  batIndexMedian: number;
+  batIndexMatches: number | null;
+  batIndexWindow: "2yr" | "4yr" | "neutral" | null;
+  whoEarnsMore: "batters" | "bowlers" | null;
+  earnsMorePct: number | null;
+  vsAverageLabel: string | null;
   boundariesPerMatch: number | null;
   sixesPerMatch: number | null;
   wktsPerMatch: number | null;
@@ -246,14 +254,48 @@ export function VenueDetailModal({
                   {TYPE_META[venue.type].emoji} {venue.typeLabel}
                 </span>
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Class is set from batting-FP ÷ bowling-FP — the same read the EFPPM valuation uses.
-                {venue.ratio != null && (
-                  <> This ground: <span className="text-foreground font-medium">{venue.ratio}</span> (bat {venue.batFp} vs bowl {venue.bowlFp} avg FP) over {venue.matches} matches
-                    {venue.fromDate && venue.toDate ? `, ${venue.fromDate.slice(0, 4)}–${venue.toDate.slice(0, 4)}` : ""}.
-                    {" "}&lt;0.95 = bowl-friendly, ≥1.10 = bat-friendly.</>
-                )}
-              </p>
+              {/* BAT INDEX — the score for this ground, stated explicitly. Same source as the
+                  class badge above, so the two can no longer contradict each other. */}
+              {venue.batIndex != null ? (
+                <div className="mt-2 rounded-md border border-border/60 bg-muted/30 p-2.5">
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <span className="text-xs uppercase tracking-wide text-muted-foreground">Bat Index</span>
+                    <span className="text-lg font-semibold text-foreground tabular-nums">
+                      {venue.batIndex.toFixed(3)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      league median {venue.batIndexMedian.toFixed(3)}
+                    </span>
+                    {venue.batIndexMatches != null && (
+                      <span className="text-xs text-muted-foreground">
+                        · {venue.batIndexMatches} matches
+                        {venue.batIndexWindow === "2yr" ? " (last 2yr)" : venue.batIndexWindow === "4yr" ? " (last 4yr)" : ""}
+                      </span>
+                    )}
+                  </div>
+                  {venue.whoEarnsMore && venue.earnsMorePct != null && (
+                    <p className="mt-1 text-xs text-foreground">
+                      <span className="font-medium">
+                        {venue.whoEarnsMore === "batters" ? "Batters" : "Bowlers"} earn {venue.earnsMorePct}% more here
+                      </span>
+                      {venue.vsAverageLabel ? <span className="text-muted-foreground"> — {venue.vsAverageLabel}</span> : null}
+                    </p>
+                  )}
+                  <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+                    batting-FP ÷ bowling-FP at this ground. Read it against the median, not 1.0 —
+                    bowlers out-earn batters at ~76% of grounds because a wicket is 30 points.
+                    Reporting only: venue does not affect any price.
+                    {venue.batIndexMatches != null && venue.batIndexMatches < 12
+                      ? " Thin sample — treat the direction as real and the size as soft."
+                      : ""}
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  No usable sample for a Bat Index at this ground, so the class falls back to the
+                  curated read. Reporting only: venue does not affect any price.
+                </p>
+              )}
             </div>
 
             {/* How it plays — data-derived */}

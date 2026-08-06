@@ -309,7 +309,10 @@ const CPL_EXPECTED_GAMES: Record<string, number> = {
   tajindersingh: 3, // first 3 matches only
   shadabkhan: 7, // misses the FIRST 3 (domestic) — chart-confirmed
   sufiyanmuqeem: 7, // misses the FIRST 3 (domestic) — chart-confirmed
-  hasannawaz: 7, // misses the FIRST 3 (domestic)
+  hassannawaz: 7, // misses the FIRST 3 (domestic). NOTE the DB spells him "Hassan Nawaz" with a
+  // double s (ci 1398125, 25 PSL games) while the availability chart writes "Hasan Nawaz" — the key
+  // must match the DB spelling or the board silently shows him FIT.
+  hasannawaz: 7, // both spellings, so a future re-match cannot drop the flag
   usamamir: 3, // temporary cover, first 2-3 games only
   // St Kitts & Nevis Patriots
   naseemshah: 7, // misses the FIRST 3 (domestic). I had him at 10 after confirming he was not in
@@ -343,6 +346,37 @@ const CPL_EXPECTED_GAMES: Record<string, number> = {
   usmankhan: 5,
   rrhendricks: 5, // "RR Hendricks" (269280, 192m) — later signing; T20Tracker lists him taking Usman Khan's phase-2 place
 };
+
+// Players carrying a fitness doubt rather than a scheduling one. Keyed by DB (cricsheet) spelling,
+// normalized. Kept separate from CPL_EXPECTED_GAMES because an injury is not a known game count —
+// it is an unknown, and the board should show it as INJURED rather than a confident number.
+const CPL_INJURED: Record<string, string> = {
+  baking: "Lower-back muscle spasms — stretchered off fielding in the 2nd Test vs Pakistan on 4 Aug 2026 and ruled out of the rest of that match. Barbados open on 11 Aug, five days after the Test ended, so he may well be fit. Status unconfirmed: the T20Tracker availability chart covers overseas players only.",
+};
+
+/**
+ * Board status for a CPL player, so the auction's Availability panel and badges actually light up
+ * instead of every row reading FIT.
+ *   INJURED   — a fitness doubt (see CPL_INJURED)
+ *   DOUBTFUL  — a known PARTIAL availability: he has an explicit game count below the full 10.
+ *               Reused for partial availability per the LPL precedent; the enum has no "PARTIAL".
+ *   FIT       — expected for the whole league campaign.
+ * Note bench players are NOT marked doubtful just for being low in the order — that is selection,
+ * not availability. Only an explicit CPL_EXPECTED_GAMES entry counts.
+ */
+export function cplAvailability(dbName: string): "FIT" | "DOUBTFUL" | "INJURED" {
+  const key = (dbName || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (CPL_INJURED[key]) return "INJURED";
+  const g = CPL_EXPECTED_GAMES[key];
+  if (g !== undefined && g < 10) return "DOUBTFUL";
+  return "FIT";
+}
+
+/** Injury detail for the board, or null. */
+export function cplInjuryNote(dbName: string): string | null {
+  const key = (dbName || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  return CPL_INJURED[key] ?? null;
+}
 
 // Expected LEAGUE matches for a CPL player: the published phase window if we have one, else the
 // positional default. (LPL's equivalent only ever subtracted; CPL genuinely needs both directions.)

@@ -8,10 +8,11 @@ import {
 } from "@/lib/venues/tour-venues";
 import { BOWLER_STYLE, classifyBowlStyle } from "@/lib/venues/bowler-styles";
 import { getTourStatScope, computeTourConsensus } from "@/lib/venues/consensus";
+import { computeBatIndex, describeBatIndex, venueTypeFromBatIndex } from "@/lib/venues/bat-index";
+import { canonicalVenue } from "@/lib/registry/venues";
 
 // GET /api/venues?tour=<tournament_name>
-// Returns per-ground behavior for a tour's venues: the authoritative bat/bowl class (same one
-// EFPPM uses), data-derived stats from match_performances (bat/bowl FP, boundaries, wickets,
+// Returns per-ground behavior for a tour's venues: the Bat Index and its class, data-derived stats from match_performances (bat/bowl FP, boundaries, wickets,
 // economy) + the venues-table innings scores, a CURATED spin/pace/seam profile, and recent
 // matches at the ground. Read-only; safe on any auction.
 export async function GET(request: NextRequest) {
@@ -29,9 +30,16 @@ export async function GET(request: NextRequest) {
     }
 
     const fmtPlaceholders = ctx.venueFormats.map(() => "?").join(",");
-    // Classification basis mirrors the engine's classifyVenues() window (men's/women's split by
-    // gender, T20-family history since 2020) so the numbers line up with what valuation sees.
+    // Descriptive "how it plays" stats (innings scores, boundaries, wickets, spin/pace split) use a
+    // long 2020-onward window, because those are texture and want the biggest sample available.
     const SINCE = "2020-01-01";
+
+    // The CLASS and the headline ratio come from the Bat Index instead — one source, so the badge
+    // and the number underneath can never disagree. They did: the badge derived from the Bat Index
+    // (2yr if >=15 matches, else 4yr) while this route printed its own ratio over 2020-onward, so
+    // Warner Park displayed "Bat-friendly" next to a 0.85 ratio and a "<0.95 = bowl-friendly" note.
+    // Venue no longer affects any price, so this is purely a reporting surface.
+    const { byGround: batIdx, median: batIdxMedian } = computeBatIndex(ctx.gender);
 
     const venues = ctx.venues.map((v) => {
       const vp = v.variants.map(() => "?").join(",");
@@ -170,15 +178,29 @@ export async function GET(request: NextRequest) {
         econ: balls ? Math.round((runs / balls) * 6 * 100) / 100 : null, // runs per over
       });
 
-      const batFp = agg.bat_fp ?? null;
-      const bowlFp = agg.bowl_fp ?? null;
-      const ratio = batFp && bowlFp ? batFp / bowlFp : null;
       const matches = agg.matches ?? 0;
+
+      // Bat Index is the authority for the class and the headline bat/bowl numbers.
+      const bi = batIdx.get(canonicalVenue(v.canonical));
+      const usable = bi && bi.source !== "neutral";
+      const type = (usable ? venueTypeFromBatIndex(bi!.batIndex, batIdxMedian) : v.type) as VenueType;
+      const desc = usable ? describeBatIndex(bi!.batIndex, batIdxMedian) : null;
+      const batFp = usable ? bi!.batFp : (agg.bat_fp ?? null);
+      const bowlFp = usable ? bi!.bowlFp : (agg.bowl_fp ?? null);
+      const ratio = usable ? bi!.batIndex : null;
 
       return {
         canonical: v.canonical,
-        type: v.type as VenueType,
-        typeLabel: VENUE_TYPE_LABEL[v.type as VenueType],
+        type,
+        typeLabel: VENUE_TYPE_LABEL[type],
+        // Bat Index block — the number, its sample, and how to read it
+        batIndex: ratio != null ? Math.round(ratio * 1000) / 1000 : null,
+        batIndexMedian: Math.round(batIdxMedian * 1000) / 1000,
+        batIndexMatches: bi?.matches ?? null,
+        batIndexWindow: bi?.source ?? null,
+        whoEarnsMore: desc?.whoEarnsMore ?? null,
+        earnsMorePct: desc?.earnsMorePct ?? null,
+        vsAverageLabel: desc?.label ?? null,
         homeTeams: homeTeamsOf[v.canonical] ?? [],
         // data-derived
         matches,
