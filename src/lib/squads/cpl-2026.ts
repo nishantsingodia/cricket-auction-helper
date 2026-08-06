@@ -497,6 +497,11 @@ export const CPL_DISPLAY_NAMES: Record<string, string> = {
 // Worst error: Warner Park, our best-sampled Caribbean ground (24 matches) and St Kitts' home for 4
 // games, was called bowl_friendly when batters actually out-earn bowlers there.
 //
+// The LABEL is the ABSOLUTE reading — who actually scores more at that ground — because that is
+// what "bowl-friendly" means to a reader. Bands are +/-5% around parity. ~76% of grounds worldwide
+// come out bowl_friendly as a result, so the label does NOT mark a ground as unusual; the separate
+// "vs average" line does that. Both are shown.
+//
 // Current Bat Index (batting FP / bowling FP; league median 0.906; higher = better for batting):
 //   Queen's Park Oval 1.137 (8m) · Sabina Park 1.104 (11m) · Warner Park 1.068 (24m)
 //   Daren Sammy 0.980 (28m) · Kensington 0.972 (26m) · Providence 0.886 (20m)
@@ -515,13 +520,13 @@ export const CPL_VENUES: Array<{ canonical: string; variants: string[]; type: Ve
                "Sir Vivian Richards Stadium, North Sound",
                "Sir Vivian Richards Stadium, Antigua",
                "Sir Vivian Richards Stadium"],
-    type: "balanced" },
+    type: "bowl_friendly" },
   { canonical: "Warner Park, Basseterre, St Kitts",
     variants: ["Warner Park, Basseterre, St Kitts", "Warner Park, Basseterre", "Warner Park, St Kitts"],
     type: "bat_road" },
   { canonical: "Providence Stadium, Guyana",
     variants: ["Providence Stadium, Guyana", "Providence Stadium"],
-    type: "balanced" },
+    type: "bowl_friendly" },
   { canonical: "Daren Sammy National Cricket Stadium, Gros Islet, St Lucia",
     variants: ["Daren Sammy National Cricket Stadium, Gros Islet, St Lucia",
                "Daren Sammy National Cricket Stadium, Gros Islet",

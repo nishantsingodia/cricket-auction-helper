@@ -140,10 +140,23 @@ export function computeBatIndex(gender: "male" | "female" = "male"): {
  */
 export function venueTypeFromBatIndex(
   batIndex: number,
-  median: number
+  _median: number
 ): "bat_road" | "balanced" | "bowl_friendly" {
-  const rel = batIndex / median;
-  return rel > 1.1 ? "bat_road" : rel >= 0.95 ? "balanced" : "bowl_friendly";
+  // ABSOLUTE reading, deliberately: the label answers "who actually scores more here?", because
+  // that is what "bowl-friendly" means to anyone reading a cricket app. batIndex is
+  // battingFP/bowlingFP, so 0.90 means bowlers earn 1/0.90 = 11% more and the honest label is
+  // bowl_friendly — even though 0.90 is also the league MEDIAN.
+  //
+  // The consequence is accepted knowingly: ~76% of grounds come out bowl_friendly, so this label
+  // does NOT tell you a ground is unusual. That is what the separate relative reading is for
+  // (`favours`/`pct` from describeBatIndex, shown as a second line). One three-way label cannot
+  // carry both questions, and an earlier attempt to make it carry the relative one produced the
+  // absurdity of Providence — where bowlers earn 13% more — being displayed as "Balanced".
+  //
+  // Bands are +/-5% around parity, i.e. under a 5% edge either way is genuinely even-handed.
+  if (batIndex > 1.05) return "bat_road";
+  if (batIndex >= 0.95) return "balanced";
+  return "bowl_friendly";
 }
 
 /**
@@ -179,12 +192,15 @@ export function describeBatIndex(batIndex: number, median: number): {
     ? `Batters earn ${earnsMorePct}% more here`
     : `Bowlers earn ${earnsMorePct}% more here`;
 
-  const label =
+  // PRIMARY label = the absolute reading (who scores more here). SECONDARY = how it compares to
+  // other grounds. Primary first because "bowlers earn 13% more here" is the fact you act on.
+  const relLabel =
     pct < 3
-      ? "Typical for a ground"
+      ? "typical for a ground"
       : rel > 0
-      ? `Unusually good for batting (+${pct}% vs average)`
-      : `Unusually good for bowling (+${pct}% vs average)`;
+      ? `${pct}% more batting-friendly than average`
+      : `${pct}% more bowling-friendly than average`;
+  const label = `${absoluteLabel} — ${relLabel}`;
 
   return {
     favours: pct < 3 ? "neutral" : rel > 0 ? "batting" : "bowling",
