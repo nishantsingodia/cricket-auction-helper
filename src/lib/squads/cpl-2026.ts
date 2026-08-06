@@ -90,12 +90,13 @@ export const CPL_2026: CPLTeam[] = [
       { name: "Ramon Simmonds", role: "BOWL", overseas: false, note: "Retained." }, // 10
       { name: "Johann Layne", role: "BOWL", overseas: false, note: "Breakout pick." }, // 11
       // Depth
-      { name: "George Linde", role: "AR", overseas: true }, // 12
+      { name: "Kofi James", role: "AR", overseas: false, note: "Retained on a Right-to-Match, not a throwaway breakout pick: top run-scorer AND biggest six-hitter in the 2025 Breakout League, a top-order bat who bowls off-spin. Only 2 CPL games so far (42 runs), so he sits just outside the XI rather than in it." }, // 12
+      { name: "George Linde", role: "AR", overseas: true }, // 13
       { name: "Rivaldo Clarke", role: "WK", overseas: false }, // 13
       { name: "Shadrack Descarte", role: "AR", overseas: false }, // 14
       { name: "Zishan Motara", role: "BOWL", overseas: false }, // 15
       { name: "Jakeem Pollard", role: "AR", overseas: false, note: "Breakout pick — NOT Kieron Pollard (no shared stats record)." }, // 16
-      { name: "Kofi James", role: "AR", overseas: false, note: "Breakout pick." }, // 17
+
     ],
   },
   {
@@ -164,11 +165,11 @@ export const CPL_2026: CPLTeam[] = [
     players: [
       // XI — 4 overseas: Shanaka, Hasaranga, Naseem, Salamkheil
       { name: "Johnson Charles", role: "WK", overseas: false }, // 1
-      { name: "Mikyle Louis", role: "BAT", overseas: false, note: "Breakout pick." }, // 2
+      { name: "Andre Fletcher", role: "WK", overseas: false, note: "St Kitts' TOP RUN-SCORER in 2025 — 310 runs in 10 games, opening at median position 2. I originally had him at 13 on the assumption Johnson Charles keeping squeezed him out; our own data, the franchise preview and T20Tracker's squad order all put him near the top, so he moves up. Charles keeps; Fletcher bats." }, // 2
       { name: "Alick Athanaze", role: "BAT", overseas: false }, // 3
       { name: "Kyle Mayers", role: "AR", overseas: false }, // 4
       { name: "Dasun Shanaka", role: "AR", overseas: true }, // 5
-      { name: "Jason Holder", role: "AR", overseas: false }, // 6
+      { name: "Jason Holder", role: "AR", overseas: false, note: "CAPTAIN for 2026 (arriving from LA Knight Riders). St Kitts have won only 9 of their last 40 CPL games and finished 6th in 2025, so the leadership change is the franchise's main bet." }, // 6
       { name: "Wanindu Hasaranga", role: "AR", overseas: true, note: "AVAILABILITY: PLAYS 10 OF 10 league games — CONFIRMED by the T20Tracker chart, which has him missing the PLAYOFFS only (national commitments). Playoffs are excluded from this model, so no discount. Retired from Tests, so India's tour of Sri Lanka does not affect him either." }, // 7
       { name: "Naseem Shah", role: "BOWL", overseas: true, note: "AVAILABILITY: PLAYS 7 OF 10 — misses the FIRST 3 (8, 12, 18 Aug) for domestic commitments, per the chart. I had him at 10 after confirming he was not in Pakistan's England Test squad: right conclusion, wrong reason — the absence is domestic, not international." }, // 8  (2025: 10 games, pos 9)
       { name: "Obed McCoy", role: "BOWL", overseas: false }, // 9
@@ -177,7 +178,7 @@ export const CPL_2026: CPLTeam[] = [
       // Depth. 2025 medians: Fletcher 2 (10 games), Wickham 4, Bidaisee 7 (7 games) — all three are
       // established squad members rather than fringe, hence the order here.
       { name: "Navin Bidaisee", role: "AR", overseas: false, note: "Breakout pick on paper but a 2025 regular — 7 games, median position 7, bowled in all 7." }, // 12
-      { name: "Andre Fletcher", role: "WK", overseas: false, note: "2025 regular (10 games, opened at pos 2) but squeezed by Johnson Charles keeping." }, // 13
+      { name: "Mikyle Louis", role: "BAT", overseas: false, note: "Breakout pick — and genuinely fringe: 2 games and 9 runs in 2025. Was at 2 in my first cut, which was wrong (see Andre Fletcher)." }, // 13
       { name: "Nikhil Chaudhary", role: "AR", overseas: true, note: "AVAILABILITY: PLAYS 9 OF 10 — misses the opening game (8 Aug) per the chart, and 8 if Southern Brave reach the Hundred playoffs (would also cost 12 Aug). Bench player, so little value at stake." }, // 14
       { name: "Kevin Wickham", role: "BAT", overseas: false }, // 15
       { name: "Jeremiah Louis", role: "BOWL", overseas: false }, // 16
@@ -226,7 +227,7 @@ export const CPL_2026: CPLTeam[] = [
       { name: "Matthew Breetzke", role: "BAT", overseas: true }, // 3  new signing
       { name: "Nicholas Pooran", role: "WK", overseas: false, note: "AVAILABILITY: PLAYS 10 OF 10 — the chart lists him Fully Available, so despite the MI London Hundred squad he is expected from game 1. CAPTAIN & keeper." }, // 4  (2025: pos 4, all 13)
       { name: "Kieron Pollard", role: "AR", overseas: false }, // 5  (2025: pos 5)
-      { name: "Justin Greaves", role: "AR", overseas: false }, // 6
+      { name: "Justin Greaves", role: "AR", overseas: false, note: "⚠️ His 2025 CPL record is EMPTY because he missed the season injured — not decline. The franchise preview calls him arguably the best-form Caribbean player right now, so his form buckets understate him and he may be underpriced here." }, // 6
       { name: "Akeal Hosein", role: "BOWL", overseas: false }, // 7  (2025: pos 7, bowled all 13)
       { name: "Sunil Narine", role: "AR", overseas: false }, // 8  (2025: pos 8, bowled all 13)
       { name: "Dominic Drakes", role: "AR", overseas: false }, // 9
