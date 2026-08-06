@@ -10,9 +10,11 @@
 // fit, which keeps the snap points identical across breakpoints and needs no JS measurement.
 //
 // COLOUR MEANS OWNERSHIP AND NOTHING ELSE. A sold row carries a left-to-right gradient in the
-// buyer's colour; the wallet legend at the top is the only key mapping colour → friend, which is
-// why it is pinned above the pager. Availability (DOUBTFUL/INJURED) is an amber `!` on the meta
-// line, never a colour. There are no owner-initial chips — the owner asked for those to go.
+// buyer's colour — EXCEPT my own picks, which are solid dark green (#14532d) with white text, the
+// same treatment getPlayerBg() gives them on the grid. My squad has to be findable at a glance and a
+// sixth pastel among five others is not; the legend chip for me is green too, so the key stays
+// honest. Availability (DOUBTFUL/INJURED) is an amber `!` on the meta line, never a colour. There
+// are no owner-initial chips — the owner asked for those to go.
 
 import { useCallback, useRef, useState, useSyncExternalStore, useLayoutEffect } from "react";
 import type { CSSProperties } from "react";
@@ -30,6 +32,9 @@ import {
 // Probable XI = batting order 1–11. 12+ is the bench (the board's PLAYING_XI_SIZE of 12 stays the
 // "Playing XII" window used for the overseas cap, which is counted over 12, not 11).
 const XI_SIZE = 11;
+// My own picks: solid dark green, matching getPlayerBg() on the grid. Deliberately NOT my
+// participant colour — my squad must be findable instantly, and a sixth pastel isn't.
+const MINE_BG = "#14532d";
 const TEAMS_PER_PAGE = 2;
 const OVERSEAS_CAP = 4;
 
@@ -154,15 +159,24 @@ export function LineupsBoard({
             <div
               key={p.id}
               title={`${p.name} — ${p.remaining_purse.toFixed(1)} of ${p.purse} left`}
-              className={`shrink-0 flex items-center gap-1.5 rounded-full border border-border bg-card px-2 py-1 ${
-                isMe ? "ring-2 ring-primary/70 ring-offset-1 ring-offset-background" : ""
+              className={`shrink-0 flex items-center gap-1.5 rounded-full border px-2 py-1 ${
+                isMe
+                  ? "border-green-400/60 text-white ring-1 ring-inset ring-green-400/60"
+                  : "border-border bg-card"
               }`}
+              // My chip carries the SAME dark green as my rows — the legend is the colour key, so
+              // showing my participant blue here while my rows render green would make it a lie.
+              style={isMe ? { backgroundColor: MINE_BG } : undefined}
             >
               <span
                 className="w-2.5 h-2.5 rounded-full shrink-0 ring-1 ring-inset ring-black/20"
-                style={{ backgroundColor: p.color }}
+                style={{ backgroundColor: isMe ? "#4ade80" : p.color }}
               />
-              <span className="text-[11px] leading-none text-muted-foreground">{p.short_name}</span>
+              <span
+                className={`text-[11px] leading-none ${isMe ? "text-white/80" : "text-muted-foreground"}`}
+              >
+                {p.short_name}
+              </span>
               <span className="text-[11px] leading-none font-bold tabular-nums">
                 {p.remaining_purse.toFixed(1)}
               </span>
@@ -402,7 +416,14 @@ function LineupRow({
   // Dynamic owner colour → a CSS custom property, so the gradient can be expressed as a static
   // class-free style while the light/dark STRENGTH comes from `--own-a` set by a `dark:` variant.
   // (`--own-a` must NOT be set inline: an inline declaration would out-specify the dark variant.)
-  const style: CSSProperties = sold
+  // MY picks are solid dark green with white text — NOT my participant colour. That is the board's
+  // long-standing convention (getPlayerBg in page.tsx uses #14532d + a green ring): my own squad has
+  // to be findable at a glance, which a sixth pastel among five others isn't. Opponents keep the
+  // gradient in their own colour.
+  const mineSold = sold && isMine;
+  const style: CSSProperties = mineSold
+    ? { backgroundColor: MINE_BG, borderLeftColor: "#4ade80" }
+    : sold
     ? ({
         ["--own" as string]: ownColor,
         borderLeftColor: ownColor,
@@ -425,20 +446,33 @@ function LineupRow({
       onClick={onClick}
       style={style}
       className={`w-full text-left flex items-center gap-1.5 min-h-[44px] pl-1.5 pr-2 py-1 border-b border-border/60 last:border-b-0 border-l-[3px] transition-colors ${
-        sold
+        mineSold
+          ? "[border-left-style:solid] text-white font-medium ring-1 ring-inset ring-green-400/60"
+          : sold
           ? "[border-left-style:solid] [--own-a:26%] [--own-b:5%] dark:[--own-a:42%] dark:[--own-b:8%]"
           : "[border-left-style:dashed] border-l-muted-foreground/50 hover:bg-muted/40"
-      } ${isMine ? "font-semibold" : ""}`}
+      }`}
       title={`${p.name}${sold ? ` — sold to ${owner?.name ?? "?"}` : " — available"}`}
     >
-      <span className="w-4 shrink-0 text-[10px] font-mono tabular-nums text-muted-foreground/70 text-right">
+      <span
+        className={`w-4 shrink-0 text-[10px] font-mono tabular-nums text-right ${
+          mineSold ? "text-white/70" : "text-muted-foreground/70"
+        }`}
+      >
         {p.squad_number || "–"}
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-[13px] font-semibold leading-tight truncate">{p.name}</span>
-        <span className="block text-[10px] leading-tight text-muted-foreground truncate tabular-nums">
+        <span
+          className={`block text-[10px] leading-tight truncate tabular-nums ${
+            mineSold ? "text-white/75" : "text-muted-foreground"
+          }`}
+        >
           {notFit && (
-            <span className="text-amber-500 font-bold" title={p.availability ?? undefined}>
+            <span
+              className={`font-bold ${mineSold ? "text-amber-300" : "text-amber-500"}`}
+              title={p.availability ?? undefined}
+            >
               !{" "}
             </span>
           )}
@@ -447,7 +481,10 @@ function LineupRow({
         </span>
       </span>
       {p.is_overseas ? (
-        <span className="shrink-0 text-[10px] text-muted-foreground/60" title="Overseas">
+        <span
+          className={`shrink-0 text-[10px] ${mineSold ? "text-yellow-300" : "text-muted-foreground/60"}`}
+          title="Overseas"
+        >
           {"✈"}
         </span>
       ) : null}
