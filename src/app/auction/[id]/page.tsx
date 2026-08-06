@@ -305,6 +305,7 @@ export default function AuctionPage() {
   const [showAvailability, setShowAvailability] = useState(false);
   const [showLeaders, setShowLeaders] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showMoreNav, setShowMoreNav] = useState(false);
 
   // Price slab config
   const [priceSlabs, setPriceSlabs] = useState<PriceSlab[]>(() => {
@@ -612,8 +613,8 @@ export default function AuctionPage() {
             )}
           </div>
 
-          {/* View toggle */}
-          <div className="flex rounded-lg border border-border overflow-hidden">
+          {/* View toggle — desktop only; on a phone this lives in the bottom bar. */}
+          <div className="hidden md:flex rounded-lg border border-border overflow-hidden">
             <button
               onClick={() => setView("grid")}
               className={`px-3 py-1.5 text-sm min-h-[40px] md:min-h-0 ${
@@ -649,7 +650,7 @@ export default function AuctionPage() {
           <div className="hidden md:block flex-1" />
 
           {/* Panel toggles — grouped, secondary (segmented control) */}
-          <div className="flex flex-wrap items-center gap-0.5 rounded-lg border border-border bg-muted/40 p-0.5 md:flex-nowrap">
+          <div className="hidden md:flex flex-wrap items-center gap-0.5 rounded-lg border border-border bg-muted/40 p-0.5 md:flex-nowrap">
             <HeaderToggle active={showCalc} onClick={() => setShowCalc((v) => !v)}>Calc</HeaderToggle>
             <HeaderToggle active={showIntel} onClick={() => setShowIntel((v) => !v)}>Intel</HeaderToggle>
             <HeaderToggle active={showAvailability} onClick={() => setShowAvailability((v) => !v)} alert={pool.some((p) => p.availability && p.availability !== "FIT")}>Availability</HeaderToggle>
@@ -660,7 +661,7 @@ export default function AuctionPage() {
           {/* Primary action */}
           <button
             onClick={() => setShowChat((v) => !v)}
-            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors min-h-[40px] md:min-h-0 ${showChat ? "bg-primary text-primary-foreground" : "bg-foreground/90 text-background hover:bg-foreground"}`}
+            className={`hidden md:block px-3 py-1.5 text-sm rounded-lg font-medium transition-colors min-h-[40px] md:min-h-0 ${showChat ? "bg-primary text-primary-foreground" : "bg-foreground/90 text-background hover:bg-foreground"}`}
           >
             Quick Sell
           </button>
@@ -678,6 +679,76 @@ export default function AuctionPage() {
           </div>
         </div>
       </header>
+
+      {/* ── Mobile bottom nav ──────────────────────────────────────────
+          On a phone the header's toolbars (view toggle, panel toggles, Quick Sell) are hidden and
+          live down here instead. They were costing ~3 rows of a screen whose whole job is showing an
+          XI in one fold. Thumb-reachable, and Quick Sell — the only write action — never costs a tab
+          switch. Desktop keeps the header exactly as it was. */}
+      <div className="md:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
+        {showMoreNav && (
+          <div className="grid grid-cols-3 gap-1 p-2 border-b border-border">
+            {([
+              ["Calc", showCalc, () => setShowCalc((v) => !v), false],
+              ["Intel", showIntel, () => setShowIntel((v) => !v), false],
+              ["Availability", showAvailability, () => setShowAvailability((v) => !v),
+                pool.some((p) => p.availability && p.availability !== "FIT")],
+              ["Leaders", showLeaders, () => setShowLeaders((v) => !v), false],
+              ["Advisor", showAdvisor, () => setShowAdvisor((v) => !v), false],
+              ["Settings", showSettings, () => setShowSettings((v) => !v), false],
+            ] as [string, boolean, () => void, boolean][]).map(([label, active, toggle, alert]) => (
+              <button
+                key={label}
+                onClick={() => { toggle(); setShowMoreNav(false); }}
+                className={`relative min-h-[42px] rounded-lg px-2 text-xs font-medium transition-colors ${
+                  active ? "bg-primary text-primary-foreground" : "bg-muted/60 hover:bg-muted"
+                }`}
+              >
+                {label}
+                {alert && <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-red-500" />}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="grid grid-cols-5">
+          {([
+            ["Lineups", activeView === "lineups", () => { setView("lineups"); setShowMoreNav(false); }],
+            ["Grid", activeView === "grid", () => { setView("grid"); setShowMoreNav(false); }],
+            ["List", activeView === "list", () => { setView("list"); setShowMoreNav(false); }],
+          ] as [string, boolean, () => void][]).map(([label, active, go]) => (
+            <button
+              key={label}
+              onClick={go}
+              className={`min-h-[52px] text-[11px] font-semibold transition-colors ${
+                active
+                  ? "text-primary shadow-[inset_0_2px_0_var(--color-primary)]"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+          <button
+            onClick={() => setShowMoreNav((v) => !v)}
+            className={`relative min-h-[52px] text-[11px] font-semibold transition-colors ${
+              showMoreNav ? "text-primary" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            More
+            {pool.some((p) => p.availability && p.availability !== "FIT") && !showMoreNav && (
+              <span className="absolute top-2.5 right-1/4 w-1.5 h-1.5 rounded-full bg-red-500" />
+            )}
+          </button>
+          <button
+            onClick={() => { setShowChat((v) => !v); setShowMoreNav(false); }}
+            className={`min-h-[52px] text-[11px] font-bold transition-colors ${
+              showChat ? "bg-primary text-primary-foreground" : "bg-foreground/90 text-background"
+            }`}
+          >
+            Sell
+          </button>
+        </div>
+      </div>
 
       {/* Auction Settings Panel */}
       {showSettings && (
@@ -719,8 +790,8 @@ export default function AuctionPage() {
       {/* Points Leaders — per-season leaderboard of squad players (pick aid) */}
       {showLeaders && <PointsLeadersPanel tournamentId={auction.tournament_id} />}
 
-      {/* Content */}
-      <div className="flex">
+      {/* Content — pb clears the fixed mobile bottom nav so the last row is never trapped under it. */}
+      <div className="flex pb-16 md:pb-0">
         <div className="flex-1 min-w-0">
           {activeView === "grid" ? (
             <SquadGrid

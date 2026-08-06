@@ -126,9 +126,12 @@ export function LineupsBoard({
       const top = root.getBoundingClientRect().top;
       // Legend + range header + pager dots sit inside the board, above/below the columns.
       const chromeInsideBoard = 88;
+      // On a phone the fixed bottom nav overlays the viewport; without reserving it the last two
+      // rows of the XI sit underneath and read as missing.
+      const bottomNav = window.matchMedia("(min-width: 768px)").matches ? 0 : 60;
       root.style.setProperty(
         "--lineups-col-h",
-        `${Math.max(240, window.innerHeight - top - chromeInsideBoard)}px`
+        `${Math.max(240, window.innerHeight - top - chromeInsideBoard - bottomNav)}px`
       );
     };
     apply();
