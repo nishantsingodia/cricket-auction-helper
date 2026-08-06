@@ -51,20 +51,22 @@ export const CPL_2026: CPLTeam[] = [
       // ball-by-ball — see the note above CPL_2026). 2025 reads: Lewis 1, Jangoo 1, Cornwall 2,
       // Gore 3, Moeen 4, Allen 6, Springer 7.5, A Joseph 9, Seales 10.
       { name: "Evin Lewis", role: "BAT", overseas: false }, // 1  (2025: opened, pos 1)
-      { name: "Kusal Perera", role: "WK", overseas: true, note: "AVAILABILITY: PLAYS 10 OF 10 — the franchise release states he is fully available for the entire tournament. ⚠️ SCENARIO: if named in Sri Lanka's Test squad for India (1st Test 15-19 Aug, 2nd 23-27 Aug) he MISSES 4 (20, 22, 23, 25 Aug) and plays 6. That squad is unannounced; the release calling him fully available is the evidence against, since franchises negotiate around known international duty." }, // 2
+      { name: "Kusal Perera", role: "WK", overseas: true, note: "AVAILABILITY: PLAYS 10 OF 10 — the chart lists him Fully Available, noting he could miss the opening game (7 Aug) at most. The India Tests in Sri Lanka do not take him." }, // 2
       { name: "Amir Jangoo", role: "WK", overseas: false }, // 3  (2025: pos 1 for Antigua)
-      { name: "Moeen Ali", role: "AR", overseas: true, note: "AVAILABILITY: PLAYS ~7 OF 10 — misses the first 3 (7, 9, 14 Aug). CAPTAIN, and the franchise release said 'fully available for the entire tournament', but he then signed for Southern Brave in The Hundred as Thomas Rew's injury replacement and reporting on 3 Aug has the Falcons opening under interim leadership. IF he lands early: 10 of 10. IF Brave reach the 16 Aug final: still ~7, since ABF's 4th game is 20 Aug." }, // 4  (2025: pos 4)
+      { name: "Moeen Ali", role: "AR", overseas: true, note: "AVAILABILITY: PLAYS 8 OF 10 — misses the opening TWO (7, 9 Aug) per the chart, and 7 if Southern Brave reach the Hundred playoffs (also 14 Aug). CAPTAIN, so ABF open under interim leadership; he is at the Hundred with Southern Brave as Thomas Rew's injury replacement." }, // 4  (2025: pos 4)
       { name: "Karima Gore", role: "AR", overseas: false, note: "Breakout pick, but a 2025 regular — 10 games at median position 3." }, // 5
       { name: "Rahkeem Cornwall", role: "AR", overseas: false }, // 6  (2025: pos 2 — used up the order)
       { name: "Fabian Allen", role: "AR", overseas: false }, // 7  (2025: pos 6)
       { name: "Shamar Springer", role: "AR", overseas: false }, // 8  (2025: pos 7.5)
-      { name: "Shadab Khan", role: "AR", overseas: true, note: "AVAILABILITY: PLAYS 7 OF 10 — misses 3, the ETPL runs 26 Aug – 20 Sep so the games at risk are 30 Aug, 2 Sep and 8 Sep. Stated verbatim in the franchise release ('available for seven matches')." }, // 9
+      { name: "Shadab Khan", role: "AR", overseas: true, note: "AVAILABILITY: PLAYS 7 OF 10 — misses the FIRST 3 (7, 9, 14 Aug) for domestic commitments, per the chart. Note the franchise release said 'seven matches' without saying WHICH: the chart resolves it as the first three, not the ETPL games at the end as I had assumed." }, // 9
       { name: "Alzarri Joseph", role: "BOWL", overseas: false }, // 10 (2025: pos 9)
       { name: "Jayden Seales", role: "BOWL", overseas: false }, // 11 (2025: pos 10)
       // Depth
-      { name: "Sufyan Moqim", role: "BOWL", overseas: true, note: "AVAILABILITY: PLAYS 7 OF 10 — misses 3 (30 Aug, 2 Sep, 8 Sep) for the ETPL. Stated verbatim in the franchise release." }, // 12
+      { name: "Sufyan Moqim", role: "BOWL", overseas: true, note: "AVAILABILITY: PLAYS 7 OF 10 — misses the FIRST 3 (7, 9, 14 Aug) for domestic commitments, per the chart (not the ETPL games at the end, as I had assumed)." }, // 12
       { name: "Anderson Phillip", role: "BOWL", overseas: false }, // 13
       { name: "Jahmar Hamilton", role: "WK", overseas: false }, // 14
+      { name: "Hasan Nawaz", role: "BAT", overseas: true, note: "AVAILABILITY: PLAYS 7 OF 10 — misses the first 3 (7, 9, 14 Aug) for domestic commitments, per the T20Tracker availability chart. He was listed in T20Tracker's ABF squad earlier but I left him out as unconfirmed (the franchise release named only 6 overseas); the availability chart confirms him." }, // 17
+      { name: "Usama Mir", role: "BOWL", overseas: true, note: "AVAILABILITY: PLAYS ~3 OF 10 — temporary replacement, first 2-3 games only (7, 9, 14 Aug), per the T20Tracker availability chart. Leg-spinner covering the Pakistani contingent's late arrival. Price as a short-stint cover, not a campaign player." }, // 18
       { name: "Milind Kumar", role: "BAT", overseas: true, note: "AVAILABILITY: PLAYS 3 OF 10 — MISSES 7. Available for the first three matches only (7, 9, 14 Aug), per the franchise release. A short-stint cover signing, not a full-campaign player — price him as ~a third of a season." }, // 15
       { name: "Tajinder Singh", role: "BAT", overseas: true, note: "AVAILABILITY: PLAYS 3 OF 10 — MISSES 7. First three matches only (7, 9, 14 Aug), per the franchise release." }, // 16
       { name: "Anderson Mahase", role: "BOWL", overseas: false, note: "Breakout pick — leg-spinner." }, // 17
@@ -77,13 +79,13 @@ export const CPL_2026: CPLTeam[] = [
       // XI — 4 overseas: de Kock, Sams, Green, Mujeeb. Order matches the ACTUAL CPL 2025 medians
       // (de Kock 1, King 2, Alleyne 3, Rutherford 5, Green 7, Sams 8, Motie 9, Simmonds 10.5).
       { name: "Quinton de Kock", role: "WK", overseas: true }, // 1  (2025: pos 1, 9 games)
-      { name: "Brandon King", role: "BAT", overseas: false }, // 2  (2025: pos 2)
+      { name: "Brandon King", role: "BAT", overseas: false, note: "⚠️ INJURY (4 Aug 2026): stretchered off with lower-back muscle spasms fielding in the 2nd Test vs Pakistan at Port of Spain, and ruled out of the rest of that match. NOT on the T20Tracker availability chart, which covers overseas players only — so his status is unconfirmed either way. BAR open on 11 Aug, five days after the Test ended, so he may well be fit; treat as a DOUBT to check rather than a discount. Priced at 10 of 10." }, // 2  (2025: pos 2)
       { name: "Kadeem Alleyne", role: "BAT", overseas: false }, // 3  (2025: pos 3 — batted ABOVE Rutherford)
-      { name: "Sherfane Rutherford", role: "BAT", overseas: false, note: "AVAILABILITY: PLAYS 10 OF 10 — he WAS in MI London's Hundred squad but has been REPLACED there (Josh Philippe in), so he is free for the whole CPL campaign. No clash." }, // 4  (2025: pos 5)
+      { name: "Sherfane Rutherford", role: "BAT", overseas: false, note: "AVAILABILITY: PLAYS 10 OF 10 — replaced at MI London in the Hundred (Josh Philippe in), so free for the whole campaign." }, // 4  (2025: pos 5)
       { name: "Daniel Sams", role: "AR", overseas: true }, // 5
       { name: "Chris Green", role: "AR", overseas: true }, // 6
       { name: "Gudakesh Motie", role: "BOWL", overseas: false, note: "Signed from Guyana after five seasons at his home franchise." }, // 7
-      { name: "Mujeeb Ur Rahman", role: "BOWL", overseas: true }, // 8
+      { name: "Mujeeb Ur Rahman", role: "BOWL", overseas: true, note: "AVAILABILITY: PLAYS 10 OF 10 as priced, but the chart marks him UNCLEAR — could miss the final 2-3 group games (10, 12, 13 Sep) and the playoffs IF Afghanistan schedule a series vs India. That series is not on the calendar, so not priced; worst case 7 of 10." }, // 8
       { name: "Zachary Carter", role: "BOWL", overseas: false }, // 9
       { name: "Ramon Simmonds", role: "BOWL", overseas: false, note: "Retained." }, // 10
       { name: "Johann Layne", role: "BOWL", overseas: false, note: "Breakout pick." }, // 11
@@ -103,11 +105,11 @@ export const CPL_2026: CPLTeam[] = [
       // 2025 medians: Hope 3, Hetmyer 4, Shepherd 7, Pretorius 7, Sampson 8, Pierre 8, S Joseph 10,
       // Tahir 11. Imran Tahir captains (as in 2025) and was the league's leading wicket-taker with
       // 23 in 12 — hence the bowlers sit high in this order despite batting low.
-      { name: "Rahmanullah Gurbaz", role: "WK", overseas: true, note: "AVAILABILITY: PLAYS 9 OF 10 — misses 1 (13 Aug). Vice-captain/keeper on Afghanistan's 5-ODI tour of Ireland (5-15 Aug); GAW are fortunate that only one league game falls inside that window. IF he skips the tour: 10 of 10." }, // 1
+      { name: "Rahmanullah Gurbaz", role: "WK", overseas: true, note: "AVAILABILITY: PLAYS 9 OF 10 — misses the opening game (13 Aug) as vice-captain/keeper on Afghanistan's Ireland ODI tour. ⚠️ The chart adds a second risk: he could also miss the final 2 group games (11, 13 Sep) AND the playoffs if Afghanistan schedule a series vs India — that would take him to 7. Not priced, as that series is unscheduled." }, // 1
       { name: "Shai Hope", role: "WK", overseas: false }, // 2  (2025: pos 3, all 12 games)
-      { name: "Glenn Phillips", role: "BAT", overseas: true, note: "AVAILABILITY: assumed 10 OF 10, but returning from a side injury — reported on track to be fit. SCENARIO: a delayed return costs him GAW's early games at 1 per week (13, 19, 23 Aug), so a fortnight's setback = ~7 of 10. Worth a second look before you bid." }, // 3
+      { name: "Glenn Phillips", role: "BAT", overseas: true, note: "AVAILABILITY: PLAYS 10 OF 10 — the chart now lists him Fully Available, so the side injury is resolved." }, // 3
       { name: "Shimron Hetmyer", role: "BAT", overseas: false }, // 4  (2025: pos 4, all 12)
-      { name: "Mohammad Nabi", role: "AR", overseas: true }, // 5
+      { name: "Mohammad Nabi", role: "AR", overseas: true, note: "AVAILABILITY: PLAYS 10 OF 10 as priced, but the chart marks him UNCLEAR — could miss the final 2 group games (11, 13 Sep) and the playoffs IF Afghanistan schedule a series vs India. Unscheduled, so not priced; worst case 8 of 10. He is NOT in Afghanistan's Ireland ODI squad, so the August tour does not affect him." }, // 5
       { name: "Romario Shepherd", role: "AR", overseas: false }, // 6  (2025: pos 7, bowled all 12)
       { name: "Quentin Sampson", role: "AR", overseas: false, note: "Listed as a breakout pick but he is a 2025 REGULAR — 9 games at median position 8. T20Tracker lists him at the top of Guyana's squad. Promoted out of the reserves accordingly." }, // 7
       { name: "Imran Tahir", role: "BOWL", overseas: true, note: "CAPTAIN. 47 years old, re-signed for a 14th CPL season; led the league with 23 wickets in 12 games in 2025." }, // 8
@@ -167,8 +169,8 @@ export const CPL_2026: CPLTeam[] = [
       { name: "Kyle Mayers", role: "AR", overseas: false }, // 4
       { name: "Dasun Shanaka", role: "AR", overseas: true }, // 5
       { name: "Jason Holder", role: "AR", overseas: false }, // 6
-      { name: "Wanindu Hasaranga", role: "AR", overseas: true, note: "AVAILABILITY: assumed 10 OF 10. Two clashes, both checked. (1) LPL knockouts run to ~8 Aug and SKN's opener IS 8 Aug — SCENARIO: if Kandy reach the final he misses 1 (8 Aug) and plays 9. (2) Sri Lanka tour England 15-27 Sep, i.e. after the 13 Sep league finish — costs PLAYOFF availability only, which this model already excludes, so 0 league games. He has retired from Tests, so the India Tests do NOT affect him." }, // 7
-      { name: "Naseem Shah", role: "BOWL", overseas: true }, // 8  (2025: 10 games, pos 9)
+      { name: "Wanindu Hasaranga", role: "AR", overseas: true, note: "AVAILABILITY: PLAYS 10 OF 10 league games — CONFIRMED by the T20Tracker chart, which has him missing the PLAYOFFS only (national commitments). Playoffs are excluded from this model, so no discount. Retired from Tests, so India's tour of Sri Lanka does not affect him either." }, // 7
+      { name: "Naseem Shah", role: "BOWL", overseas: true, note: "AVAILABILITY: PLAYS 7 OF 10 — misses the FIRST 3 (8, 12, 18 Aug) for domestic commitments, per the chart. I had him at 10 after confirming he was not in Pakistan's England Test squad: right conclusion, wrong reason — the absence is domestic, not international." }, // 8  (2025: 10 games, pos 9)
       { name: "Obed McCoy", role: "BOWL", overseas: false }, // 9
       { name: "Ashmead Nedd", role: "BOWL", overseas: false }, // 10
       { name: "Waqar Salamkheil", role: "BOWL", overseas: true }, // 11
@@ -176,7 +178,7 @@ export const CPL_2026: CPLTeam[] = [
       // established squad members rather than fringe, hence the order here.
       { name: "Navin Bidaisee", role: "AR", overseas: false, note: "Breakout pick on paper but a 2025 regular — 7 games, median position 7, bowled in all 7." }, // 12
       { name: "Andre Fletcher", role: "WK", overseas: false, note: "2025 regular (10 games, opened at pos 2) but squeezed by Johnson Charles keeping." }, // 13
-      { name: "Nikhil Chaudhary", role: "AR", overseas: true, note: "AVAILABILITY: assumed 10 OF 10, not discounted (no franchise caveat). SCENARIO: in Southern Brave's Hundred squad, which ran to ~16 Aug — if he stays to the end he MISSES 2 (8, 12 Aug) and plays 8. Bench player, so the value at stake is small." }, // 14
+      { name: "Nikhil Chaudhary", role: "AR", overseas: true, note: "AVAILABILITY: PLAYS 9 OF 10 — misses the opening game (8 Aug) per the chart, and 8 if Southern Brave reach the Hundred playoffs (would also cost 12 Aug). Bench player, so little value at stake." }, // 14
       { name: "Kevin Wickham", role: "BAT", overseas: false }, // 15
       { name: "Jeremiah Louis", role: "BOWL", overseas: false }, // 16
       { name: "Micah McKenzie", role: "BOWL", overseas: false, note: "Breakout pick — NOT Kirk McKenzie (JAM) or Neil McKenzie (SA)." }, // 17
@@ -191,15 +193,15 @@ export const CPL_2026: CPLTeam[] = [
       // the Hundred final (9, 12, 14, 16 Aug) and two of their overseas XI (Seifert, Noor Ahmad)
       // were in Manchester Super Giants' squad. The franchise published no caveat, so both are left
       // at full 10 games — this is the single biggest unpriced availability risk in the pool.
-      { name: "Tim Seifert", role: "WK", overseas: true, note: "AVAILABILITY: assumed 10 OF 10 but ⚠️ THE BIGGEST UNPRICED RISK IN THE POOL. In Manchester Super Giants' Hundred squad (3 games as of 29 Jul) and the Hundred runs to ~16 Aug, while SLK play FOUR league games before then (9, 12, 14, 16 Aug). SCENARIO: stays for the Hundred = MISSES 4, plays 6. Leaves early = 10. No franchise caveat published, so not discounted — but this is the one to check before bidding." }, // 1
+      { name: "Tim Seifert", role: "WK", overseas: true, note: "AVAILABILITY: PLAYS 9 OF 10 — misses the opening game (9 Aug) per the chart. ⚠️ WORST CASE 6 OF 10: if Manchester Super Giants reach the Hundred FINAL he misses up to the first four (9, 12, 14, 16 Aug). Priced at 9; the extra three games are the risk you carry." }, // 1
       { name: "Ackeem Auguste", role: "BAT", overseas: false, note: "Breakout pick but a 2025 regular — 10 games at median position 3." }, // 2
-      { name: "Charith Asalanka", role: "BAT", overseas: true, note: "AVAILABILITY: assumed 10 OF 10. THREE clashes checked. (1) LPL knockouts to ~8 Aug vs SLK's 9 Aug opener — if Galle reach the final he MISSES 1, plays 9. (2) ⚠️ India's 2 Tests in Sri Lanka, 15-19 and 23-27 Aug: IF he is in that Test squad he MISSES 4 (16, 19, 21, 26 Aug) and plays 6. Squad unannounced; he is SL's white-ball captain and not a current Test pick, which is the evidence against. (3) SL tour England 15-27 Sep = playoffs only, 0 league games." }, // 3
+      { name: "Charith Asalanka", role: "BAT", overseas: true, note: "AVAILABILITY: PLAYS 10 OF 10 (may be 9) — the chart has him missing the PLAYOFFS, which are not priced here, and says he MIGHT miss the opening game (9 Aug). The India Tests in Sri Lanka do NOT take him: he is SL's white-ball captain, not a current Test pick." }, // 3
       { name: "Jewel Andrew", role: "WK", overseas: false }, // 4  (2025: pos 1 for Antigua)
       { name: "Roston Chase", role: "AR", overseas: false, note: "CAPTAIN. 2025: 10 games, pos 4, bowled in 9." }, // 5
       { name: "Kamil Pooran", role: "BAT", overseas: false, note: "NOT Nicholas Pooran (TKR) — no shared stats record." }, // 6
       { name: "Matthew Forde", role: "AR", overseas: false }, // 7
-      { name: "Noor Ahmad", role: "BOWL", overseas: true, note: "AVAILABILITY: assumed 10 OF 10 but ⚠️ same 4-game exposure as Seifert — Manchester Super Giants in the Hundred to ~16 Aug vs SLK's games on 9, 12, 14 and 16 Aug. SCENARIO: stays = MISSES 4, plays 6. Not discounted (no franchise caveat)." }, // 8
-      { name: "Maheesh Theekshana", role: "BOWL", overseas: true, note: "AVAILABILITY: assumed 10 OF 10. (1) LPL knockouts to ~8 Aug vs SLK's 9 Aug opener — worst case MISSES 1. (2) ⚠️ India's 2 Tests in Sri Lanka 15-19 and 23-27 Aug: IF selected he MISSES 4 (16, 19, 21, 26 Aug) and plays 6 — but he is a white-ball specialist, so unlikely. (3) SL tour England 15-27 Sep = playoffs only, 0 league games." }, // 9
+      { name: "Noor Ahmad", role: "BOWL", overseas: true, note: "AVAILABILITY: PLAYS 9 OF 10 — misses the opening game (9 Aug). ⚠️ WORST CASE 6 OF 10 if Manchester Super Giants reach the Hundred final (also 12, 14, 16 Aug). Chart also flags he could miss the PLAYOFFS if Afghanistan schedule a series vs India — playoffs are not priced here." }, // 8
+      { name: "Maheesh Theekshana", role: "BOWL", overseas: true, note: "AVAILABILITY: PLAYS 10 OF 10 — the chart has him missing the PLAYOFFS only (national commitments), which are not priced here. A white-ball specialist, so the India Tests do not take him." }, // 9
       { name: "Joshua Bishop", role: "BOWL", overseas: false }, // 10
       { name: "McKenny Clarke", role: "BOWL", overseas: false }, // 11
       // Depth
@@ -222,13 +224,13 @@ export const CPL_2026: CPLTeam[] = [
       { name: "Colin Munro", role: "BAT", overseas: true }, // 1  (2025: pos 1, all 13 games)
       { name: "Alex Hales", role: "BAT", overseas: true }, // 2  (2025: pos 2, all 13)
       { name: "Matthew Breetzke", role: "BAT", overseas: true }, // 3  new signing
-      { name: "Nicholas Pooran", role: "WK", overseas: false, note: "AVAILABILITY: assumed 10 OF 10, not discounted (no franchise caveat). CAPTAIN & keeper. SCENARIO: in MI London's Hundred squad (4 games as of 29 Jul), which ran to ~16 Aug — if he stays to the end he MISSES 2 (8, 15 Aug) and plays 8. As captain, TKR will want him from game 1." }, // 4  (2025: pos 4, all 13)
+      { name: "Nicholas Pooran", role: "WK", overseas: false, note: "AVAILABILITY: PLAYS 10 OF 10 — the chart lists him Fully Available, so despite the MI London Hundred squad he is expected from game 1. CAPTAIN & keeper." }, // 4  (2025: pos 4, all 13)
       { name: "Kieron Pollard", role: "AR", overseas: false }, // 5  (2025: pos 5)
       { name: "Justin Greaves", role: "AR", overseas: false }, // 6
       { name: "Akeal Hosein", role: "BOWL", overseas: false }, // 7  (2025: pos 7, bowled all 13)
       { name: "Sunil Narine", role: "AR", overseas: false }, // 8  (2025: pos 8, bowled all 13)
       { name: "Dominic Drakes", role: "AR", overseas: false }, // 9
-      { name: "Usman Tariq", role: "BOWL", overseas: true, note: "AVAILABILITY: assumed 10 OF 10 but the clearest doubt in this XI. Leading wicket-taker for TKR in 2025 (20 in 10). Signed by Birmingham Phoenix for the Hundred and ESPNcricinfo explicitly flags it 'remains to be seen' whether he makes all of TKR's games. SCENARIO: stays for the Hundred = MISSES 2 (8, 15 Aug), plays 8. Not discounted, no franchise caveat." }, // 10
+      { name: "Usman Tariq", role: "BOWL", overseas: true, note: "AVAILABILITY: PLAYS 9 OF 10 — misses the opening game (8 Aug) per the chart; 8 if Birmingham Phoenix reach the Hundred FINAL. TKR's leading wicket-taker in 2025 (20 in 10)." }, // 10
       { name: "Terrance Hinds", role: "BOWL", overseas: false }, // 11
       // Depth
       { name: "Joshua Da Silva", role: "WK", overseas: false, note: "Breakout pick." }, // 12
@@ -305,9 +307,21 @@ const CPL_EXPECTED_GAMES: Record<string, number> = {
   // Antigua & Barbuda Falcons
   milindkumar: 3, // first 3 matches only
   tajindersingh: 3, // first 3 matches only
-  shadabkhan: 7, // 7 of 10 (ETPL — Edinburgh Castle Rockers)
-  sufiyanmuqeem: 7, // 7 of 10 (ETPL)
-  mmali: 7, // Moeen Ali — see note on his squad entry: the Falcons release said "fully available",
+  shadabkhan: 7, // misses the FIRST 3 (domestic) — chart-confirmed
+  sufiyanmuqeem: 7, // misses the FIRST 3 (domestic) — chart-confirmed
+  hasannawaz: 7, // misses the FIRST 3 (domestic)
+  usamamir: 3, // temporary cover, first 2-3 games only
+  // St Kitts & Nevis Patriots
+  naseemshah: 7, // misses the FIRST 3 (domestic). I had him at 10 after confirming he was not in
+  // Pakistan's England Test squad — right conclusion, wrong reason, the absence is domestic.
+  mdshanaka: 9, // Dasun Shanaka — misses the opening game (8 Aug) + playoffs (playoffs not priced)
+  nikhilchaudhary: 9, // misses the opening game; 8 if Southern Brave reach the Hundred playoffs
+  // Trinbago Knight Riders
+  usmantariq: 9, // misses the opening game (8 Aug); 8 if Birmingham Phoenix reach the Hundred final
+  // Saint Lucia Kings
+  tlseifert: 9, // misses the opening game (9 Aug); as low as 6 if Manchester reach the Hundred final
+  noorahmad: 9, // misses the opening game; as low as 6 if Manchester reach the final
+  mmali: 8, // Moeen Ali — chart says he misses the opening TWO (7, 9 Aug), not three — see note on his squad entry: the Falcons release said "fully available",
   // but he subsequently signed for Southern Brave in The Hundred (Thomas Rew's ankle injury) and
   // reporting on 3 Aug says the Falcons start under interim leadership. ABF play 3 games before the
   // Hundred final (7, 9, 14 Aug), so 7 is the availability-consistent figure. Revise to 10 if he

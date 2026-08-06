@@ -211,3 +211,39 @@ export function describeBatIndex(batIndex: number, median: number): {
     absoluteLabel,
   };
 }
+
+// ============================================================================
+// Per-team venue mix — how many of a team's games fall on each type of ground.
+// ============================================================================
+// Reporting only. Uses the DERIVED (measured) type, not any hand-typed value, and the ABSOLUTE
+// calibration — so "bowl_friendly" here means bowlers genuinely out-earn batters at that ground.
+export interface TeamVenueMix {
+  team: string;
+  games: number;
+  batRoad: number;
+  balanced: number;
+  bowlFriendly: number;
+  unknown: number; // grounds with no usable sample
+}
+
+export function teamVenueMix(
+  teamSchedule: Record<string, Array<{ venue: string; games: number }>>,
+  gender: "male" | "female" = "male"
+): TeamVenueMix[] {
+  const { byGround, median } = computeBatIndex(gender);
+  const out: TeamVenueMix[] = [];
+  for (const [team, sched] of Object.entries(teamSchedule)) {
+    const m: TeamVenueMix = { team, games: 0, batRoad: 0, balanced: 0, bowlFriendly: 0, unknown: 0 };
+    for (const { venue, games } of sched) {
+      m.games += games;
+      const e = byGround.get(canonicalVenue(venue));
+      if (!e || e.source === "neutral") { m.unknown += games; continue; }
+      const t = venueTypeFromBatIndex(e.batIndex, median);
+      if (t === "bat_road") m.batRoad += games;
+      else if (t === "balanced") m.balanced += games;
+      else m.bowlFriendly += games;
+    }
+    out.push(m);
+  }
+  return out.sort((a, b) => b.bowlFriendly - a.bowlFriendly);
+}
