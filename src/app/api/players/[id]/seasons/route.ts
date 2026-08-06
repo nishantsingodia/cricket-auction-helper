@@ -22,7 +22,7 @@ export async function GET(
   // --- Tour × Year: one row per tour per year, across ALL formats ---
   // Tour label: leagues use their format code (IPL/MLC/WPL); internationals use the
   // cricsheet series name; event-less matches fall into an "Other T20Is" bucket.
-  const tours = sqlite
+  const tours = await sqlite
     .prepare(
       `SELECT
         CASE
@@ -41,6 +41,7 @@ export async function GET(
             THEN CAST(SUM(bat_runs) AS REAL) / SUM(bat_balls) * 100
           END, 1
         ) as bat_sr,
+        ROUND(AVG(bat_position), 1) as avg_pos,
         SUM(CASE WHEN bat_runs >= 50 AND bat_runs < 100 THEN 1 ELSE 0 END) as fifties,
         SUM(CASE WHEN bat_runs >= 100 THEN 1 ELSE 0 END) as hundreds,
         SUM(bat_6s) as sixes,
@@ -64,7 +65,7 @@ export async function GET(
     .all(playerId) as Record<string, unknown>[];
 
   // --- League rows (IPL/MLC/WPL) by year — kept for the Fantasy tab's "Last IPL" card ---
-  const leagueSeasons = sqlite
+  const leagueSeasons = await sqlite
     .prepare(
       `SELECT
         format,
@@ -95,6 +96,7 @@ export async function GET(
       runs: s.runs,
       batAvg: s.bat_avg,
       batSr: s.bat_sr,
+      avgPos: s.avg_pos,
       fifties: s.fifties,
       hundreds: s.hundreds,
       sixes: s.sixes,

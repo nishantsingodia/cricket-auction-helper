@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "tournamentId required" }, { status: 400 });
   }
 
-  const tournament = sqlite
+  const tournament = await sqlite
     .prepare("SELECT * FROM tournaments WHERE id = ?")
     .get(tournamentId) as Record<string, unknown> | undefined;
 
@@ -19,12 +19,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
   }
 
-  const teams = sqlite
+  const teams = await sqlite
     .prepare("SELECT * FROM tournament_teams WHERE tournament_id = ? ORDER BY name")
     .all(tournamentId) as Record<string, unknown>[];
 
   // Get auction pool with player details and career stats
-  const pool = sqlite
+  const pool = await sqlite
     .prepare(`
       SELECT
         ap.*,

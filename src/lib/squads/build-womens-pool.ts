@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import { withTransaction, type DbHandle } from "@/db";
 import { WOMENS_T20_WC_2026, type WCTeam } from "./womens-t20-wc-2026";
 import { fuzzyMatchName, normName } from "@/lib/fuzzy-name-match";
 import { resolveByName } from "@/lib/registry";
@@ -46,29 +46,11 @@ function matchPlayer(squadName: string, pool: DbPlayer[]): number | null {
   return match !== null ? (pool.find((p) => p.name === match)?.id ?? null) : null;
 }
 
-export function buildWomensWCPool(
-  sqlite: Database.Database,
+export async function buildWomensWCPool(
+  sqlite: DbHandle,
   opts: { auctionId: number; tournamentId: number; teams?: WCTeam[] }
-): BuildResult {
+): Promise<BuildResult> {
   const teams = opts.teams ?? WOMENS_T20_WC_2026;
-
-  const insertPool = sqlite.prepare(
-    `INSERT OR IGNORE INTO auction_pool
-       (tournament_id, player_id, base_price, status, auction_id, ipl_team, squad_number, efppm)
-     VALUES (?, ?, ?, 'AVAILABLE', ?, ?, ?, ?)`
-  );
-
-  const insertPlayer = sqlite.prepare(
-    `INSERT INTO players (name, country, role, is_overseas, gender)
-     VALUES (?, ?, ?, 0, 'female')`
-  );
-
-  const getEfppm = sqlite.prepare(
-    `SELECT avg_fantasy_points FROM career_stats
-     WHERE player_id = ? AND format = 'T20'
-     ORDER BY bat_matches DESC
-     LIMIT 1`
-  );
 
   const result: BuildResult = {
     teams: 0,
@@ -79,10 +61,28 @@ export function buildWomensWCPool(
     teamBreakdown: [],
   };
 
-  const transaction = sqlite.transaction(() => {
+  await withTransaction(async (tx) => {
+    const insertPool = tx.prepare(
+      `INSERT OR IGNORE INTO auction_pool
+       (tournament_id, player_id, base_price, status, auction_id, ipl_team, squad_number, efppm)
+     VALUES (?, ?, ?, 'AVAILABLE', ?, ?, ?, ?)`
+    );
+
+    const insertPlayer = tx.prepare(
+      `INSERT INTO players (name, country, role, is_overseas, gender)
+     VALUES (?, ?, ?, 0, 'female')`
+    );
+
+    const getEfppm = tx.prepare(
+      `SELECT avg_fantasy_points FROM career_stats
+     WHERE player_id = ? AND format = 'T20'
+     ORDER BY bat_matches DESC
+     LIMIT 1`
+    );
+
     for (const team of teams) {
       // Build a per-country pool of female players to match against.
-      const rows = sqlite
+      const rows = await tx
         .prepare(
           `SELECT id, name, cricsheet_id FROM players WHERE gender = 'female' AND country = ?`
         )
@@ -98,7 +98,7 @@ export function buildWomensWCPool(
         if (playerId) {
           result.matched++;
         } else {
-          const ins = insertPlayer.run(sp.name, team.country, sp.role);
+          const ins = await insertPlayer.run(sp.name, team.country, sp.role);
           playerId = Number(ins.lastInsertRowid);
           result.created++;
           result.unmatched.push({ team: team.short, name: sp.name });
@@ -106,12 +106,12 @@ export function buildWomensWCPool(
           pool.push({ id: playerId, name: sp.name, cricsheetId: null });
         }
 
-        const efppmRow = getEfppm.get(playerId) as
+        const efppmRow = (await getEfppm.get(playerId)) as
           | { avg_fantasy_points: number }
           | undefined;
         const efppm = efppmRow?.avg_fantasy_points || 0;
 
-        insertPool.run(
+        await insertPool.run(
           opts.tournamentId,
           playerId,
           0, // base price (valuation engine fills this on auction/start)
@@ -131,6 +131,5 @@ export function buildWomensWCPool(
     }
   });
 
-  transaction();
   return result;
 }

@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const existing = sqlite
+    const existing = await sqlite
       .prepare("SELECT id FROM auction_pool WHERE id = ?")
       .get(poolId);
 
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    sqlite
+    await sqlite
       .prepare(
         "UPDATE auction_pool SET availability = ?, news_notes = ? WHERE id = ?"
       )

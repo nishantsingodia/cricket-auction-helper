@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sqlite } from "@/db";
+import { sqlite, withTransaction } from "@/db";
 import { recalculateValuations } from "@/lib/valuation/engine";
 
 /**
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get tournament_id for this auction
-    const auction = sqlite
+    const auction = await sqlite
       .prepare("SELECT tournament_id FROM auctions WHERE id = ?")
       .get(auctionId) as { tournament_id: number } | undefined;
 
@@ -33,20 +33,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Auction not found" }, { status: 404 });
     }
 
-    const update = sqlite.prepare(
-      `UPDATE auction_pool SET squad_number = ? WHERE auction_id = ? AND player_id = ? AND ipl_team = ?`
-    );
-
-    const transaction = sqlite.transaction(() => {
+    await withTransaction(async (tx) => {
+      const update = tx.prepare(
+        `UPDATE auction_pool SET squad_number = ? WHERE auction_id = ? AND player_id = ? AND ipl_team = ?`
+      );
       for (let i = 0; i < playerOrder.length; i++) {
-        update.run(i + 1, auctionId, playerOrder[i], iplTeam);
+        await update.run(i + 1, auctionId, playerOrder[i], iplTeam);
       }
     });
 
-    transaction();
-
     // Recalculate valuations since squad position affects expected matches & pricing
-    recalculateValuations(auction.tournament_id, auctionId);
+    await recalculateValuations(auction.tournament_id, auctionId);
 
     return NextResponse.json({ success: true, updated: playerOrder.length });
   } catch (err) {

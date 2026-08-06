@@ -87,7 +87,7 @@ export function SellDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Sell {playerName}</DialogTitle>
         </DialogHeader>
@@ -105,6 +105,7 @@ export function SellDialog({
               value={price}
               onChange={(e) => setPrice(parseFloat(e.target.value) || 0)}
               autoFocus
+              className="h-11 md:h-8"
             />
           </div>
 
@@ -113,7 +114,8 @@ export function SellDialog({
             <label className="text-sm font-medium mb-2 block">
               Sold to
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            {/* One column on the narrowest phones so a long name + purse still fits a row */}
+            <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-2">
               {participants.map((p) => (
                 <button
                   key={p.id}
@@ -157,14 +159,14 @@ export function SellDialog({
             <Button
               variant="outline"
               onClick={onClose}
-              className="flex-1"
+              className="flex-1 h-11 md:h-8"
             >
               Cancel
             </Button>
             <Button
               onClick={handleSell}
               disabled={selling || !selectedParticipant}
-              className="flex-1"
+              className="flex-1 h-11 md:h-8"
             >
               {selling ? "Selling..." : "Confirm Sale"}
             </Button>

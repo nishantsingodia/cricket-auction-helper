@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef, useMemo, memo } from "react";
+import type { CSSProperties } from "react";
 import { useParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -510,11 +511,11 @@ export default function AuctionPage() {
       {/* Top Bar */}
       <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border">
         {/* Row 1 — identity + live status */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5">
-          <a href="/" className="text-muted-foreground hover:text-foreground shrink-0 text-xl leading-none -mt-0.5" title="Back to home">&larr;</a>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 md:px-4 md:py-2.5">
+          <a href="/" className="text-muted-foreground hover:text-foreground shrink-0 text-xl leading-none -mt-0.5 flex items-center justify-center w-8 h-8 -ml-1.5 md:w-auto md:h-auto md:ml-0" title="Back to home">&larr;</a>
           <div className="min-w-0">
-            <h1 className="font-semibold text-base leading-tight truncate max-w-[240px]">{auction.name}</h1>
-            <div className="text-[11px] text-muted-foreground leading-tight truncate max-w-[240px]">{auction.tournament_name}</div>
+            <h1 className="font-semibold text-base leading-tight truncate max-w-[52vw] md:max-w-[240px]">{auction.name}</h1>
+            <div className="text-[11px] text-muted-foreground leading-tight truncate max-w-[52vw] md:max-w-[240px]">{auction.tournament_name}</div>
           </div>
 
           {/* Tour bat/bowl "general stats" chip — always visible; click for the venue breakdown */}
@@ -533,7 +534,7 @@ export default function AuctionPage() {
                 disabled={!clickable}
                 onClick={() => clickable && setSelectedVenue("__ALL__")}
                 title={`Tour lean (${tourConsensus.formats.join("+")} history, ${matches} matches): bat ${batFp} vs bowl ${bowlFp} avg fantasy pts.${clickable ? " Click for the venue breakdown." : ""}`}
-                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${meta.cls} ${clickable ? "hover:bg-foreground/5 cursor-pointer" : "cursor-default"}`}
+                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-2 min-h-[40px] md:py-1 md:min-h-0 text-xs font-medium ${meta.cls} ${clickable ? "hover:bg-foreground/5 cursor-pointer" : "cursor-default"}`}
               >
                 <span aria-hidden>{meta.emoji}</span>
                 <span className="opacity-70">Tour lean:</span> {meta.txt}
@@ -541,17 +542,19 @@ export default function AuctionPage() {
             );
           })()}
 
-          <div className="flex-1" />
+          <div className="hidden md:block flex-1" />
 
-          {/* Purse — the live-critical info, given more weight */}
-          <div className="flex flex-wrap items-center gap-1.5">
+          {/* Purse — the live-critical info, given more weight.
+              Phone: one full-width row that scrolls sideways inside itself, so a 6-friend
+              auction can't stack six chips and push the board off-screen. */}
+          <div className="flex items-center gap-1.5 w-full order-last overflow-x-auto md:w-auto md:order-none md:flex-wrap md:overflow-visible">
             {participants.map((p) => {
               const pct = p.purse > 0 ? Math.max(0, Math.min(1, p.remaining_purse / p.purse)) : 0;
               const low = pct < 0.2;
               return (
                 <div
                   key={p.id}
-                  className={`flex items-center gap-1.5 pl-2 pr-2.5 py-1 rounded-lg border bg-card ${low ? "border-red-500/60" : "border-border"}`}
+                  className={`flex shrink-0 items-center gap-1.5 pl-2 pr-2.5 py-1.5 md:py-1 rounded-lg border bg-card ${low ? "border-red-500/60" : "border-border"}`}
                   title={`${p.short_name}: ${p.remaining_purse.toFixed(1)} of ${p.purse} left`}
                 >
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
@@ -572,11 +575,11 @@ export default function AuctionPage() {
         </div>{/* end Row 1 */}
 
         {/* Row 2 — controls */}
-        <div className="flex flex-wrap items-center gap-2 px-4 py-1.5 border-t border-border/60">
+        <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 md:px-4 border-t border-border/60">
           {/* Price tiers — click to edit */}
           <div className="relative">
             <div
-              className="flex items-center gap-1 cursor-pointer"
+              className="flex flex-wrap items-center gap-1 cursor-pointer min-h-[40px] md:flex-nowrap md:min-h-0"
               onClick={() => setEditingSlabs((v) => !v)}
               title="Click to edit price tiers"
             >
@@ -600,7 +603,7 @@ export default function AuctionPage() {
           <div className="flex rounded-lg border border-border overflow-hidden">
             <button
               onClick={() => setView("grid")}
-              className={`px-3 py-1.5 text-sm ${
+              className={`px-3 py-1.5 text-sm min-h-[40px] md:min-h-0 ${
                 view === "grid"
                   ? "bg-primary text-primary-foreground"
                   : "hover:bg-muted"
@@ -610,7 +613,7 @@ export default function AuctionPage() {
             </button>
             <button
               onClick={() => setView("list")}
-              className={`px-3 py-1.5 text-sm ${
+              className={`px-3 py-1.5 text-sm min-h-[40px] md:min-h-0 ${
                 view === "list"
                   ? "bg-primary text-primary-foreground"
                   : "hover:bg-muted"
@@ -620,10 +623,10 @@ export default function AuctionPage() {
             </button>
           </div>
 
-          <div className="flex-1" />
+          <div className="hidden md:block flex-1" />
 
           {/* Panel toggles — grouped, secondary (segmented control) */}
-          <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/40 p-0.5">
+          <div className="flex flex-wrap items-center gap-0.5 rounded-lg border border-border bg-muted/40 p-0.5 md:flex-nowrap">
             <HeaderToggle active={showCalc} onClick={() => setShowCalc((v) => !v)}>Calc</HeaderToggle>
             <HeaderToggle active={showIntel} onClick={() => setShowIntel((v) => !v)}>Intel</HeaderToggle>
             <HeaderToggle active={showAvailability} onClick={() => setShowAvailability((v) => !v)} alert={pool.some((p) => p.availability && p.availability !== "FIT")}>Availability</HeaderToggle>
@@ -634,16 +637,16 @@ export default function AuctionPage() {
           {/* Primary action */}
           <button
             onClick={() => setShowChat((v) => !v)}
-            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${showChat ? "bg-primary text-primary-foreground" : "bg-foreground/90 text-background hover:bg-foreground"}`}
+            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors min-h-[40px] md:min-h-0 ${showChat ? "bg-primary text-primary-foreground" : "bg-foreground/90 text-background hover:bg-foreground"}`}
           >
             Quick Sell
           </button>
 
           {/* Utilities */}
-          <div className="flex items-center gap-1 pl-2 ml-0.5 border-l border-border">
+          <div className="flex items-center gap-1 pl-2 ml-auto md:ml-0.5 border-l border-border">
             <button
               onClick={() => setShowSettings((v) => !v)}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg text-base transition-colors ${showSettings ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+              className={`w-10 h-10 md:w-8 md:h-8 flex items-center justify-center rounded-lg text-base transition-colors ${showSettings ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
               title="Settings"
             >
               ⚙
@@ -695,7 +698,7 @@ export default function AuctionPage() {
 
       {/* Content */}
       <div className="flex">
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           {view === "grid" ? (
             <SquadGrid
               sortedTeams={sortedTeams}
@@ -768,24 +771,33 @@ export default function AuctionPage() {
         />
       )}
 
-      {/* Quick Sell Chat */}
-      {showChat && (
-        <QuickSellChat auctionId={auctionId} onSold={fetchData} />
-      )}
+      {/* Floating panels — Quick Sell + AI Advisor.
+          Desktop is untouched: each panel is its own fixed box pinned bottom-right / bottom-left.
+          On a phone those fixed pixel widths overflow the screen and cover each other, so both
+          share ONE bottom-sheet stack that is capped to 70vh (the board stays visible above it)
+          and splits the space when both are open. `md:contents` dissolves this wrapper from `md:`
+          up so each panel falls back to its own fixed positioning. */}
+      {(showChat || showAdvisor) && (
+        <div className="fixed inset-x-0 bottom-0 z-50 flex h-[70vh] flex-col gap-1 md:contents">
+          {showChat && (
+            <QuickSellChat auctionId={auctionId} onSold={fetchData} onClose={() => setShowChat(false)} />
+          )}
 
-      {/* AI Advisor */}
-      {showAdvisor && (
-        <AuctionAdvisor
-          pool={pool}
-          participants={participants}
-          myId={myId}
-          marketFactor={marketFactor}
-          getAdjustedPrice={getAdjustedPrice}
-          pursePerFriend={auction.purse_per_friend}
-          playersPerFriend={auction.players_per_friend}
-          watchlist={watchlist}
-          teamPitchBreakdown={teamPitchBreakdown}
-        />
+          {showAdvisor && (
+            <AuctionAdvisor
+              pool={pool}
+              participants={participants}
+              myId={myId}
+              marketFactor={marketFactor}
+              getAdjustedPrice={getAdjustedPrice}
+              pursePerFriend={auction.purse_per_friend}
+              playersPerFriend={auction.players_per_friend}
+              watchlist={watchlist}
+              teamPitchBreakdown={teamPitchBreakdown}
+              onClose={() => setShowAdvisor(false)}
+            />
+          )}
+        </div>
       )}
 
       {/* Sell Dialog */}
@@ -849,8 +861,14 @@ function SquadGrid({
   onVenueClick: (canonical: string) => void;
 }) {
   return (
-    <div className="overflow-x-auto p-4">
-      <div className="flex gap-3" style={{ minWidth: sortedTeams.length * 220 }}>
+    // Desktop: one long horizontal track of fixed-width team columns, scrolling inside THIS box.
+    // Phone: the same columns stack vertically full-width (the track's min-width is applied only
+    // from `md:` up, via the --board-min-w custom property) so the page never scrolls sideways.
+    <div className="overflow-x-auto p-3 md:p-4">
+      <div
+        className="flex flex-col gap-3 md:flex-row md:min-w-[var(--board-min-w)]"
+        style={{ "--board-min-w": `${sortedTeams.length * 220}px` } as CSSProperties}
+      >
         {sortedTeams.map(([team, players]) => (
           <TeamColumn
             key={team}
@@ -921,6 +939,9 @@ function TeamColumn({
   onVenueClick?: (canonical: string) => void;
 }) {
   const [players, setPlayers] = useState(initialPlayers);
+  // Phone-only: the columns are stacked, so let a team be folded away to shorten the scroll.
+  // Never applied from `md:` up — the desktop board always shows every column in full.
+  const [collapsed, setCollapsed] = useState(false);
 
   // Sync with parent when data refreshes
   useEffect(() => {
@@ -962,12 +983,23 @@ function TeamColumn({
   const overseasInXII = players.filter((p, i) => i < PLAYING_XI_SIZE && p.is_overseas).length;
 
   return (
-    <div className="flex-shrink-0 w-[210px]">
-      {/* Team Header */}
+    <div className="flex-shrink-0 w-full md:w-[210px]">
+      {/* Team Header. pr-12 below md reserves the fold button's column so it can never sit on
+          top of the venue chip underneath it; md:px-3 restores the original desktop padding. */}
       <div
-        className="rounded-t-lg px-3 py-2 text-white font-bold text-center text-sm"
+        className={`relative rounded-t-lg pl-3 pr-12 py-2 md:px-3 text-white font-bold text-center text-sm ${collapsed ? "rounded-b-lg md:rounded-b-none" : ""}`}
         style={{ backgroundColor: IPL_COLORS[team] || "#555" }}
       >
+        {/* Fold/unfold this team — phone only (see `collapsed` above) */}
+        <button
+          type="button"
+          onClick={() => setCollapsed((v) => !v)}
+          className="md:hidden absolute right-1 top-1 w-9 h-9 flex items-center justify-center rounded text-white/80 hover:bg-black/20 text-xs font-normal"
+          aria-expanded={!collapsed}
+          title={collapsed ? `Show ${team} players` : `Hide ${team} players`}
+        >
+          {collapsed ? "▼" : "▲"}
+        </button>
         <div>
           {team}
           {!venueSummary && pitchBreakdown && (pitchBreakdown.F + pitchBreakdown.B + pitchBreakdown.T) > 0 ? (
@@ -1054,7 +1086,7 @@ function TeamColumn({
       </div>
 
       {/* Players — sortable */}
-      <div className="border border-t-0 border-border rounded-b-lg bg-card">
+      <div className={`border border-t-0 border-border rounded-b-lg bg-card ${collapsed ? "hidden md:block" : ""}`}>
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -1164,7 +1196,7 @@ function SortablePlayerCard({
       <div
         ref={setNodeRef}
         style={{ ...style, ...(soldStyle || rStyle || {}) }}
-        className={`group px-2 py-1.5 border-b border-border last:border-b-0 hover:bg-muted/30 transition-colors ${bgClass} ${watchlistClass} ${
+        className={`group px-2 py-2 md:py-1.5 border-b border-border last:border-b-0 hover:bg-muted/30 transition-colors ${bgClass} ${watchlistClass} ${
           isDragging ? "shadow-lg bg-card" : ""
         }`}
       >
@@ -1192,7 +1224,7 @@ function SortablePlayerCard({
               e.stopPropagation();
               onWatchlist();
             }}
-            className={`text-xs mt-0.5 ${
+            className={`text-base leading-none px-1 py-0.5 md:px-0 md:py-0 md:text-xs mt-0.5 ${
               isWatched
                 ? "text-amber-400"
                 : "text-muted-foreground/40 hover:text-amber-400"
@@ -1282,24 +1314,26 @@ function SortablePlayerCard({
                   }}
                 />
               )}
+              {/* Row actions. Desktop keeps them hover-revealed; on touch there is no hover, so
+                  below `md:` they are always on (and given a real tap target). */}
               {p.status === "SOLD" ? (
                 <button
                   onClick={(e) => { e.stopPropagation(); onUndo(); }}
-                  className="ml-auto text-[9px] opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground/60 hover:text-foreground shrink-0"
+                  className="ml-auto text-[10px] px-2 py-1 md:px-0 md:py-0 md:text-[9px] opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-muted-foreground/60 hover:text-foreground shrink-0"
                 >
                   undo
                 </button>
               ) : (
-                <span className="ml-auto flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                <span className="ml-auto flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0">
                   <button
                     onClick={(e) => { e.stopPropagation(); onSell(); }}
-                    className="text-[9px] px-1 py-0.5 rounded text-muted-foreground hover:text-foreground"
+                    className="text-[10px] px-2 py-1 md:text-[9px] md:px-1 md:py-0.5 rounded text-muted-foreground hover:text-foreground"
                   >
                     sell
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); onRiskToggle(); }}
-                    className={`text-[9px] px-1 py-0.5 rounded ${p.risk_note ? "text-red-500 hover:text-red-400" : "text-muted-foreground/50 hover:text-red-500"}`}
+                    className={`text-[10px] px-2 py-1 md:text-[9px] md:px-1 md:py-0.5 rounded ${p.risk_note ? "text-red-500 hover:text-red-400" : "text-muted-foreground/50 hover:text-red-500"}`}
                     title={p.risk_note ? `Risk: ${p.risk_note} — click to clear` : "Flag as risky"}
                   >
                     {p.risk_note ? "⚠✕" : "⚠"}
@@ -1376,22 +1410,27 @@ function Masterlist({
     ) : null;
 
   return (
-    <div className="p-4">
-      <div className="flex gap-3 mb-3">
+    <div className="p-3 md:p-4">
+      <div className="flex flex-wrap items-center gap-3 mb-3">
         <Input
           placeholder="Search player..."
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="max-w-xs"
+          className="max-w-xs h-10 md:h-8"
         />
         <Badge variant="secondary">{filtered.length} players</Badge>
+        {/* Phone only: the stat columns are dropped from the table to keep it inside 390px —
+            say where they went, since tapping a row is how you reach them. */}
+        <span className="text-[11px] text-muted-foreground md:hidden">
+          Tap a player for stats
+        </span>
       </div>
 
       <div className="rounded-lg border border-border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
-              <TableHead className="w-8">#</TableHead>
+              <TableHead className="w-8 hidden md:table-cell">#</TableHead>
               <TableHead className="w-5"></TableHead>
               <TableHead>Player</TableHead>
               <TableHead>Team</TableHead>
@@ -1405,28 +1444,29 @@ function Masterlist({
                 className="text-right cursor-pointer"
                 onClick={() => handleSort("val_expected")}
               >
-                Exp. Price <SortInd col="val_expected" />
+                <span className="md:hidden">Price</span>
+                <span className="hidden md:inline">Exp. Price</span> <SortInd col="val_expected" />
               </TableHead>
               <TableHead
-                className="text-right cursor-pointer"
+                className="text-right cursor-pointer hidden md:table-cell"
                 onClick={() => handleSort("matches")}
               >
                 Mat <SortInd col="matches" />
               </TableHead>
               <TableHead
-                className="text-right cursor-pointer"
+                className="text-right cursor-pointer hidden md:table-cell"
                 onClick={() => handleSort("runs")}
               >
                 Runs <SortInd col="runs" />
               </TableHead>
               <TableHead
-                className="text-right cursor-pointer"
+                className="text-right cursor-pointer hidden md:table-cell"
                 onClick={() => handleSort("wickets")}
               >
                 Wkts <SortInd col="wickets" />
               </TableHead>
-              <TableHead className="text-right">Ov/M</TableHead>
-              <TableHead className="w-12"></TableHead>
+              <TableHead className="text-right hidden md:table-cell">Ov/M</TableHead>
+              <TableHead className="w-12 hidden md:table-cell"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -1437,7 +1477,7 @@ function Masterlist({
                 style={getPlayerBg(p).style || (p.status === "AVAILABLE" ? rampStyle(getAdjustedPrice(p)) : undefined)}
                 onClick={() => onPlayerClick(p.player_id)}
               >
-                <TableCell className="text-muted-foreground text-xs">
+                <TableCell className="text-muted-foreground text-xs hidden md:table-cell">
                   {idx + 1}
                 </TableCell>
                 <TableCell>
@@ -1446,16 +1486,16 @@ function Masterlist({
                       e.stopPropagation();
                       onWatchlistToggle(p.player_id);
                     }}
-                    className={
+                    className={`text-base leading-none px-1 py-1 md:px-0 md:py-0 md:text-sm ${
                       p.player_id in watchlist
                         ? "text-amber-400"
                         : "text-muted-foreground/40 hover:text-amber-400"
-                    }
+                    }`}
                   >
                     {p.player_id in watchlist ? "\u2605" : "\u2606"}
                   </button>
                 </TableCell>
-                <TableCell className={`font-medium ${
+                <TableCell className={`font-medium whitespace-normal md:whitespace-nowrap ${
                   p.status === "SOLD"
                     ? p.sold_to_participant === myId
                       ? "text-white font-bold"
@@ -1493,17 +1533,20 @@ function Masterlist({
                     />
                   </div>
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right hidden md:table-cell">
                   {p.matches || "—"}
                 </TableCell>
-                <TableCell className="text-right">{p.runs || "—"}</TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right hidden md:table-cell">{p.runs || "—"}</TableCell>
+                <TableCell className="text-right hidden md:table-cell">
                   {p.wickets || "—"}
                 </TableCell>
-                <TableCell className="text-right text-muted-foreground">
+                <TableCell className="text-right text-muted-foreground hidden md:table-cell">
                   {p.bowl_overs_avg != null ? p.bowl_overs_avg.toFixed(1) : "—"}
                 </TableCell>
-                <TableCell>
+                {/* Hover-only actions: desktop convenience. On a phone these are unreachable
+                    (no hover) and there is no room, so the column is dropped — the same
+                    sell / risk actions live in the player detail sheet a tap away. */}
+                <TableCell className="hidden md:table-cell">
                   <span className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     {p.status === "AVAILABLE" && (
                       <button
@@ -1650,7 +1693,7 @@ function SlabEditor({
     <div className="absolute top-full left-0 mt-1 z-50 bg-card border border-border rounded-lg shadow-lg p-3 w-64 max-w-[calc(100vw-2rem)]">
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-bold">Price Tiers</span>
-        <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xs">✕</button>
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xs w-9 h-9 -mr-2 -my-2 flex items-center justify-center md:w-auto md:h-auto md:m-0">✕</button>
       </div>
       <div className="space-y-1.5">
         {sorted.map((slab, i) => (
@@ -1662,13 +1705,13 @@ function SlabEditor({
               step={1}
               value={slab.min}
               onChange={(e) => updateSlab(i, "min", e.target.value)}
-              className="w-12 text-xs px-1.5 py-0.5 border rounded bg-background text-right"
+              className="w-12 text-base h-9 md:text-xs md:h-auto px-1.5 py-0.5 border rounded bg-background text-right"
             />
             <span className="flex-1 text-[10px] text-muted-foreground">tier {i + 1} · Cr</span>
             <div className="w-5 h-5 rounded shrink-0 border border-border" style={{ backgroundColor: PRICE_RAMP[Math.min(i, PRICE_RAMP.length - 1)] }} title={`tier ${i + 1} shade`} />
             <button
               onClick={() => removeSlab(i)}
-              className="text-[10px] text-muted-foreground/50 hover:text-red-500 shrink-0"
+              className="text-[10px] text-muted-foreground/50 hover:text-red-500 shrink-0 px-2 py-2 md:px-0 md:py-0"
               title="Remove tier"
             >
               ✕
@@ -1677,12 +1720,12 @@ function SlabEditor({
         ))}
       </div>
       <div className="flex items-center justify-between mt-2 pt-2 border-t border-border">
-        <button onClick={addSlab} className="text-[10px] text-primary hover:underline">
+        <button onClick={addSlab} className="text-[10px] text-primary hover:underline py-2 md:py-0">
           + Add tier
         </button>
         <button
           onClick={() => onChange([...DEFAULT_SLABS])}
-          className="text-[10px] text-muted-foreground hover:underline"
+          className="text-[10px] text-muted-foreground hover:underline py-2 md:py-0"
         >
           Reset defaults
         </button>
@@ -1754,10 +1797,10 @@ function BudgetCalculator({
   };
 
   return (
-    <div className="border-b border-border bg-card px-4 py-2">
+    <div className="border-b border-border bg-card px-3 py-2 md:px-4">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         {/* Meta */}
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
           <h3 className="font-bold text-sm">Budget Planner</h3>
           {boughtCount > 0 && (
             <span className="text-xs px-2 py-0.5 rounded bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 font-medium">
@@ -1776,7 +1819,7 @@ function BudgetCalculator({
               <input
                 type="number"
                 min={0}
-                className="w-10 text-sm px-1 py-0.5 border rounded bg-background text-center"
+                className="w-10 text-base h-9 md:text-sm md:h-auto px-1 py-0.5 border rounded bg-background text-center"
                 value={slab.count}
                 onChange={(e) =>
                   updateSlab(slab.id, "count", parseInt(e.target.value) || 0)
@@ -1787,7 +1830,7 @@ function BudgetCalculator({
                 type="number"
                 min={0}
                 step={0.5}
-                className="w-12 text-sm px-1 py-0.5 border rounded bg-background text-right"
+                className="w-12 text-base h-9 md:text-sm md:h-auto px-1 py-0.5 border rounded bg-background text-right"
                 value={slab.price}
                 onChange={(e) =>
                   updateSlab(slab.id, "price", parseFloat(e.target.value) || 0)
@@ -1797,7 +1840,7 @@ function BudgetCalculator({
               <span className="text-xs text-muted-foreground tabular-nums">= {(slab.count * slab.price).toFixed(1)}</span>
               <button
                 onClick={() => removeSlab(slab.id)}
-                className="text-xs text-muted-foreground hover:text-destructive ml-0.5"
+                className="text-xs text-muted-foreground hover:text-destructive ml-0.5 px-1.5 py-1 md:px-0 md:py-0"
               >
                 ×
               </button>
@@ -1805,14 +1848,14 @@ function BudgetCalculator({
           ))}
           <button
             onClick={addSlab}
-            className="text-xs text-primary hover:underline px-1"
+            className="text-xs text-primary hover:underline px-2 py-2 md:px-1 md:py-0"
           >
             + Add
           </button>
         </div>
 
         {/* Summary — inline, pushed right */}
-        <div className="flex items-center gap-4 ml-auto shrink-0 text-sm">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 ml-auto text-sm md:flex-nowrap md:shrink-0">
           <span>
             Players{" "}
             <span className={totalPlayers === remainingSlots ? "text-green-600 font-bold" : totalPlayers > remainingSlots ? "text-red-500 font-bold" : "font-bold"}>
@@ -1952,7 +1995,7 @@ function AuctionIntel({
     .slice(0, 5);
 
   return (
-    <div className="border-b border-border bg-muted/20 px-4 py-3">
+    <div className="border-b border-border bg-muted/20 px-3 py-3 md:px-4">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
         {/* Column 1: Progress + Friend Stats */}
@@ -1976,7 +2019,7 @@ function AuctionIntel({
           </div>
           <div className="space-y-1">
             {friendStats.map((f) => (
-              <div key={f.id} className="flex items-center gap-1.5 text-[11px]">
+              <div key={f.id} className="flex flex-wrap items-center gap-1.5 text-[11px] md:flex-nowrap">
                 <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: f.color }} />
                 <span className={`font-medium ${f.id === myId ? "text-green-600 dark:text-green-400" : ""}`}>
                   {f.short_name}
@@ -2086,7 +2129,7 @@ function AuctionIntel({
           </h3>
           <div className="space-y-1">
             {topTargets.map((p) => (
-              <div key={p.player_id} className="flex items-center gap-1.5 text-[11px]">
+              <div key={p.player_id} className="flex flex-wrap items-center gap-1.5 text-[11px] md:flex-nowrap">
                 <span className="font-medium truncate">{p.name}</span>
                 <span className="text-muted-foreground/60 text-[10px] shrink-0">{p.role}</span>
                 <span className="ml-auto text-amber-600 dark:text-amber-400 font-bold shrink-0">
@@ -2138,9 +2181,12 @@ interface ChatMessage {
 function QuickSellChat({
   auctionId,
   onSold,
+  onClose,
 }: {
   auctionId: number;
   onSold: () => void;
+  /** Phone only — dismisses the bottom sheet (desktop closes it from the header toggle). */
+  onClose?: () => void;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -2227,13 +2273,22 @@ function QuickSellChat({
   };
 
   return (
-    <div className="fixed bottom-4 right-4 w-[380px] h-[400px] bg-card border border-border rounded-xl shadow-2xl flex flex-col z-50">
+    <div className="flex min-h-0 flex-1 flex-col bg-card border-t border-border rounded-t-xl rounded-b-none shadow-2xl z-50 md:fixed md:bottom-4 md:right-4 md:w-[380px] md:h-[400px] md:flex-none md:border md:rounded-b-xl">
       {/* Header */}
-      <div className="px-4 py-2 border-b border-border bg-muted/30 rounded-t-xl">
+      <div className="relative px-4 py-2 border-b border-border bg-muted/30 rounded-t-xl">
         <span className="text-sm font-bold">Quick Sell</span>
         <span className="text-[10px] text-muted-foreground ml-2">
           Friend | Player & Price
         </span>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="md:hidden absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-foreground"
+            title="Close Quick Sell"
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       {/* Messages */}
@@ -2257,6 +2312,7 @@ function QuickSellChat({
 
       {/* Input */}
       <div className="p-2 border-t border-border">
+        {/* text-base below md: iOS auto-zooms the whole page on focusing any input under 16px */}
         <div className="flex gap-2">
           <input
             ref={inputRef}
@@ -2267,13 +2323,13 @@ function QuickSellChat({
               if (e.key === "Enter") send();
             }}
             placeholder="Pradeep | Kohli 25 Bumrah 21 Head 36"
-            className="flex-1 text-sm px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+            className="flex-1 min-w-0 text-base md:text-sm px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary"
             disabled={sending}
           />
           <button
             onClick={send}
             disabled={sending || !input.trim()}
-            className="px-3 py-2 text-sm rounded-lg bg-primary text-primary-foreground disabled:opacity-50"
+            className="shrink-0 px-3 py-2 min-h-[44px] md:min-h-0 text-sm rounded-lg bg-primary text-primary-foreground disabled:opacity-50"
           >
             {sending ? "..." : "Send"}
           </button>
@@ -2413,7 +2469,7 @@ function TierAnalysis({
                   <span className="font-bold">{i === 0 ? "👑 " : ""}{f.name}</span>
                   <span className="font-bold text-amber-500">{f.totalFp.toFixed(0)} FP est.</span>
                 </div>
-                <div className="text-[10px] text-muted-foreground/70 flex gap-2">
+                <div className="text-[10px] text-muted-foreground/70 flex flex-wrap gap-x-2 md:flex-nowrap md:gap-2">
                   <span>{f.bought} bought</span>
                   <span>Best: {f.topEfppm.toFixed(0)} FP</span>
                   <span>Top-3 avg: {f.top3Avg.toFixed(0)}</span>
@@ -2489,7 +2545,7 @@ function AuctionSettings({
         type="number"
         min={min}
         step={step}
-        className="w-20 text-sm border rounded px-2 py-1 bg-background text-right"
+        className="w-20 text-base h-10 md:text-sm md:h-auto border rounded px-2 py-1 bg-background text-right"
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
       />
@@ -2497,7 +2553,7 @@ function AuctionSettings({
   );
 
   return (
-    <div className="mx-4 mb-3 border border-border rounded-lg bg-card overflow-hidden max-w-md">
+    <div className="mx-3 mb-3 md:mx-4 border border-border rounded-lg bg-card overflow-hidden max-w-md">
       <div className="px-3 py-2 bg-muted/30 border-b border-border font-bold text-sm">
         Auction Settings
       </div>
@@ -2505,7 +2561,7 @@ function AuctionSettings({
         <div className="flex items-center justify-between gap-3">
           <label className="text-xs text-muted-foreground">Auction Name</label>
           <input
-            className="w-48 text-sm border rounded px-2 py-1 bg-background"
+            className="w-48 max-w-[60%] text-base h-10 md:max-w-none md:text-sm md:h-auto border rounded px-2 py-1 bg-background"
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
@@ -2518,14 +2574,14 @@ function AuctionSettings({
 
         <div className="flex items-center gap-2 pt-2 border-t border-border">
           <button
-            className="flex-1 text-sm px-3 py-1.5 rounded bg-primary text-primary-foreground disabled:opacity-50"
+            className="flex-1 text-sm px-3 py-2.5 min-h-[42px] md:py-1.5 md:min-h-0 rounded bg-primary text-primary-foreground disabled:opacity-50"
             onClick={save}
             disabled={saving}
           >
             {saving ? "Saving..." : "Save & Recalculate"}
           </button>
           <button
-            className="text-sm px-3 py-1.5 rounded border hover:bg-muted"
+            className="text-sm px-3 py-2.5 min-h-[42px] md:py-1.5 md:min-h-0 rounded border hover:bg-muted"
             onClick={onClose}
           >
             Cancel
@@ -2541,7 +2597,7 @@ function HeaderToggle({ active, onClick, alert, children }: { active: boolean; o
   return (
     <button
       onClick={onClick}
-      className={`relative px-2.5 py-1 text-xs rounded-md transition-colors ${active ? "bg-background shadow-sm text-foreground font-medium" : "text-muted-foreground hover:text-foreground"}`}
+      className={`relative px-2.5 py-2 min-h-[38px] md:py-1 md:min-h-0 text-xs rounded-md transition-colors ${active ? "bg-background shadow-sm text-foreground font-medium" : "text-muted-foreground hover:text-foreground"}`}
     >
       {children}
       {alert && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-background" />}
@@ -2664,7 +2720,7 @@ function PointsLeadersPanel({ tournamentId }: { tournamentId: number }) {
 
   return (
     <div className="border-b border-border bg-card">
-      <div className="px-4 py-2 flex items-center gap-2 flex-wrap">
+      <div className="px-3 py-2 md:px-4 flex items-center gap-2 flex-wrap">
         <h3 className="font-bold text-sm">Points Leaders</h3>
         <span className="text-xs text-muted-foreground">
           {data.config.label} · {cols.join(" & ")} ({kindLabel}) · sorted by {sortLabel} {activeDir === "desc" ? "↓" : "↑"} · squad players only · {data.leaders.length} shown
@@ -2678,8 +2734,10 @@ function PointsLeadersPanel({ tournamentId }: { tournamentId: number }) {
           </button>
         )}
       </div>
-      <div className="max-h-[62vh] overflow-y-auto">
-        <table className="w-full text-xs">
+      {/* overflow-x so the leaderboard scrolls sideways INSIDE this box on a phone instead of
+          squeezing (or widening the page); min-w only bites below the desktop breakpoint. */}
+      <div className="max-h-[62vh] overflow-y-auto overflow-x-auto">
+        <table className="w-full min-w-[560px] md:min-w-0 text-xs">
           <thead className="sticky top-0 bg-card border-y border-border">
             <tr className="text-muted-foreground">
               <th className="text-left font-medium px-3 py-1.5 w-8">#</th>
@@ -2826,14 +2884,14 @@ function AvailabilityPanel({ pool, onUpdate }: { pool: PoolPlayer[]; onUpdate: (
     const isEditing = editingId === p.pool_id;
     return (
       <div className="py-2 px-3 border-b border-border last:border-b-0">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 md:flex-nowrap">
           <StatusBadge status={p.availability || "FIT"} />
           <span className="text-xs font-medium">{p.name}</span>
           {p.is_overseas ? <span className="text-sm text-blue-400">✈</span> : null}
           <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted/50">{p.ipl_team}</span>
           <span className="text-[10px] text-muted-foreground">{p.role}</span>
           <button
-            className="ml-auto text-[10px] text-muted-foreground hover:text-foreground"
+            className="ml-auto text-[10px] text-muted-foreground hover:text-foreground px-2 py-1.5 md:px-0 md:py-0"
             onClick={() => {
               if (isEditing) { setEditingId(null); return; }
               setEditingId(p.pool_id);
@@ -2845,14 +2903,14 @@ function AvailabilityPanel({ pool, onUpdate }: { pool: PoolPlayer[]; onUpdate: (
           </button>
         </div>
         {p.risk_note && !isEditing && (
-          <div className="text-[11px] text-muted-foreground/80 mt-1 ml-[72px] leading-snug">
+          <div className="text-[11px] text-muted-foreground/80 mt-1 ml-0 md:ml-[72px] leading-snug">
             {p.risk_note}
           </div>
         )}
         {isEditing && (
-          <div className="flex items-center gap-2 mt-2 ml-[72px]">
+          <div className="flex flex-wrap items-center gap-2 mt-2 ml-0 md:flex-nowrap md:ml-[72px]">
             <select
-              className="text-xs border rounded px-1.5 py-1 bg-background"
+              className="text-base h-10 md:text-xs md:h-auto border rounded px-1.5 py-1 bg-background"
               value={editStatus}
               onChange={(e) => setEditStatus(e.target.value)}
             >
@@ -2862,13 +2920,13 @@ function AvailabilityPanel({ pool, onUpdate }: { pool: PoolPlayer[]; onUpdate: (
               <option value="UNAVAILABLE">UNAVAILABLE</option>
             </select>
             <input
-              className="text-xs border rounded px-2 py-1 bg-background flex-1"
+              className="text-base h-10 md:text-xs md:h-auto border rounded px-2 py-1 bg-background flex-1 min-w-0"
               placeholder="Reason / notes"
               value={editNote}
               onChange={(e) => setEditNote(e.target.value)}
             />
             <button
-              className="text-xs px-2 py-1 bg-primary text-primary-foreground rounded"
+              className="text-xs px-3 py-2.5 md:px-2 md:py-1 bg-primary text-primary-foreground rounded"
               onClick={() => saveEdit(p.pool_id)}
             >
               Save
@@ -2880,14 +2938,14 @@ function AvailabilityPanel({ pool, onUpdate }: { pool: PoolPlayer[]; onUpdate: (
   };
 
   return (
-    <div className="mx-4 mb-3 border border-border rounded-lg bg-card overflow-hidden">
-      <div className="px-3 py-2 bg-muted/30 border-b border-border flex items-center gap-3">
+    <div className="mx-3 mb-3 md:mx-4 border border-border rounded-lg bg-card overflow-hidden">
+      <div className="px-3 py-2 bg-muted/30 border-b border-border flex flex-wrap items-center gap-x-3 gap-y-2 md:flex-nowrap">
         <span className="font-bold text-sm">Availability Tracker</span>
         <span className="text-xs text-muted-foreground">
           {unavailable.length} out · {injured.length} injured · {doubtful.length} doubtful
         </span>
         <input
-          className="ml-auto text-xs border rounded px-2 py-1 bg-background w-48"
+          className="w-full text-base h-10 md:ml-auto md:text-xs md:h-auto md:w-48 border rounded px-2 py-1 bg-background"
           placeholder="Search player to update..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -3083,6 +3141,7 @@ function AuctionAdvisor({
   playersPerFriend,
   watchlist,
   teamPitchBreakdown,
+  onClose,
 }: {
   pool: PoolPlayer[];
   participants: Participant[];
@@ -3093,6 +3152,8 @@ function AuctionAdvisor({
   playersPerFriend: number;
   watchlist: Record<number, { color: string | null; priority: number; notes: string | null }>;
   teamPitchBreakdown: Record<string, { F: number; B: number; T: number }>;
+  /** Phone only — dismisses the bottom sheet (desktop closes it from the header toggle). */
+  onClose?: () => void;
 }) {
   const [messages, setMessages] = useState<AdvisorMessage[]>([
     { id: 0, role: "assistant", content: "Ask me anything — \"Should I bid 16 for Pant?\", \"Who should I target next?\", \"Will Pradeep run out of budget?\"" },
@@ -3175,10 +3236,19 @@ function AuctionAdvisor({
   };
 
   return (
-    <div className="fixed bottom-4 left-4 w-[400px] h-[440px] bg-card border border-border rounded-lg shadow-xl flex flex-col z-50">
-      <div className="px-3 py-2 border-b border-border bg-muted/30 rounded-t-lg">
+    <div className="flex min-h-0 flex-1 flex-col bg-card border-t border-border rounded-t-xl rounded-b-none shadow-xl z-50 md:fixed md:bottom-4 md:left-4 md:w-[400px] md:h-[440px] md:flex-none md:border md:rounded-t-lg md:rounded-b-lg">
+      <div className="relative px-3 py-2 border-b border-border bg-muted/30 rounded-t-lg">
         <div className="font-bold text-sm">AI Advisor</div>
         <div className="text-[10px] text-muted-foreground">Strategy questions with full auction context</div>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="md:hidden absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-foreground"
+            title="Close AI Advisor"
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
@@ -3200,6 +3270,7 @@ function AuctionAdvisor({
       </div>
 
       <div className="p-2 border-t border-border">
+        {/* text-base below md: iOS auto-zooms the whole page on focusing any input under 16px */}
         <div className="flex gap-2">
           <input
             ref={inputRef}
@@ -3210,13 +3281,13 @@ function AuctionAdvisor({
               if (e.key === "Enter") send();
             }}
             placeholder="Should I bid 16 for Pant?"
-            className="flex-1 text-sm px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+            className="flex-1 min-w-0 text-base md:text-sm px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary"
             disabled={sending}
           />
           <button
             onClick={send}
             disabled={sending || !input.trim()}
-            className="px-3 py-2 text-sm rounded-lg bg-primary text-primary-foreground disabled:opacity-50"
+            className="shrink-0 px-3 py-2 min-h-[44px] md:min-h-0 text-sm rounded-lg bg-primary text-primary-foreground disabled:opacity-50"
           >
             {sending ? "..." : "Ask"}
           </button>

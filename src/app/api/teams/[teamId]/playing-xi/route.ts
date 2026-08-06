@@ -66,7 +66,7 @@ export async function GET(
   }
 
   // Get tournament config
-  const tournament = sqlite
+  const tournament = await sqlite
     .prepare("SELECT * FROM tournaments WHERE id = ?")
     .get(tournamentId) as Record<string, unknown> | undefined;
 
@@ -78,7 +78,7 @@ export async function GET(
   }
 
   // Get team info
-  const team = sqlite
+  const team = await sqlite
     .prepare("SELECT * FROM tournament_teams WHERE id = ? AND tournament_id = ?")
     .get(teamId, tournamentId) as Record<string, unknown> | undefined;
 
@@ -95,7 +95,7 @@ export async function GET(
     (tournament.match_format as string) === "T20" ? "IPL" : (tournament.match_format as string);
 
   // Step 1: Get all SOLD players for this team
-  const allSold = sqlite
+  const allSold = await sqlite
     .prepare(
       `
       SELECT

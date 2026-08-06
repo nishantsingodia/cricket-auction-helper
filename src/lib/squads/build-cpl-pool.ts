@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import { withTransaction, type DbHandle } from "@/db";
 import {
   CPL_2026,
   CPL_NAME_ALIASES,
@@ -82,14 +82,14 @@ function resolveFuzzy(squadName: string, pools: DbPlayer[][]): number | null {
 }
 
 // Candidate pools, exported so the setup/verification scripts resolve identically to the build.
-export function cplCandidatePools(sqlite: Database.Database): DbPlayer[][] {
-  const cplPool = sqlite
+export async function cplCandidatePools(sqlite: DbHandle): Promise<DbPlayer[][]> {
+  const cplPool = await sqlite
     .prepare(
       `SELECT DISTINCT p.id, p.name, p.cricsheet_id AS cricsheetId FROM players p
        JOIN career_stats cs ON cs.player_id = p.id AND cs.format = 'CPL'`
     )
     .all() as DbPlayer[];
-  const broadPool = sqlite
+  const broadPool = await sqlite
     .prepare(
       // Any male with marquee-franchise-T20 or T20I history. Mirrors the valuation quality set —
       // a CPL overseas signing's form often lives entirely in PSL/BBL/SA20/LPL, and without those
@@ -105,17 +105,17 @@ export function cplCandidatePools(sqlite: Database.Database): DbPlayer[][] {
 
 // Resolve the whole squad list to player ids using the exact-then-fuzzy + claimed-set passes.
 // Exported (and side-effect free) so a dry run can print the mapping BEFORE any DB write.
-export function resolveCplSquads(
-  sqlite: Database.Database,
+export async function resolveCplSquads(
+  sqlite: DbHandle,
   teams: CPLTeam[] = CPL_2026
-): Array<{
+): Promise<Array<{
   team: CPLTeam;
   sp: CPLTeam["players"][number];
   sn: number;
   playerId: number | null;
   via: "exact" | "fuzzy" | null;
-}> {
-  const pools = cplCandidatePools(sqlite);
+}>> {
+  const pools = await cplCandidatePools(sqlite);
   const rows: Array<{
     team: CPLTeam;
     sp: CPLTeam["players"][number];
@@ -151,57 +151,58 @@ export function resolveCplSquads(
   return rows;
 }
 
-export function buildCPLPool(
-  sqlite: Database.Database,
+export async function buildCPLPool(
+  sqlite: DbHandle,
   opts: { auctionId: number; tournamentId: number; teams?: CPLTeam[] }
-): BuildResult {
+): Promise<BuildResult> {
   const teams = opts.teams ?? CPL_2026;
 
-  const insertPool = sqlite.prepare(
-    // `availability` is written here so the board's Availability panel and per-player badges light
-    // up. Derived from the published phase windows (see cplAvailability), never hand-maintained.
-    `INSERT OR IGNORE INTO auction_pool
-       (tournament_id, player_id, base_price, status, auction_id, ipl_team, squad_number, efppm, risk_note, availability)
-     VALUES (?, ?, ?, 'AVAILABLE', ?, ?, ?, ?, ?, ?)`
-  );
-  const updateIsOverseas = sqlite.prepare(`UPDATE players SET is_overseas = ? WHERE id = ?`);
-  const insertPlayer = sqlite.prepare(
-    `INSERT INTO players (name, country, role, is_overseas, gender)
-     VALUES (?, 'CPL', ?, ?, 'male')`
-  );
-  // Initial efppm hint (engine recomputes the real blended value on auction/start).
-  const getEfppm = sqlite.prepare(
-    `SELECT avg_fantasy_points FROM career_stats
-     WHERE player_id = ? AND format IN ('CPL','IPL','T20')
-     ORDER BY CASE format WHEN 'CPL' THEN 1 WHEN 'IPL' THEN 2 ELSE 3 END
-     LIMIT 1`
-  );
-
-  const rows = resolveCplSquads(sqlite, teams);
+  const rows = await resolveCplSquads(sqlite, teams);
 
   const result: BuildResult = {
     teams: 0, players: 0, matched: 0, created: 0, unmatched: [], teamBreakdown: [],
   };
 
-  const transaction = sqlite.transaction(() => {
+  await withTransaction(async (tx) => {
+    const insertPool = tx.prepare(
+      // `availability` is written here so the board's Availability panel and per-player badges light
+      // up. Derived from the published phase windows (see cplAvailability), never hand-maintained.
+      `INSERT OR IGNORE INTO auction_pool
+       (tournament_id, player_id, base_price, status, auction_id, ipl_team, squad_number, efppm, risk_note, availability)
+     VALUES (?, ?, ?, 'AVAILABLE', ?, ?, ?, ?, ?, ?)`
+    );
+    const updateIsOverseas = tx.prepare(`UPDATE players SET is_overseas = ? WHERE id = ?`);
+    const insertPlayer = tx.prepare(
+      `INSERT INTO players (name, country, role, is_overseas, gender)
+     VALUES (?, 'CPL', ?, ?, 'male')`
+    );
+    // Initial efppm hint (engine recomputes the real blended value on auction/start).
+    const getEfppm = tx.prepare(
+      `SELECT avg_fantasy_points FROM career_stats
+     WHERE player_id = ? AND format IN ('CPL','IPL','T20')
+     ORDER BY CASE format WHEN 'CPL' THEN 1 WHEN 'IPL' THEN 2 ELSE 3 END
+     LIMIT 1`
+    );
+    const getName = tx.prepare(`SELECT name FROM players WHERE id = ?`);
+
     for (const r of rows) {
       result.players++;
       let playerId = r.playerId;
       if (playerId !== null) {
         result.matched++;
-        updateIsOverseas.run(r.sp.overseas ? 1 : 0, playerId);
+        await updateIsOverseas.run(r.sp.overseas ? 1 : 0, playerId);
       } else {
-        const ins = insertPlayer.run(r.sp.name, r.sp.role, r.sp.overseas ? 1 : 0);
+        const ins = await insertPlayer.run(r.sp.name, r.sp.role, r.sp.overseas ? 1 : 0);
         playerId = Number(ins.lastInsertRowid);
         result.created++;
         result.unmatched.push({ team: r.team.short, name: r.sp.name });
       }
-      const efppmRow = getEfppm.get(playerId) as { avg_fantasy_points: number } | undefined;
+      const efppmRow = (await getEfppm.get(playerId)) as { avg_fantasy_points: number } | undefined;
       // Availability keys off the DB spelling, which is what the valuation engine uses too.
       const dbName =
-        (sqlite.prepare(`SELECT name FROM players WHERE id = ?`).get(playerId) as { name: string })
+        ((await getName.get(playerId)) as { name: string } | undefined)
           ?.name ?? r.sp.name;
-      insertPool.run(
+      await insertPool.run(
         opts.tournamentId, playerId, 0, opts.auctionId,
         r.team.short, r.sn, efppmRow?.avg_fantasy_points || 0, r.sp.note ?? "",
         cplAvailability(dbName)
@@ -213,6 +214,5 @@ export function buildCPLPool(
     }
   });
 
-  transaction();
   return result;
 }

@@ -21,6 +21,8 @@ import {
 interface PlayerDetailProps {
   playerId: number;
   onClose: () => void;
+  /** Tournament name — scopes the Venue Stats tab to only this tour's grounds. */
+  tour?: string;
   riskNote?: string | null;
   poolId?: number;
   playerStatus?: string;
@@ -55,6 +57,7 @@ interface SeasonStat {
   runs: number;
   batAvg: number;
   batSr: number;
+  avgPos?: number | null;
   fifties: number;
   hundreds: number;
   sixes: number;
@@ -86,6 +89,8 @@ interface PlayerDetail {
     isOverseas: boolean;
     dob: string;
   };
+  avgBatPosition?: number | null;
+  batPositionInns?: number;
   fantasyBreakdown?: FantasyBreakdown;
   careerStats: Array<{
     format: string;
@@ -113,6 +118,7 @@ interface PlayerDetail {
     matchId: string;
     date: string;
     format: string;
+    batPos?: number | null;
     opposition: string;
     venue: string;
     batRuns: number;
@@ -173,7 +179,7 @@ function MiniStat({
   );
 }
 
-export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerStatus, isWatched, onRiskToggle, onSell, onUndo, onWatchlist }: PlayerDetailProps) {
+export function PlayerDetailModal({ playerId, onClose, tour, riskNote, poolId, playerStatus, isWatched, onRiskToggle, onSell, onUndo, onWatchlist }: PlayerDetailProps) {
   const [data, setData] = useState<PlayerDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [seasonData, setSeasonData] = useState<{ leagueSeasons: SeasonStat[]; tours: SeasonStat[] } | null>(null);
@@ -187,7 +193,7 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
       setSeasonFmt("ALL");
       try {
         const [res, seasonsRes] = await Promise.all([
-          fetch(`/api/players/${playerId}`),
+          fetch(`/api/players/${playerId}${tour ? `?tour=${encodeURIComponent(tour)}` : ""}`),
           fetch(`/api/players/${playerId}/seasons`),
         ]);
         const json = await res.json();
@@ -201,7 +207,7 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
       }
     }
     fetchDetail();
-  }, [playerId]);
+  }, [playerId, tour]);
 
   return (
     <Dialog open onOpenChange={() => onClose()}>
@@ -231,6 +237,11 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
                 {data.player.bowlStyle && (
                   <span>Bowl: {data.player.bowlStyle}</span>
                 )}
+                {data.avgBatPosition != null && (
+                  <span title={`Avg batting position across white-ball franchise/T20${data.batPositionInns ? ` — ${data.batPositionInns} inns, excl. did-not-bat` : ""}`}>
+                    Bats @{data.avgBatPosition}
+                  </span>
+                )}
                 {data.player.dob && <span>DOB: {data.player.dob}</span>}
               </div>
               {/* Risk note banner */}
@@ -245,7 +256,7 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
               <div className="flex flex-wrap gap-2 mt-3">
                 {onWatchlist && (
                   <button
-                    className={`text-xs px-3 py-1.5 rounded border font-medium ${
+                    className={`text-xs px-3 py-2 min-h-[40px] sm:py-1.5 sm:min-h-0 rounded border font-medium ${
                       isWatched
                         ? "bg-amber-500/20 border-amber-500 text-amber-600 dark:text-amber-400"
                         : "border-border text-muted-foreground hover:border-amber-500 hover:text-amber-500"
@@ -257,7 +268,7 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
                 )}
                 {playerStatus === "AVAILABLE" && onSell && (
                   <button
-                    className="text-xs px-3 py-1.5 rounded border border-green-500 text-green-600 dark:text-green-400 font-medium hover:bg-green-500/10"
+                    className="text-xs px-3 py-2 min-h-[40px] sm:py-1.5 sm:min-h-0 rounded border border-green-500 text-green-600 dark:text-green-400 font-medium hover:bg-green-500/10"
                     onClick={() => { onSell(); onClose(); }}
                   >
                     Sell Player
@@ -265,7 +276,7 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
                 )}
                 {playerStatus === "SOLD" && onUndo && (
                   <button
-                    className="text-xs px-3 py-1.5 rounded border border-orange-500 text-orange-600 dark:text-orange-400 font-medium hover:bg-orange-500/10"
+                    className="text-xs px-3 py-2 min-h-[40px] sm:py-1.5 sm:min-h-0 rounded border border-orange-500 text-orange-600 dark:text-orange-400 font-medium hover:bg-orange-500/10"
                     onClick={() => { onUndo(); onClose(); }}
                   >
                     Undo Sale
@@ -273,7 +284,7 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
                 )}
                 {onRiskToggle && poolId && (
                   <button
-                    className={`text-xs px-3 py-1.5 rounded border font-medium ${
+                    className={`text-xs px-3 py-2 min-h-[40px] sm:py-1.5 sm:min-h-0 rounded border font-medium ${
                       riskNote
                         ? "border-red-500 text-red-600 dark:text-red-400 hover:bg-red-500/10"
                         : "border-border text-muted-foreground hover:border-red-500 hover:text-red-500"
@@ -286,7 +297,9 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
               </div>
             </DialogHeader>
 
-            <Tabs defaultValue="fantasy" className="mt-4">
+            {/* min-w-0 so a wide stats table scrolls inside its own box instead of
+                stretching the dialog (and the page) sideways on a phone. */}
+            <Tabs defaultValue="fantasy" className="mt-4 min-w-0">
               <TabsList className="flex-wrap h-auto w-full gap-1 sm:w-fit sm:gap-0 [&>button]:min-h-[34px] sm:[&>button]:min-h-0">
                 <TabsTrigger value="fantasy">Fantasy Breakdown</TabsTrigger>
                 <TabsTrigger value="career">Career Stats</TabsTrigger>
@@ -409,6 +422,11 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
 
               {/* Career Stats */}
               <TabsContent value="career">
+                {/* The table is wider than a phone; it scrolls inside its own box (the Table
+                    primitive is an overflow-x-auto container), so say so. */}
+                <p className="mb-1 text-[11px] text-muted-foreground sm:hidden">
+                  Swipe the table sideways for more columns →
+                </p>
                 <Table className="min-w-[560px]">
                   <TableHeader>
                     <TableRow>
@@ -534,6 +552,7 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
                               <div className="mt-2 grid grid-cols-3 gap-1.5 text-center">
                                 <MiniStat label="Mat" value={s.matches} />
                                 <MiniStat label="Runs" value={s.runs} />
+                                <MiniStat label="Pos" value={s.avgPos != null ? `#${s.avgPos}` : "—"} />
                                 <MiniStat
                                   label="Best"
                                   value={s.bestMatch != null ? s.bestMatch.toFixed(0) : "—"}
@@ -559,6 +578,7 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
                               <TableHead>Tour</TableHead>
                               <TableHead className="text-right">Mat</TableHead>
                               <TableHead className="text-right">Runs</TableHead>
+                              <TableHead className="text-right">Pos</TableHead>
                               <TableHead className="text-right">Avg</TableHead>
                               <TableHead className="text-right">SR</TableHead>
                               <TableHead className="text-right">50s</TableHead>
@@ -582,6 +602,7 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
                                 </TableCell>
                                 <TableCell className="text-right">{s.matches}</TableCell>
                                 <TableCell className="text-right">{s.runs}</TableCell>
+                                <TableCell className="text-right">{s.avgPos != null ? `#${s.avgPos}` : "—"}</TableCell>
                                 <TableCell className="text-right">{s.batAvg?.toFixed(1) ?? "—"}</TableCell>
                                 <TableCell className="text-right">{s.batSr?.toFixed(1) ?? "—"}</TableCell>
                                 <TableCell className="text-right">{s.fifties}</TableCell>
@@ -666,7 +687,7 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
                                   <span className="truncate text-sm font-semibold">vs {m.opposition}</span>
                                 </div>
                                 <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                                  {m.date} · {m.venue}
+                                  {m.date} · {m.venue}{m.batPos != null ? ` · batted #${m.batPos}` : ""}
                                 </div>
                               </div>
                               <div className="shrink-0 text-right">
@@ -700,6 +721,7 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
                             <TableHead>Fmt</TableHead>
                             <TableHead>vs</TableHead>
                             <TableHead>Venue</TableHead>
+                            <TableHead className="text-right">Pos</TableHead>
                             <TableHead className="text-right">Runs</TableHead>
                             <TableHead className="text-right">Balls</TableHead>
                             <TableHead className="text-right">4s</TableHead>
@@ -732,6 +754,9 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
                         <TableCell>{m.opposition}</TableCell>
                         <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
                           {m.venue}
+                        </TableCell>
+                        <TableCell className="text-right text-sm text-muted-foreground">
+                          {m.batPos != null ? `#${m.batPos}` : "—"}
                         </TableCell>
                         <TableCell className="text-right">
                           {m.batRuns ?? "—"}
@@ -769,6 +794,22 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
 
               {/* Venue Stats */}
               <TabsContent value="venues">
+                {tour && (
+                  <div className="mb-2 text-xs text-muted-foreground">
+                    Showing only this tour&apos;s venues.
+                  </div>
+                )}
+                {data.venueStats.length === 0 ? (
+                  <div className="py-8 text-center text-sm text-muted-foreground">
+                    {tour
+                      ? "No matches at this tour's venues."
+                      : "No venue data available."}
+                  </div>
+                ) : (
+                <>
+                <p className="mb-1 text-[11px] text-muted-foreground sm:hidden">
+                  Swipe the table sideways for more columns →
+                </p>
                 <Table className="min-w-[520px]">
                   <TableHeader>
                     <TableRow>
@@ -820,10 +861,15 @@ export function PlayerDetailModal({ playerId, onClose, riskNote, poolId, playerS
                     ))}
                   </TableBody>
                 </Table>
+                </>
+                )}
               </TabsContent>
 
               {/* Opposition Stats */}
               <TabsContent value="opposition">
+                <p className="mb-1 text-[11px] text-muted-foreground sm:hidden">
+                  Swipe the table sideways for more columns →
+                </p>
                 <Table className="min-w-[520px]">
                   <TableHeader>
                     <TableRow>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sqlite } from "@/db";
+import { sqlite, withTransaction } from "@/db";
 import { SEARCH_ALIASES } from "@/lib/squads/womens-t20-wc-2026";
 
 /**
@@ -218,7 +218,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Match friend
-    const participants = sqlite
+    const participants = await sqlite
       .prepare(
         "SELECT id, name, short_name, remaining_purse FROM auction_participants WHERE auction_id = ?"
       )
@@ -242,7 +242,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Load pool
-    const poolPlayers = sqlite
+    const poolPlayers = await sqlite
       .prepare(
         `SELECT ap.id as pool_id, ap.player_id, p.name, ap.status, ap.sold_to_participant, ap.sold_price, ap.ipl_team
          FROM auction_pool ap
@@ -276,45 +276,56 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      // Undo if already sold
-      if (player.status === "SOLD" && player.sold_to_participant) {
-        const prevFriend = participants.find(
-          (p) => p.id === player.sold_to_participant
-        );
-        if (player.sold_price) {
-          sqlite
+      // One entry = one atomic unit: the optional refund/un-sell of a previous owner PLUS the new
+      // sale and its purse debit. Against Turso each statement is a separate network round-trip, so
+      // without this a drop mid-entry could refund the old owner without re-selling, or debit the
+      // new owner without recording the sale. Per-entry (not per-batch) so the existing
+      // results/errors-per-entry reporting still holds: earlier entries stay committed.
+      const prevFriend =
+        player.status === "SOLD" && player.sold_to_participant
+          ? participants.find((p) => p.id === player.sold_to_participant)
+          : undefined;
+      const undonePrice = player.status === "SOLD" ? player.sold_price : null;
+
+      await withTransaction(async (tx) => {
+        // Undo if already sold
+        if (player.status === "SOLD" && player.sold_to_participant) {
+          if (player.sold_price) {
+            await tx
+              .prepare(
+                "UPDATE auction_participants SET remaining_purse = remaining_purse + ? WHERE id = ?"
+              )
+              .run(player.sold_price, player.sold_to_participant);
+          }
+          await tx
             .prepare(
-              "UPDATE auction_participants SET remaining_purse = remaining_purse + ? WHERE id = ?"
+              `UPDATE auction_pool
+               SET status = 'AVAILABLE', sold_to_participant = NULL, sold_price = NULL, sold_at = NULL
+               WHERE auction_id = ? AND player_id = ?`
             )
-            .run(player.sold_price, player.sold_to_participant);
+            .run(auctionId, player.player_id);
         }
-        sqlite
+
+        // Sell
+        await tx
           .prepare(
             `UPDATE auction_pool
-             SET status = 'AVAILABLE', sold_to_participant = NULL, sold_price = NULL, sold_at = NULL
+             SET status = 'SOLD', sold_to_participant = ?, sold_price = ?, sold_at = ?
              WHERE auction_id = ? AND player_id = ?`
           )
-          .run(auctionId, player.player_id);
+          .run(friend.id, entry.price, now, auctionId, player.player_id);
 
-        results.push(
-          `(undid ${prevFriend?.name || "?"} @ ${player.sold_price})`
-        );
+        await tx
+          .prepare(
+            "UPDATE auction_participants SET remaining_purse = remaining_purse - ? WHERE id = ?"
+          )
+          .run(entry.price, friend.id);
+      });
+
+      // Reported only after the write actually committed.
+      if (prevFriend !== undefined || undonePrice !== null) {
+        results.push(`(undid ${prevFriend?.name || "?"} @ ${undonePrice})`);
       }
-
-      // Sell
-      sqlite
-        .prepare(
-          `UPDATE auction_pool
-           SET status = 'SOLD', sold_to_participant = ?, sold_price = ?, sold_at = ?
-           WHERE auction_id = ? AND player_id = ?`
-        )
-        .run(friend.id, entry.price, now, auctionId, player.player_id);
-
-      sqlite
-        .prepare(
-          "UPDATE auction_participants SET remaining_purse = remaining_purse - ? WHERE id = ?"
-        )
-        .run(entry.price, friend.id);
 
       // Update local state so next iteration sees correct status
       player.status = "SOLD";
@@ -327,7 +338,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get updated purse
-    const updatedFriend = sqlite
+    const updatedFriend = await sqlite
       .prepare("SELECT remaining_purse FROM auction_participants WHERE id = ?")
       .get(friend.id) as { remaining_purse: number };
 

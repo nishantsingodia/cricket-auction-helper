@@ -227,7 +227,7 @@ export function VenueDetailModal({
                     key={v.canonical}
                     type="button"
                     onClick={() => setSelected(v.canonical)}
-                    className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                    className={`inline-flex items-center text-xs px-2.5 py-2 min-h-[38px] sm:py-1 sm:min-h-0 rounded-full border transition-colors ${
                       isSel
                         ? "border-amber-400 bg-amber-400/15 font-semibold"
                         : "border-border hover:border-amber-400/60"

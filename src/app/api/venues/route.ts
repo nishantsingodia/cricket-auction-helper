@@ -18,7 +18,7 @@ import { canonicalVenue } from "@/lib/registry/venues";
 export async function GET(request: NextRequest) {
   try {
     const tour = request.nextUrl.searchParams.get("tour") ?? "";
-    const ctx = getTourVenueContext(tour);
+    const ctx = await getTourVenueContext(tour);
     if (!ctx) {
       return NextResponse.json({ error: "No venue model for this tour" }, { status: 404 });
     }
@@ -39,13 +39,14 @@ export async function GET(request: NextRequest) {
     // (2yr if >=15 matches, else 4yr) while this route printed its own ratio over 2020-onward, so
     // Warner Park displayed "Bat-friendly" next to a 0.85 ratio and a "<0.95 = bowl-friendly" note.
     // Venue no longer affects any price, so this is purely a reporting surface.
-    const { byGround: batIdx, median: batIdxMedian } = computeBatIndex(ctx.gender);
+    const { byGround: batIdx, median: batIdxMedian } = await computeBatIndex(ctx.gender);
 
-    const venues = ctx.venues.map((v) => {
+    // Each ground's stats are independent, so the per-venue query fan-out runs concurrently.
+    const venues = await Promise.all(ctx.venues.map(async (v) => {
       const vp = v.variants.map(() => "?").join(",");
 
       // 1) Character + aggregate behavior from ball-by-ball derived performances.
-      const agg = sqlite
+      const agg = await sqlite
         .prepare(
           `SELECT
              AVG(CASE WHEN p.role IN ('BAT','WK') THEN mp.fantasy_points END) AS bat_fp,
@@ -82,12 +83,12 @@ export async function GET(request: NextRequest) {
       // venues table's avg_run_rate column is actually AVG(fantasy_points) (misnamed in seed_venues.py)
       // and avg_second_innings_score is only hand-seeded for a few grounds — so we deliberately DON'T
       // surface either; the real scoring rate comes from the computed bowling economy below.
-      const inns = sqlite
+      const inns = await sqlite
         .prepare(`SELECT AVG(avg_first_innings_score) AS fis FROM venues WHERE name IN (${vp})`)
         .get(...v.variants) as { fis: number | null };
 
       // 3) Recent matches at the ground (aggregated per match) + its top fantasy performer.
-      const recentRows = sqlite
+      const recentRows = await sqlite
         .prepare(
           `SELECT mp.match_id AS match_id,
                   MAX(mp.match_date) AS date,
@@ -116,7 +117,7 @@ export async function GET(request: NextRequest) {
       let topByMatch: Record<string, { name: string; fp: number }> = {};
       if (recentRows.length) {
         const idPlaceholders = recentRows.map(() => "?").join(",");
-        const tops = sqlite
+        const tops = await sqlite
           .prepare(
             `SELECT match_id, name, fantasy_points FROM (
                SELECT mp.match_id AS match_id, p.name AS name, mp.fantasy_points AS fantasy_points,
@@ -138,7 +139,7 @@ export async function GET(request: NextRequest) {
       // cricsheet_id-keyed style map, then derive average (runs/wkt), strike rate (balls/wkt) and
       // economy (runs/over) per type. Coverage = share of wickets where the bowler's style is known
       // (reported so a partial map stays honest). bowl_wickets excludes run-outs (bowler credits only).
-      const wktRows = sqlite
+      const wktRows = await sqlite
         .prepare(
           `SELECT p.cricsheet_id AS cid,
                   p.bowl_style AS bowl_style,
@@ -238,12 +239,12 @@ export async function GET(request: NextRequest) {
           top: topByMatch[r.match_id] ?? null,
         })),
       };
-    });
+    }));
 
     // Tour-level bat vs bowl consensus — the SAME number shown on the auction header chip
     // (shared helper, scoped by the tour's format+gender), so the two never disagree.
     const scope = getTourStatScope(ctx.tour) ?? { formats: ctx.venueFormats, gender: ctx.gender };
-    const consensus = computeTourConsensus(scope);
+    const consensus = await computeTourConsensus(scope);
 
     return NextResponse.json({
       tour: ctx.tour,

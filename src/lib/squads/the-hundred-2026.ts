@@ -253,6 +253,8 @@ export const HUNDRED_WOMEN_2026: HundredTeam[] = [
       { name: "Alice Monaghan", role: "BOWL", overseas: false },
       { name: "Kalea Moore", role: "AR", overseas: false },
       { name: "Danielle Gregory", role: "BOWL", overseas: false },
+      { name: "Kate Coppack", role: "BOWL", overseas: false, note: "Vitality Wildcard pick" },
+      { name: "Francesca Sweet", role: "BAT", overseas: false, note: "Vitality Wildcard pick" },
     ],
   },
   {
@@ -272,6 +274,8 @@ export const HUNDRED_WOMEN_2026: HundredTeam[] = [
       { name: "Jo Gardner", role: "BAT", overseas: false },
       { name: "Rebecca Tyson", role: "BOWL", overseas: false },
       { name: "Natasha Wraith", role: "WK", overseas: false },
+      { name: "Beth Langston", role: "BOWL", overseas: false, note: "Vitality Wildcard pick" },
+      { name: "Mia Rogers", role: "WK", overseas: false, note: "Vitality Wildcard pick" },
     ],
   },
   {
@@ -291,6 +295,8 @@ export const HUNDRED_WOMEN_2026: HundredTeam[] = [
       { name: "Katie Jones", role: "BAT", overseas: false, note: "Injury replacement for Maddie Ward (single-source, M-confidence)" },
       { name: "Emily Windsor", role: "BAT", overseas: false, note: "Injury replacement for Florence Miller (single-source, M-confidence)" },
       { name: "Claudie Cooper", role: "AR", overseas: false },
+      { name: "Darcey Carter", role: "AR", overseas: false, note: "Vitality Wildcard pick (Scotland — local slot)" },
+      { name: "Sophia Turner", role: "BOWL", overseas: false, note: "Vitality Wildcard pick" },
     ],
   },
   {
@@ -311,6 +317,7 @@ export const HUNDRED_WOMEN_2026: HundredTeam[] = [
       { name: "Jemima Spence", role: "BAT", overseas: false },
       { name: "Esmae MacGregor", role: "AR", overseas: false },
       { name: "Phoebe Brett", role: "WK", overseas: false },
+      { name: "Mary Taylor", role: "AR", overseas: false, note: "Vitality Wildcard pick (Warwickshire)" },
     ],
   },
   {
@@ -330,6 +337,8 @@ export const HUNDRED_WOMEN_2026: HundredTeam[] = [
       { name: "Seren Smale", role: "WK", overseas: false },
       { name: "Hannah Rainey", role: "BOWL", overseas: false, note: "Injury replacement for Phoebe Turner (single-source, M-confidence)" },
       { name: "Josephine Groves", role: "AR", overseas: false },
+      { name: "Liv Barnes", role: "BOWL", overseas: false, note: "Vitality Wildcard pick" },
+      { name: "Trudy Johnson", role: "BOWL", overseas: false, note: "Vitality Wildcard pick" },
     ],
   },
   {
@@ -344,11 +353,12 @@ export const HUNDRED_WOMEN_2026: HundredTeam[] = [
       { name: "Bess Heath", role: "WK", overseas: false },
       { name: "Katie Levick", role: "BOWL", overseas: false },
       { name: "Samantha Bates", role: "BOWL", overseas: true },
-      { name: "Emma Jones", role: "BOWL", overseas: false },
-      { name: "Millicent Taylor", role: "AR", overseas: false },
+      { name: "Eve Jones", role: "BAT", overseas: false, note: "Vitality Wildcard pick (Lancashire batter; cricsheet 'E Jones' — was mislabelled 'Emma Jones')" },
+      { name: "Millicent Taylor", role: "BOWL", overseas: false, note: "Millie, left-arm spin (cricsheet 'MSL Taylor')" },
       { name: "Sophie Luff", role: "BAT", overseas: false, note: "Injury replacement for Ailsa Lister" },
       { name: "Georgia Adams", role: "AR", overseas: false },
       { name: "Charley Phillips", role: "WK", overseas: false },
+      { name: "Amu Surenkumar", role: "AR", overseas: false, note: "Vitality Wildcard pick (Warwickshire)" },
     ],
   },
   {
@@ -368,6 +378,7 @@ export const HUNDRED_WOMEN_2026: HundredTeam[] = [
       { name: "Ellie Anderson", role: "BOWL", overseas: false },
       { name: "Naomi Dattani", role: "AR", overseas: false },
       { name: "Rebecca Odgers", role: "WK", overseas: false },
+      { name: "Katherine Fraser", role: "AR", overseas: false, note: "Vitality Wildcard pick (Scotland — local slot)" },
     ],
   },
   {
@@ -387,6 +398,8 @@ export const HUNDRED_WOMEN_2026: HundredTeam[] = [
       { name: "Abi Norgrove", role: "BAT", overseas: false },
       { name: "Rhianna Southby", role: "WK", overseas: false },
       { name: "Grace Thompson", role: "AR", overseas: false },
+      { name: "Georgia Davis", role: "BOWL", overseas: false, note: "Vitality Wildcard pick" },
+      { name: "Niamh Holland", role: "BAT", overseas: false, note: "Vitality Wildcard pick" },
     ],
   },
 ];
@@ -420,4 +433,27 @@ export const HUNDRED_NAME_ALIASES: Record<string, string> = {
   "jamie smith": "JL Smith",
   "leus du plooy": "JL du Plooy",
   "matthew fisher": "MD Fisher",
+  // Women's domestic players who otherwise fuzzy-STEAL a famous namesake (surname + first-initial
+  // collide). Anchored to their exact cricsheet spellings; records exist via the Women's Blast ingest.
+  "samantha bates": "SL Bates",     // NOT Suzie Bates (SW Bates, NZ)
+  "claudie cooper": "CAR Cooper",   // NOT B Cooper (WI)
+  "charley phillips": "CN Phillips", // NOT Sunjidmaa Phillips
+  "grace thompson": "GJ Thompson",  // NOT KC Thompson (UAE)
+  // Vitality Wildcard picks (added 2026-07-19) — anchored to exact cricsheet spellings.
+  "mary taylor": "MLL Taylor",       // Warwickshire (NOT Millie Taylor = MSL, left-arm spin)
+  "millicent taylor": "MSL Taylor",  // Millie, left-arm spin (NOT Mary = MLL, RA fast)
+  "olivia barnes": "OJ Barnes",
+  "liv barnes": "OJ Barnes",
+  "trudy johnson": "T Johnson",
+  "beth langston": "BA Langston",
+  "mia rogers": "M Rogers",
+  "kate coppack": "KL Coppack",
+  "francesca sweet": "F Sweet",
+  "katherine fraser": "K Fraser",    // Scotland (NOT CS Fraser, WI)
+  "darcey carter": "DEM Carter",     // Scotland
+  "sophia turner": "S Turner",
+  "amu surenkumar": "A Surenkumar",
+  "georgia davis": "GK Davis",
+  "niamh holland": "N Holland",
+  "eve jones": "E Jones",            // Lancashire batter (was mislabelled "Emma Jones" in the seed)
 };

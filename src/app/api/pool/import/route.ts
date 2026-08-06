@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sqlite } from "@/db";
+import { sqlite, withTransaction } from "@/db";
 import { normalizeName } from "@/lib/scrapers/ipl-squads";
 
 interface ImportPlayer {
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const auction = sqlite
+    const auction = await sqlite
       .prepare("SELECT id, tournament_id FROM auctions WHERE id = ?")
       .get(auctionId) as { id: number; tournament_id: number | null } | undefined;
 
@@ -36,20 +36,20 @@ export async function POST(request: NextRequest) {
 
     let tournamentId = auction.tournament_id;
     if (!tournamentId) {
-      const result = sqlite
+      const result = await sqlite
         .prepare(
           `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size)
            VALUES ('IPL 2026', 'IPL', 'T20', 120, 25)`
         )
         .run();
       tournamentId = Number(result.lastInsertRowid);
-      sqlite
+      await sqlite
         .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
         .run(tournamentId, auctionId);
     }
 
     // Build name→id lookup
-    const existingPlayers = sqlite
+    const existingPlayers = await sqlite
       .prepare("SELECT id, name FROM players")
       .all() as { id: number; name: string }[];
     const nameMap = new Map<string, number>();
@@ -61,30 +61,30 @@ export async function POST(request: NextRequest) {
     let matched = 0;
     let created = 0;
 
-    const insertPlayer = sqlite.prepare(
-      `INSERT INTO players (name, country, role, is_overseas) VALUES (?, ?, ?, ?)`
-    );
-    const insertPool = sqlite.prepare(
-      `INSERT OR IGNORE INTO auction_pool
+    await withTransaction(async (tx) => {
+      const insertPlayer = tx.prepare(
+        `INSERT INTO players (name, country, role, is_overseas) VALUES (?, ?, ?, ?)`
+      );
+      const insertPool = tx.prepare(
+        `INSERT OR IGNORE INTO auction_pool
        (tournament_id, player_id, base_price, status, auction_id, ipl_team, squad_number, efppm)
        VALUES (?, ?, ?, 'AVAILABLE', ?, ?, ?, ?)`
-    );
-    const getEfppm = sqlite.prepare(
-      `SELECT avg_fantasy_points FROM career_stats
+      );
+      const getEfppm = tx.prepare(
+        `SELECT avg_fantasy_points FROM career_stats
        WHERE player_id = ? AND format IN ('IPL', 'T20')
        ORDER BY CASE format WHEN 'IPL' THEN 1 WHEN 'T20' THEN 2 END
        LIMIT 1`
-    );
+      );
 
-    const transaction = sqlite.transaction((data: ImportPlayer[]) => {
-      for (const p of data) {
+      for (const p of importPlayers) {
         const normalized = normalizeName(p.name);
         let playerId = nameMap.get(normalized) ?? null;
 
         if (playerId) {
           matched++;
         } else {
-          const result = insertPlayer.run(
+          const result = await insertPlayer.run(
             p.name,
             p.country || "IND",
             p.role || "BAT",
@@ -95,11 +95,11 @@ export async function POST(request: NextRequest) {
           created++;
         }
 
-        const efppmRow = getEfppm.get(playerId) as {
+        const efppmRow = (await getEfppm.get(playerId)) as {
           avg_fantasy_points: number;
         } | undefined;
 
-        insertPool.run(
+        await insertPool.run(
           tournamentId,
           playerId,
           p.price || 0,
@@ -111,8 +111,6 @@ export async function POST(request: NextRequest) {
         imported++;
       }
     });
-
-    transaction(importPlayers);
 
     return NextResponse.json({ success: true, imported, matched, created });
   } catch (err) {

@@ -22,6 +22,8 @@ FOLDER_FORMAT = {
     "bbl": "BBL", "blast": "BLAST", "psl": "PSL",
     "sa20": "SA20", "ilt20": "ILT20", "cpl": "CPL",
     "wbbl": "WBBL",  # Women's Big Bash League (women-only 20-over; T20 scorer)
+    "wblast": "BLAST",  # Vitality Blast Women (women's English domestic T20 — reuse BLAST code so it's
+    #                     T20-scored + already excluded from EFPPM; women's rows gendered by player)
 }
 
 # ==================== DREAM11 T20 FANTASY POINTS ====================
@@ -681,7 +683,7 @@ def process_all_matches(conn: sqlite3.Connection):
 
     # Gather all JSON files
     json_files = []
-    for folder in ["ipl", "t20i", "wpl", "mlc", "hundred", "odi", "lpl", "bbl", "blast", "psl", "sa20", "ilt20", "cpl", "wbbl"]:
+    for folder in ["ipl", "t20i", "wpl", "mlc", "hundred", "odi", "lpl", "bbl", "blast", "psl", "sa20", "ilt20", "cpl", "wbbl", "wblast"]:
         folder_path = os.path.join(RAW_DIR, folder)
         if os.path.isdir(folder_path):
             files = glob.glob(os.path.join(folder_path, "*.json"))

@@ -153,11 +153,11 @@ export interface TourVenueContext {
 }
 
 // Decorates each venue with its Bat Index (reporting only — it never affects a price).
-function withBatIndex(
+async function withBatIndex(
   venues: TourVenue[],
   gender: "male" | "female"
-): { venues: TourVenue[]; batIndexMedian: number } {
-  const { byGround, median } = computeBatIndex(gender);
+): Promise<{ venues: TourVenue[]; batIndexMedian: number }> {
+  const { byGround, median } = await computeBatIndex(gender);
   return {
     median,
     batIndexMedian: median,
@@ -183,7 +183,7 @@ function withBatIndex(
 }
 
 // Returns the venue context for a tour name, or null if the tour has no home/venue model here yet.
-export function getTourVenueContext(tournamentName: string): TourVenueContext | null {
+export async function getTourVenueContext(tournamentName: string): Promise<TourVenueContext | null> {
   const isHundredMen = tournamentName === THE_HUNDRED_MEN_2026_NAME;
   const isHundredWomen = tournamentName === THE_HUNDRED_WOMEN_2026_NAME;
   const isLpl = tournamentName === LPL_2026_NAME;
@@ -208,7 +208,7 @@ export function getTourVenueContext(tournamentName: string): TourVenueContext | 
       gender: isHundredMen ? "male" : "female",
       venueFormats: ["HUN", "T20"],
       venueWindowMonths: 30,
-      ...(() => { const d = withBatIndex(HUNDRED_VENUES.map((v) => ({ canonical: v.canonical, variants: v.variants, type: v.type })), isHundredWomen ? "female" : "male"); return { venues: d.venues, batIndexMedian: d.batIndexMedian }; })(),
+      ...(await (async () => { const d = await withBatIndex(HUNDRED_VENUES.map((v) => ({ canonical: v.canonical, variants: v.variants, type: v.type })), isHundredWomen ? "female" : "male"); return { venues: d.venues, batIndexMedian: d.batIndexMedian }; })()),
       teamSchedule,
       homeOf,
     };
@@ -224,7 +224,7 @@ export function getTourVenueContext(tournamentName: string): TourVenueContext | 
       venueFormats: ["LPL", "T20"],
       venueWindowMonths: 60,
       // Only the 3 league grounds carry a per-team schedule; Premadasa is a playoffs-only venue.
-      ...(() => { const d = withBatIndex(LPL_VENUES.map((v) => ({ canonical: v.canonical, variants: v.variants, type: v.type })), "male"); return { venues: d.venues, batIndexMedian: d.batIndexMedian }; })(),
+      ...(await (async () => { const d = await withBatIndex(LPL_VENUES.map((v) => ({ canonical: v.canonical, variants: v.variants, type: v.type })), "male"); return { venues: d.venues, batIndexMedian: d.batIndexMedian }; })()),
       teamSchedule: LPL_TEAM_SCHEDULE,
       homeOf,
     };
@@ -248,7 +248,7 @@ export function getTourVenueContext(tournamentName: string): TourVenueContext | 
       gender: "male",
       venueFormats: ["CPL", "T20"],
       venueWindowMonths: 60,
-      ...(() => { const d = withBatIndex(CPL_VENUES.map((v) => ({ canonical: v.canonical, variants: v.variants, type: v.type })), "male"); return { venues: d.venues, batIndexMedian: d.batIndexMedian }; })(),
+      ...(await (async () => { const d = await withBatIndex(CPL_VENUES.map((v) => ({ canonical: v.canonical, variants: v.variants, type: v.type })), "male"); return { venues: d.venues, batIndexMedian: d.batIndexMedian }; })()),
       // Mirror the engine: honour CPL_VENUE_BASIS so the header chip never disagrees with valuations.
       teamSchedule:
         CPL_VENUE_BASIS === "tournament"

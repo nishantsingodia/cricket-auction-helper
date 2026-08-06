@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, sqlite } from "@/db";
+import { db, sqlite, withTransaction } from "@/db";
 import { auctionPool, players } from "@/db/schema";
 import {
   fetchAllIPLSquads,
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Look up the auction so we can branch the pool source on its tournament.
-    const auctionRow = sqlite
+    const auctionRow = await sqlite
       .prepare("SELECT id, tournament_id, tournament_name FROM auctions WHERE id = ?")
       .get(auctionId) as
       | { id: number; tournament_id: number | null; tournament_name: string }
@@ -75,14 +75,14 @@ export async function POST(request: NextRequest) {
     if (auctionRow.tournament_name === WOMENS_T20_WC_2026_NAME) {
       let tournamentId = auctionRow.tournament_id;
       if (!tournamentId) {
-        const t = sqlite
+        const t = await sqlite
           .prepare(
             `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size)
              VALUES (?, 'CUSTOM', 'T20', 120, 25)`
           )
           .run(WOMENS_T20_WC_2026_NAME);
         tournamentId = Number(t.lastInsertRowid);
-        sqlite
+        await sqlite
           .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
           .run(tournamentId, auctionId);
       }
@@ -94,14 +94,14 @@ export async function POST(request: NextRequest) {
         ? WOMENS_T20_WC_2026.filter((t) => teamsFilter.includes(t.short))
         : undefined;
 
-      const built = buildWomensWCPool(sqlite, {
+      const built = await buildWomensWCPool(sqlite, {
         auctionId,
         tournamentId,
         teams,
       });
 
       if (isFirstBuild)
-        carryOverPreviousLineups({
+        await carryOverPreviousLineups({
           tournamentName: auctionRow.tournament_name,
           tournamentId,
           auctionId,
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
       // Auto-run valuation so prices are never left empty after a pool build.
       // Re-valuing only writes val_expected/efppm — never sold rows or purses —
       // so this is safe even when teams are added to a live auction.
-      initializeValuations(tournamentId);
+      await initializeValuations(tournamentId);
 
       return NextResponse.json({
         success: true,
@@ -127,14 +127,14 @@ export async function POST(request: NextRequest) {
     if (auctionRow.tournament_name === MLC_2026_NAME) {
       let tournamentId = auctionRow.tournament_id;
       if (!tournamentId) {
-        const t = sqlite
+        const t = await sqlite
           .prepare(
             `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size)
              VALUES (?, 'CUSTOM', 'T20', 100, 18)`
           )
           .run(MLC_2026_NAME);
         tournamentId = Number(t.lastInsertRowid);
-        sqlite
+        await sqlite
           .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
           .run(tournamentId, auctionId);
       }
@@ -143,14 +143,14 @@ export async function POST(request: NextRequest) {
         ? MLC_2026.filter((t) => teamsFilter.includes(t.short))
         : undefined;
 
-      const built = buildMLCPool(sqlite, { auctionId, tournamentId, teams });
+      const built = await buildMLCPool(sqlite, { auctionId, tournamentId, teams });
       if (isFirstBuild)
-        carryOverPreviousLineups({
+        await carryOverPreviousLineups({
           tournamentName: auctionRow.tournament_name,
           tournamentId,
           auctionId,
         });
-      initializeValuations(tournamentId);
+      await initializeValuations(tournamentId);
 
       return NextResponse.json({
         success: true,
@@ -167,14 +167,14 @@ export async function POST(request: NextRequest) {
     if (auctionRow.tournament_name === IND_VS_ENG_T20_2026_NAME) {
       let tournamentId = auctionRow.tournament_id;
       if (!tournamentId) {
-        const t = sqlite
+        const t = await sqlite
           .prepare(
             `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size)
              VALUES (?, 'BILATERAL', 'T20', 100, 17)`
           )
           .run(IND_VS_ENG_T20_2026_NAME);
         tournamentId = Number(t.lastInsertRowid);
-        sqlite
+        await sqlite
           .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
           .run(tournamentId, auctionId);
       }
@@ -183,14 +183,14 @@ export async function POST(request: NextRequest) {
         ? IND_VS_ENG_T20_2026.filter((t) => teamsFilter.includes(t.short))
         : undefined;
 
-      const built = buildBilateralT20Pool(sqlite, { auctionId, tournamentId, teams });
+      const built = await buildBilateralT20Pool(sqlite, { auctionId, tournamentId, teams });
       if (isFirstBuild)
-        carryOverPreviousLineups({
+        await carryOverPreviousLineups({
           tournamentName: auctionRow.tournament_name,
           tournamentId,
           auctionId,
         });
-      initializeValuations(tournamentId);
+      await initializeValuations(tournamentId);
 
       return NextResponse.json({
         success: true,
@@ -207,14 +207,14 @@ export async function POST(request: NextRequest) {
     if (auctionRow.tournament_name === IRE_VS_WI_W_ODI_2026_NAME) {
       let tournamentId = auctionRow.tournament_id;
       if (!tournamentId) {
-        const t = sqlite
+        const t = await sqlite
           .prepare(
             `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size)
              VALUES (?, 'BILATERAL', 'ODI', 100, 14)`
           )
           .run(IRE_VS_WI_W_ODI_2026_NAME);
         tournamentId = Number(t.lastInsertRowid);
-        sqlite
+        await sqlite
           .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
           .run(tournamentId, auctionId);
       }
@@ -223,14 +223,14 @@ export async function POST(request: NextRequest) {
         ? IRE_VS_WI_W_ODI_2026.filter((t) => teamsFilter.includes(t.short))
         : undefined;
 
-      const built = buildWomensOdiPool(sqlite, { auctionId, tournamentId, teams });
+      const built = await buildWomensOdiPool(sqlite, { auctionId, tournamentId, teams });
       if (isFirstBuild)
-        carryOverPreviousLineups({
+        await carryOverPreviousLineups({
           tournamentName: auctionRow.tournament_name,
           tournamentId,
           auctionId,
         });
-      initializeValuations(tournamentId);
+      await initializeValuations(tournamentId);
 
       return NextResponse.json({
         success: true,
@@ -247,14 +247,14 @@ export async function POST(request: NextRequest) {
     if (auctionRow.tournament_name === NZ_VS_WI_MEN_ODI_2026_NAME) {
       let tournamentId = auctionRow.tournament_id;
       if (!tournamentId) {
-        const t = sqlite
+        const t = await sqlite
           .prepare(
             `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size)
              VALUES (?, 'BILATERAL', 'ODI', 100, 16)`
           )
           .run(NZ_VS_WI_MEN_ODI_2026_NAME);
         tournamentId = Number(t.lastInsertRowid);
-        sqlite
+        await sqlite
           .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
           .run(tournamentId, auctionId);
       }
@@ -263,14 +263,14 @@ export async function POST(request: NextRequest) {
         ? NZ_VS_WI_MEN_ODI_2026.filter((t) => teamsFilter.includes(t.short))
         : undefined;
 
-      const built = buildMensOdiPool(sqlite, { auctionId, tournamentId, teams });
+      const built = await buildMensOdiPool(sqlite, { auctionId, tournamentId, teams });
       if (isFirstBuild)
-        carryOverPreviousLineups({
+        await carryOverPreviousLineups({
           tournamentName: auctionRow.tournament_name,
           tournamentId,
           auctionId,
         });
-      initializeValuations(tournamentId);
+      await initializeValuations(tournamentId);
 
       return NextResponse.json({
         success: true,
@@ -291,14 +291,14 @@ export async function POST(request: NextRequest) {
       const isWomen = auctionRow.tournament_name === THE_HUNDRED_WOMEN_2026_NAME;
       let tournamentId = auctionRow.tournament_id;
       if (!tournamentId) {
-        const t = sqlite
+        const t = await sqlite
           .prepare(
             `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size)
              VALUES (?, 'CUSTOM', 'T20', 100, 16)`
           )
           .run(auctionRow.tournament_name);
         tournamentId = Number(t.lastInsertRowid);
-        sqlite
+        await sqlite
           .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
           .run(tournamentId, auctionId);
       }
@@ -308,19 +308,19 @@ export async function POST(request: NextRequest) {
         ? allTeams.filter((t) => teamsFilter.includes(t.short))
         : undefined;
 
-      const built = buildHundredPool(sqlite, {
+      const built = await buildHundredPool(sqlite, {
         auctionId,
         tournamentId,
         gender: isWomen ? "female" : "male",
         teams,
       });
       if (isFirstBuild)
-        carryOverPreviousLineups({
+        await carryOverPreviousLineups({
           tournamentName: auctionRow.tournament_name,
           tournamentId,
           auctionId,
         });
-      initializeValuations(tournamentId);
+      await initializeValuations(tournamentId);
 
       return NextResponse.json({
         success: true,
@@ -337,14 +337,14 @@ export async function POST(request: NextRequest) {
     if (auctionRow.tournament_name === LPL_2026_NAME) {
       let tournamentId = auctionRow.tournament_id;
       if (!tournamentId) {
-        const t = sqlite
+        const t = await sqlite
           .prepare(
             `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size, max_overseas)
              VALUES (?, 'CUSTOM', 'T20', 100, 18, 4)`
           )
           .run(LPL_2026_NAME);
         tournamentId = Number(t.lastInsertRowid);
-        sqlite
+        await sqlite
           .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
           .run(tournamentId, auctionId);
       }
@@ -353,14 +353,14 @@ export async function POST(request: NextRequest) {
         ? LPL_2026.filter((t) => teamsFilter.includes(t.short))
         : undefined;
 
-      const built = buildLPLPool(sqlite, { auctionId, tournamentId, teams });
+      const built = await buildLPLPool(sqlite, { auctionId, tournamentId, teams });
       if (isFirstBuild)
-        carryOverPreviousLineups({
+        await carryOverPreviousLineups({
           tournamentName: auctionRow.tournament_name,
           tournamentId,
           auctionId,
         });
-      initializeValuations(tournamentId);
+      await initializeValuations(tournamentId);
 
       return NextResponse.json({
         success: true,
@@ -377,7 +377,7 @@ export async function POST(request: NextRequest) {
     if (auctionRow.tournament_name === CPL_2026_NAME) {
       let tournamentId = auctionRow.tournament_id;
       if (!tournamentId) {
-        const t = sqlite
+        const t = await sqlite
           .prepare(
             // 7 franchises, squads of 17–19 (JAM carry 19), CPL caps the XI at 4 overseas.
             `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size, max_overseas)
@@ -385,7 +385,7 @@ export async function POST(request: NextRequest) {
           )
           .run(CPL_2026_NAME);
         tournamentId = Number(t.lastInsertRowid);
-        sqlite
+        await sqlite
           .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
           .run(tournamentId, auctionId);
       }
@@ -394,14 +394,14 @@ export async function POST(request: NextRequest) {
         ? CPL_2026.filter((t) => teamsFilter.includes(t.short))
         : undefined;
 
-      const built = buildCPLPool(sqlite, { auctionId, tournamentId, teams });
+      const built = await buildCPLPool(sqlite, { auctionId, tournamentId, teams });
       if (isFirstBuild)
-        carryOverPreviousLineups({
+        await carryOverPreviousLineups({
           tournamentName: auctionRow.tournament_name,
           tournamentId,
           auctionId,
         });
-      initializeValuations(tournamentId);
+      await initializeValuations(tournamentId);
 
       return NextResponse.json({
         success: true,
@@ -419,7 +419,7 @@ export async function POST(request: NextRequest) {
     const teams = await fetchAllIPLSquads();
 
     // Get all existing players for fuzzy matching
-    const existingPlayers = db
+    const existingPlayers = await db
       .select({ id: players.id, name: players.name })
       .from(players)
       .all();
@@ -433,14 +433,14 @@ export async function POST(request: NextRequest) {
     // Use or create a tournament for this auction
     let tournamentId = auctionRow.tournament_id;
     if (!tournamentId) {
-      const result = sqlite
+      const result = await sqlite
         .prepare(
           `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size)
            VALUES ('IPL 2026', 'IPL', 'T20', 120, 25)`
         )
         .run();
       tournamentId = Number(result.lastInsertRowid);
-      sqlite
+      await sqlite
         .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
         .run(tournamentId, auctionId);
     }
@@ -449,81 +449,78 @@ export async function POST(request: NextRequest) {
     let matched = 0;
     let created = 0;
 
-    const insertPool = sqlite.prepare(
-      `INSERT OR IGNORE INTO auction_pool
+    await withTransaction(async (tx) => {
+      const insertPool = tx.prepare(
+        `INSERT OR IGNORE INTO auction_pool
        (tournament_id, player_id, base_price, status, auction_id, ipl_team, squad_number, efppm)
        VALUES (?, ?, ?, 'AVAILABLE', ?, ?, ?, ?)`
-    );
+      );
 
-    const insertPlayer = sqlite.prepare(
-      `INSERT INTO players (name, country, role, is_overseas)
+      const insertPlayer = tx.prepare(
+        `INSERT INTO players (name, country, role, is_overseas)
        VALUES (?, ?, ?, ?)`
-    );
+      );
 
-    // Get EFPPM from career stats
-    const getEfppm = sqlite.prepare(
-      `SELECT avg_fantasy_points FROM career_stats
+      // Get EFPPM from career stats
+      const getEfppm = tx.prepare(
+        `SELECT avg_fantasy_points FROM career_stats
        WHERE player_id = ? AND format IN ('IPL', 'T20')
        ORDER BY CASE format WHEN 'IPL' THEN 1 WHEN 'T20' THEN 2 END
        LIMIT 1`
-    );
+      );
 
-    const transaction = sqlite.transaction(
-      (teamsData: ScrapedTeam[]) => {
-        for (const team of teamsData) {
-          for (const player of team.players) {
-            totalPlayers++;
+      const teamsData: ScrapedTeam[] = teams;
+      for (const team of teamsData) {
+        for (const player of team.players) {
+          totalPlayers++;
 
-            // Try to match player to existing DB
-            let playerId = findPlayerId(player, nameMap);
+          // Try to match player to existing DB
+          let playerId = findPlayerId(player, nameMap);
 
-            if (playerId) {
-              matched++;
-            } else {
-              // Create new player
-              const result = insertPlayer.run(
-                player.name,
-                player.country,
-                player.role,
-                player.isOverseas ? 1 : 0
-              );
-              playerId = Number(result.lastInsertRowid);
-              nameMap.set(normalizeName(player.name), playerId);
-              created++;
-            }
-
-            // Get EFPPM from career stats
-            const efppmRow = getEfppm.get(playerId) as {
-              avg_fantasy_points: number;
-            } | undefined;
-            const efppm = efppmRow?.avg_fantasy_points || 0;
-
-            // Insert into auction pool
-            insertPool.run(
-              tournamentId,
-              playerId,
-              player.price || 0,
-              auctionId,
-              team.team,
-              player.squadNumber,
-              efppm
+          if (playerId) {
+            matched++;
+          } else {
+            // Create new player
+            const result = await insertPlayer.run(
+              player.name,
+              player.country,
+              player.role,
+              player.isOverseas ? 1 : 0
             );
+            playerId = Number(result.lastInsertRowid);
+            nameMap.set(normalizeName(player.name), playerId);
+            created++;
           }
+
+          // Get EFPPM from career stats
+          const efppmRow = (await getEfppm.get(playerId)) as {
+            avg_fantasy_points: number;
+          } | undefined;
+          const efppm = efppmRow?.avg_fantasy_points || 0;
+
+          // Insert into auction pool
+          await insertPool.run(
+            tournamentId,
+            playerId,
+            player.price || 0,
+            auctionId,
+            team.team,
+            player.squadNumber,
+            efppm
+          );
         }
       }
-    );
-
-    transaction(teams);
+    });
 
     if (isFirstBuild)
-      carryOverPreviousLineups({
+      await carryOverPreviousLineups({
         tournamentName: auctionRow.tournament_name,
         tournamentId,
         auctionId,
       });
 
     // Auto-run valuation so prices are never left empty after a pool build.
-    initializeValuations(tournamentId);
+    await initializeValuations(tournamentId);
 
     return NextResponse.json({
       success: true,
@@ -592,14 +589,14 @@ function findPlayerId(
  * "Previous" = the most recent EARLIER auction of the same tournament_name that
  * has a pool built, so each new auction inherits the latest accumulated edits.
  */
-function carryOverPreviousLineups(opts: {
+async function carryOverPreviousLineups(opts: {
   tournamentName: string;
   tournamentId: number;
   auctionId: number;
-}): { sourceAuctionId: number | null; updated: number } {
+}): Promise<{ sourceAuctionId: number | null; updated: number }> {
   const { tournamentName, tournamentId, auctionId } = opts;
 
-  const prev = sqlite
+  const prev = await sqlite
     .prepare(
       `SELECT a.id AS auction_id, a.tournament_id AS tournament_id
          FROM auctions a
@@ -618,7 +615,7 @@ function carryOverPreviousLineups(opts: {
 
   if (!prev) return { sourceAuctionId: null, updated: 0 };
 
-  const res = sqlite
+  const res = await sqlite
     .prepare(
       `UPDATE auction_pool
           SET squad_number = (

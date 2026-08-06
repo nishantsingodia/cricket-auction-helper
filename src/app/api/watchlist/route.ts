@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const items = sqlite
+  const items = await sqlite
     .prepare("SELECT * FROM watchlist WHERE auction_id = ?")
     .all(Number(auctionId));
 
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    sqlite
+    await sqlite
       .prepare(
         `INSERT OR REPLACE INTO watchlist (auction_id, player_id, color, priority, notes)
          VALUES (?, ?, ?, ?, ?)`
@@ -54,7 +54,7 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
-  sqlite
+  await sqlite
     .prepare("DELETE FROM watchlist WHERE auction_id = ? AND player_id = ?")
     .run(Number(auctionId), Number(playerId));
 

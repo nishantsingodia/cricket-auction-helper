@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "tournamentId required" }, { status: 400 });
   }
 
-  initializeValuations(tournamentId);
+  await initializeValuations(tournamentId);
 
   return NextResponse.json({ success: true });
 }

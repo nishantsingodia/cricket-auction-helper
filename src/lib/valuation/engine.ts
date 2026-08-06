@@ -1,4 +1,4 @@
-import { sqlite } from "@/db";
+import { sqlite, withTransaction } from "@/db";
 import {
   WOMENS_T20_WC_2026_NAME,
   WC_TEAM_TIERS,
@@ -167,12 +167,12 @@ const HUNDRED_NORM_MIN_N = 20; // per role & format: min performances to trust t
 const HUNDRED_NORM_MIN_FACTOR = 0.6; // clamp band — guards against a data glitch
 const HUNDRED_NORM_MAX_FACTOR = 1.15;
 
-function computeHundredRoleNorm(
+async function computeHundredRoleNorm(
   gender: "male" | "female"
-): Record<HundredRole, number> {
+): Promise<Record<HundredRole, number>> {
   const variants = HUNDRED_VENUES.flatMap((v) => v.variants);
   const ph = variants.map(() => "?").join(",");
-  const rows = sqlite
+  const rows = await sqlite
     .prepare(
       `SELECT mp.format AS fmt, p.role AS role, mp.fantasy_points AS fp
        FROM match_performances mp JOIN players p ON p.id = mp.player_id
@@ -212,18 +212,18 @@ function computeHundredRoleNorm(
 
 // ==================== MAIN VALUATION ====================
 
-export function recalculateValuations(
+export async function recalculateValuations(
   tournamentId: number | string,
   auctionId?: number | string
 ) {
   // --- Auction config ---
   const auctionQuery = auctionId
-    ? sqlite
+    ? await sqlite
         .prepare(
           "SELECT purse_per_friend, num_friends, players_per_friend, num_captains, num_vice_captains, changes_allowed FROM auctions WHERE id = ?"
         )
         .get(auctionId)
-    : sqlite
+    : await sqlite
         .prepare(
           "SELECT purse_per_friend, num_friends, players_per_friend, num_captains, num_vice_captains, changes_allowed FROM auctions WHERE tournament_id = ? LIMIT 1"
         )
@@ -241,7 +241,7 @@ export function recalculateValuations(
 
   // Detect tournament type — the Women's T20 WC uses a different
   // expected-matches model (WC fixtures, not the 14-game IPL league).
-  const tournamentRow = sqlite
+  const tournamentRow = await sqlite
     .prepare("SELECT name FROM tournaments WHERE id = ?")
     .get(tournamentId) as { name: string } | undefined;
   const isWomensWC = tournamentRow?.name === WOMENS_T20_WC_2026_NAME;
@@ -335,7 +335,7 @@ export function recalculateValuations(
   const topN = numFriends * playersPerFriend;
 
   // --- Pool ---
-  const pool = sqlite
+  const pool = await sqlite
     .prepare(
       `SELECT ap.id, ap.player_id, ap.status, ap.squad_number, ap.ipl_team, p.role, p.name AS name, COALESCE(ap.price_manual, 0) as price_manual, COALESCE(ap.efppm, 0) as efppm, COALESCE(ap.sold_price, 0) as sold_price
        FROM auction_pool ap
@@ -370,7 +370,7 @@ export function recalculateValuations(
   // --- Batch Query: Score 1 sources ---
 
   // A: Last 15 quality T20 matches per player
-  const last15Rows = sqlite
+  const last15Rows = await sqlite
     .prepare(
       `SELECT player_id, AVG(fantasy_points) as avg_fp, COUNT(*) as cnt
        FROM (
@@ -392,7 +392,7 @@ export function recalculateValuations(
   const last15Map = new Map(last15Rows.map((r) => [r.player_id, r]));
 
   // B: most-recent league season avg FP (default 2025; LPL → 2024)
-  const ipl2025Rows = sqlite
+  const ipl2025Rows = await sqlite
     .prepare(
       `SELECT player_id, AVG(fantasy_points) as avg_fp, COUNT(*) as cnt
        FROM match_performances
@@ -408,7 +408,7 @@ export function recalculateValuations(
   const ipl2025Map = new Map(ipl2025Rows.map((r) => [r.player_id, r]));
 
   // C: prior league season avg FP (default 2024; LPL → 2023)
-  const ipl2024Rows = sqlite
+  const ipl2024Rows = await sqlite
     .prepare(
       `SELECT player_id, AVG(fantasy_points) as avg_fp, COUNT(*) as cnt
        FROM match_performances
@@ -424,7 +424,7 @@ export function recalculateValuations(
   const ipl2024Map = new Map(ipl2024Rows.map((r) => [r.player_id, r]));
 
   // D: All quality T20 last 2.5yr
-  const t20AllRows = sqlite
+  const t20AllRows = await sqlite
     .prepare(
       `SELECT player_id, AVG(fantasy_points) as avg_fp, COUNT(*) as cnt
        FROM match_performances
@@ -446,7 +446,7 @@ export function recalculateValuations(
   const hunFracMap = new Map<number, number>();
   const qualNMap = new Map<number, number>(); // player -> total quality games (30mo), for shrinkage
   if (isHundred) {
-    const hunFracRows = sqlite
+    const hunFracRows = await sqlite
       .prepare(
         `SELECT player_id,
            SUM(CASE WHEN format='HUN' THEN 1 ELSE 0 END) AS hun, COUNT(*) AS tot
@@ -480,7 +480,7 @@ export function recalculateValuations(
   // genuinely wrong ground data, where 651 cricsheet spellings were really 459 grounds.
 
   // --- Batch Query: Bowling overs avg ---
-  const bowlOversRows = sqlite
+  const bowlOversRows = await sqlite
     .prepare(
       `SELECT player_id, AVG(CAST(bowl_balls AS REAL) / 6.0) as avg_overs
        FROM match_performances
@@ -495,7 +495,7 @@ export function recalculateValuations(
   );
 
   // --- Batch Query: Ceiling (avg of top-10% matches) ---
-  const ceilingRows = sqlite
+  const ceilingRows = await sqlite
     .prepare(
       `SELECT player_id, AVG(fantasy_points) as ceiling_avg, cnt FROM (
         SELECT player_id, fantasy_points, cnt,
@@ -532,7 +532,7 @@ export function recalculateValuations(
   // Data-driven per-role scale factors for the Hundred (measured this run from HUN vs T20I at the
   // Hundred grounds — see computeHundredRoleNorm). null for non-Hundred tours (normMult stays 1).
   const hundredRoleNorm = isHundred
-    ? computeHundredRoleNorm(isHundredWomen ? "female" : "male")
+    ? await computeHundredRoleNorm(isHundredWomen ? "female" : "male")
     : null;
 
   for (const p of availPool) {
@@ -746,33 +746,34 @@ export function recalculateValuations(
   }
 
   // --- Write to DB ---
-  const updateStmt = sqlite.prepare(`
+  // Build set of manually-priced pool IDs so we skip their price columns
+  const manualIds = new Set(pool.filter((p) => p.price_manual === 1).map((p) => p.id));
+
+  await withTransaction(async (tx) => {
+    // Prepared from `tx` so the writes actually run INSIDE the transaction.
+    const updateStmt = tx.prepare(`
     UPDATE auction_pool
     SET efppm = ?, val_floor = ?, val_expected = ?, val_ceiling = ?, bowl_overs_avg = ?
     WHERE id = ?
   `);
 
-  // Build set of manually-priced pool IDs so we skip their price columns
-  const manualIds = new Set(pool.filter((p) => p.price_manual === 1).map((p) => p.id));
-
-  const updateManualStmt = sqlite.prepare(`
+    const updateManualStmt = tx.prepare(`
     UPDATE auction_pool
     SET efppm = ?, bowl_overs_avg = ?
     WHERE id = ?
   `);
 
-  const transaction = sqlite.transaction(() => {
     for (const v of results) {
       if (manualIds.has(v.id)) {
         // Only update EFPPM + bowling overs, preserve user's manual price
-        updateManualStmt.run(
+        await updateManualStmt.run(
           Math.round(v.efppm * 100) / 100,
           v.bowlOversAvg !== null ? Math.round(v.bowlOversAvg * 10) / 10 : null,
           v.id
         );
       } else {
         const price = priceMap.get(v.id)!;
-        updateStmt.run(
+        await updateStmt.run(
           Math.round(v.efppm * 100) / 100,
           Math.round(price.floor * 100) / 100,
           Math.round(price.expected * 100) / 100,
@@ -783,15 +784,14 @@ export function recalculateValuations(
       }
     }
   });
-  transaction();
 }
 
-export function initializeValuations(
+export async function initializeValuations(
   tournamentId: number | string,
   auctionId?: number | string
 ) {
-  recalculateValuations(tournamentId, auctionId);
-  sqlite
+  await recalculateValuations(tournamentId, auctionId);
+  await sqlite
     .prepare("UPDATE tournaments SET status = 'AUCTION' WHERE id = ?")
     .run(tournamentId);
 }

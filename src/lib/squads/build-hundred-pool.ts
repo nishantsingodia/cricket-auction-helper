@@ -1,9 +1,10 @@
-import type Database from "better-sqlite3";
+import { withTransaction, type DbHandle } from "@/db";
 import {
   HUNDRED_MEN_2026,
   HUNDRED_WOMEN_2026,
   HUNDRED_NAME_ALIASES,
   type HundredTeam,
+  type Avail,
 } from "./the-hundred-2026";
 import { fuzzyMatchName, normName } from "@/lib/fuzzy-name-match";
 import { resolveByName } from "@/lib/registry";
@@ -29,6 +30,19 @@ interface BuildResult {
   teamBreakdown: { team: string; name: string; playerCount: number }[];
 }
 
+// Map the seed's fine-grained availability flag onto the DB's coarse availability enum
+// (FIT/DOUBTFUL/INJURED/UNAVAILABLE) that the auction board's Availability Panel + the
+// playing-XI route understand. The precise reason (misses first N games / injury monitor)
+// rides along in news_notes. Without this the seed `avail` was silently dropped and every
+// player showed FIT (e.g. Fatima Sana's "misses first ~2 games" never surfaced).
+const AVAIL_TO_DB: Record<Avail, string> = {
+  OUT: "UNAVAILABLE",
+  LATE1: "DOUBTFUL",
+  LATE2: "DOUBTFUL",
+  EARLY: "DOUBTFUL",
+  DOUBT: "DOUBTFUL",
+};
+
 function matchPlayer(squadName: string, pool: DbPlayer[]): number | null {
   // 1. registry cricsheet_id
   const hit = resolveByName(squadName);
@@ -49,42 +63,24 @@ function matchPlayer(squadName: string, pool: DbPlayer[]): number | null {
   return match !== null ? pool.find((p) => p.name === match)?.id ?? null : null;
 }
 
-export function buildHundredPool(
-  sqlite: Database.Database,
+export async function buildHundredPool(
+  sqlite: DbHandle,
   opts: {
     auctionId: number;
     tournamentId: number;
     gender: "male" | "female";
     teams?: HundredTeam[];
   }
-): BuildResult {
+): Promise<BuildResult> {
   const isWomen = opts.gender === "female";
   const teams = opts.teams ?? (isWomen ? HUNDRED_WOMEN_2026 : HUNDRED_MEN_2026);
-
-  const insertPool = sqlite.prepare(
-    `INSERT OR IGNORE INTO auction_pool
-       (tournament_id, player_id, base_price, status, auction_id, ipl_team, squad_number, efppm, risk_note)
-     VALUES (?, ?, ?, 'AVAILABLE', ?, ?, ?, ?, ?)`
-  );
-  const updateIsOverseas = sqlite.prepare(`UPDATE players SET is_overseas = ? WHERE id = ?`);
-  const insertPlayer = sqlite.prepare(
-    `INSERT INTO players (name, country, role, is_overseas, gender)
-     VALUES (?, 'Hundred', ?, ?, ?)`
-  );
-  // Initial efppm hint (engine recomputes the real normalized value on auction/start).
-  const getEfppm = sqlite.prepare(
-    `SELECT avg_fantasy_points FROM career_stats
-     WHERE player_id = ? AND format IN ('HUN','T20','IPL','WPL','MLC')
-     ORDER BY CASE format WHEN 'HUN' THEN 1 WHEN 'T20' THEN 2 ELSE 3 END
-     LIMIT 1`
-  );
 
   // Matching pool: players of this GENDER with data in a Hundred-relevant format.
   const genderClause = isWomen
     ? "p.gender = 'female'"
     : "(p.gender != 'female' OR p.gender IS NULL)";
   const formatList = isWomen ? "'HUN','WPL','T20'" : "'HUN','T20','IPL','MLC'";
-  const pool = sqlite
+  const pool = await sqlite
     .prepare(
       `SELECT DISTINCT p.id, p.name, p.cricsheet_id AS cricsheetId FROM players p
        JOIN match_performances mp ON mp.player_id = p.id AND mp.format IN (${formatList})
@@ -96,7 +92,25 @@ export function buildHundredPool(
     teams: 0, players: 0, matched: 0, created: 0, unmatched: [], teamBreakdown: [],
   };
 
-  const transaction = sqlite.transaction(() => {
+  await withTransaction(async (tx) => {
+    const insertPool = tx.prepare(
+      `INSERT OR IGNORE INTO auction_pool
+       (tournament_id, player_id, base_price, status, auction_id, ipl_team, squad_number, efppm, risk_note, availability, news_notes)
+     VALUES (?, ?, ?, 'AVAILABLE', ?, ?, ?, ?, ?, ?, ?)`
+    );
+    const updateIsOverseas = tx.prepare(`UPDATE players SET is_overseas = ? WHERE id = ?`);
+    const insertPlayer = tx.prepare(
+      `INSERT INTO players (name, country, role, is_overseas, gender)
+     VALUES (?, 'Hundred', ?, ?, ?)`
+    );
+    // Initial efppm hint (engine recomputes the real normalized value on auction/start).
+    const getEfppm = tx.prepare(
+      `SELECT avg_fantasy_points FROM career_stats
+     WHERE player_id = ? AND format IN ('HUN','T20','IPL','WPL','MLC')
+     ORDER BY CASE format WHEN 'HUN' THEN 1 WHEN 'T20' THEN 2 ELSE 3 END
+     LIMIT 1`
+    );
+
     for (const team of teams) {
       let squadNumber = 1;
       for (const sp of team.players) {
@@ -104,20 +118,24 @@ export function buildHundredPool(
         let playerId = matchPlayer(sp.name, pool);
         if (playerId) {
           result.matched++;
-          updateIsOverseas.run(sp.overseas ? 1 : 0, playerId);
+          await updateIsOverseas.run(sp.overseas ? 1 : 0, playerId);
         } else {
-          const ins = insertPlayer.run(sp.name, sp.role, sp.overseas ? 1 : 0, opts.gender);
+          const ins = await insertPlayer.run(sp.name, sp.role, sp.overseas ? 1 : 0, opts.gender);
           playerId = Number(ins.lastInsertRowid);
           result.created++;
           result.unmatched.push({ team: team.short, name: sp.name });
           pool.push({ id: playerId, name: sp.name, cricsheetId: null });
         }
 
-        const efppmRow = getEfppm.get(playerId) as { avg_fantasy_points: number } | undefined;
+        const efppmRow = (await getEfppm.get(playerId)) as { avg_fantasy_points: number } | undefined;
         const sn = squadNumber++;
-        insertPool.run(
+        const dbAvail = sp.avail ? AVAIL_TO_DB[sp.avail] : "FIT";
+        // News note only for flagged players (the availability panel reads it); risk_note
+        // keeps carrying every seed note (injury-replacement lineage, etc.).
+        const newsNote = sp.avail ? (sp.note ?? "") : "";
+        await insertPool.run(
           opts.tournamentId, playerId, 0, opts.auctionId,
-          team.short, sn, efppmRow?.avg_fantasy_points || 0, sp.note ?? ""
+          team.short, sn, efppmRow?.avg_fantasy_points || 0, sp.note ?? "", dbAvail, newsNote
         );
       }
       result.teams++;
@@ -125,6 +143,5 @@ export function buildHundredPool(
     }
   });
 
-  transaction();
   return result;
 }

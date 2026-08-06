@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sqlite } from "@/db";
 
 export async function GET() {
-  const tournaments = sqlite
+  const tournaments = await sqlite
     .prepare("SELECT * FROM tournaments ORDER BY created_at DESC")
     .all();
   return NextResponse.json({ tournaments });
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Name and teams are required" }, { status: 400 });
   }
 
-  const tournamentResult = sqlite
+  const tournamentResult = await sqlite
     .prepare(`
       INSERT INTO tournaments (name, format, match_format, purse_per_team, currency_unit,
         max_squad_size, max_overseas, max_overseas_squad, num_captains, num_vice_captains, status)
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
   `);
 
   for (const team of teams) {
-    insertTeam.run(
+    await insertTeam.run(
       tournamentId,
       team.name,
       team.shortName || team.name.substring(0, 3).toUpperCase(),
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     `);
 
     for (const pid of playerIds) {
-      insertPool.run(tournamentId, pid.id || pid, pid.basePrice || 0.5);
+      await insertPool.run(tournamentId, pid.id || pid, pid.basePrice || 0.5);
     }
   }
 

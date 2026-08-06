@@ -21,12 +21,12 @@ export async function PATCH(request: NextRequest) {
 
     // Update role on players table (via pool -> player_id)
     if (body.role && ["BAT", "BOWL", "AR", "WK"].includes(body.role)) {
-      const poolRow = sqlite
+      const poolRow = await sqlite
         .prepare("SELECT player_id FROM auction_pool WHERE id = ?")
         .get(body.poolId) as { player_id: number } | undefined;
 
       if (poolRow) {
-        sqlite
+        await sqlite
           .prepare("UPDATE players SET role = ? WHERE id = ?")
           .run(body.role, poolRow.player_id);
       }
@@ -34,7 +34,7 @@ export async function PATCH(request: NextRequest) {
 
     // Update risk note (set to null to clear)
     if (body.risk_note !== undefined) {
-      sqlite
+      await sqlite
         .prepare("UPDATE auction_pool SET risk_note = ? WHERE id = ?")
         .run(body.risk_note || null, body.poolId);
     }
@@ -42,7 +42,7 @@ export async function PATCH(request: NextRequest) {
     // Update expected price (manual override) — flag as manual so engine won't overwrite
     if (body.val_expected !== undefined) {
       const price = Math.max(1, Math.round(body.val_expected));
-      sqlite
+      await sqlite
         .prepare(
           "UPDATE auction_pool SET val_expected = ?, val_floor = ?, val_ceiling = ?, price_manual = 1 WHERE id = ?"
         )

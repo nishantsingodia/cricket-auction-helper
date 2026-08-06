@@ -50,9 +50,9 @@ export interface TourConsensus {
   gender: "male" | "female";
 }
 
-export function computeTourConsensus(scope: TourStatScope): TourConsensus {
+export async function computeTourConsensus(scope: TourStatScope): Promise<TourConsensus> {
   const fmt = scope.formats.map(() => "?").join(",");
-  const row = sqlite
+  const row = await sqlite
     .prepare(
       `SELECT
          AVG(CASE WHEN p.role IN ('BAT','WK') THEN mp.fantasy_points END) AS bat_fp,

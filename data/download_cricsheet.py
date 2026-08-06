@@ -25,6 +25,7 @@ ARCHIVES = {
     "bbl": "https://cricsheet.org/downloads/bbl_json.zip",    # Big Bash League
     "wbbl": "https://cricsheet.org/downloads/wbb_json.zip",   # Women's Big Bash League
     "blast": "https://cricsheet.org/downloads/ntb_json.zip",  # Vitality Blast (English domestic T20)
+    "wblast": "https://cricsheet.org/downloads/wtb_json.zip", # Vitality Blast Women (women's English domestic T20; display-only form, excluded from EFPPM)
     "psl": "https://cricsheet.org/downloads/psl_json.zip",    # Pakistan Super League
     "sa20": "https://cricsheet.org/downloads/sat_json.zip",   # SA20
     "ilt20": "https://cricsheet.org/downloads/ilt_json.zip",  # International League T20 (UAE)

@@ -17,7 +17,7 @@ export async function GET(
     }
 
     // Get auction details
-    const auction = sqlite
+    const auction = await sqlite
       .prepare("SELECT * FROM auctions WHERE id = ?")
       .get(auctionId);
 
@@ -26,7 +26,7 @@ export async function GET(
     }
 
     // Get participants
-    const participants = sqlite
+    const participants = await sqlite
       .prepare(
         `SELECT id, auction_id, name, short_name, color, purse, remaining_purse, is_me
          FROM auction_participants WHERE auction_id = ?
@@ -35,7 +35,7 @@ export async function GET(
       .all(auctionId);
 
     // Get pool with player details (pick best career_stats: IPL first, then T20)
-    const pool = sqlite
+    const pool = await sqlite
       .prepare(
         `SELECT ap.id as pool_id, ap.player_id, ap.base_price, ap.status,
                 ap.sold_to_participant, ap.sold_price, ap.sold_at, ap.ipl_team, ap.squad_number,
@@ -79,7 +79,7 @@ export async function GET(
     }
 
     // Get watchlist
-    const watchlistItems = sqlite
+    const watchlistItems = await sqlite
       .prepare(
         `SELECT player_id, color, priority, notes FROM watchlist WHERE auction_id = ?`
       )
@@ -92,7 +92,7 @@ export async function GET(
     }
 
     // Team pitch breakdown: classify venues then count per team schedule
-    const venueClassRows = sqlite
+    const venueClassRows = await sqlite
       .prepare(
         `SELECT mp.venue_name,
           AVG(CASE WHEN p.role IN ('BAT','WK') THEN mp.fantasy_points END) as bat_fp,
@@ -178,12 +178,12 @@ export async function GET(
     // Reads the SAME schedules + authoritative venue classes the EFPPM engine uses (#transparency).
     // IPL keeps its inline teamPitchBreakdown above; other tours fall through to null.
     const tourName = (auction as { tournament_name?: string }).tournament_name ?? "";
-    const venueCtx = getTourVenueContext(tourName);
+    const venueCtx = await getTourVenueContext(tourName);
     const teamVenueSummary = venueCtx ? buildTeamVenueSummaries(venueCtx) : null;
 
     // Tour-level bat/bowl "general stats" for the header chip (works for all tours, venue or not).
     const statScope = getTourStatScope(tourName);
-    const tourConsensus = statScope ? computeTourConsensus(statScope) : null;
+    const tourConsensus = statScope ? await computeTourConsensus(statScope) : null;
 
     return NextResponse.json({
       auction,
@@ -229,7 +229,7 @@ export async function PATCH(
     }
 
     values.push(auctionId);
-    sqlite
+    await sqlite
       .prepare(`UPDATE auctions SET ${updates.join(", ")} WHERE id = ?`)
       .run(...values);
 
@@ -237,7 +237,7 @@ export async function PATCH(
     // remaining_purse adjusts by the same delta (so spent amount is preserved)
     if ("purse_per_friend" in body) {
       const newPurse = body.purse_per_friend;
-      sqlite
+      await sqlite
         .prepare(
           `UPDATE auction_participants
            SET remaining_purse = remaining_purse + (? - purse),

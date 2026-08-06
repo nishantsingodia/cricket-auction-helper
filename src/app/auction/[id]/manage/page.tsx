@@ -82,9 +82,9 @@ export default function ManageSoldPage() {
   );
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="min-h-screen bg-background p-4 md:p-6">
       <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div>
             <h1 className="text-2xl font-bold">Manage Sold Players</h1>
             <p className="text-sm text-muted-foreground">
@@ -107,7 +107,7 @@ export default function ManageSoldPage() {
               return (
                 <Card key={par.id}>
                   <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center justify-between text-base">
+                    <CardTitle className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-base">
                       <span className="flex items-center gap-2">
                         <span
                           className="inline-block w-3 h-3 rounded-full"
@@ -134,9 +134,9 @@ export default function ManageSoldPage() {
                         {players.map((p) => (
                           <div
                             key={p.player_id}
-                            className="flex items-center justify-between py-1.5"
+                            className="flex flex-wrap items-center justify-between gap-2 py-1.5"
                           >
-                            <span className="flex items-center gap-2">
+                            <span className="flex min-w-0 items-center gap-2">
                               <Badge variant="outline" className="text-[10px]">
                                 {p.ipl_team}
                               </Badge>
@@ -149,6 +149,7 @@ export default function ManageSoldPage() {
                               <Button
                                 size="sm"
                                 variant="destructive"
+                                className="h-10 md:h-7"
                                 disabled={busy === p.player_id}
                                 onClick={() => removeSale(p.player_id, p.name)}
                               >

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sqlite } from "@/db";
+import { sqlite, withTransaction } from "@/db";
 
 /**
  * GET /api/captains?tournamentId=X&teamId=Y
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const captains = sqlite
+    const captains = await sqlite
       .prepare(
         `SELECT tc.id, tc.player_id, tc.role, p.name as player_name, p.role as player_role
          FROM team_captains tc
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get tournament limits
-    const tournament = sqlite
+    const tournament = await sqlite
       .prepare("SELECT num_captains, num_vice_captains FROM tournaments WHERE id = ?")
       .get(tournamentId) as Record<string, number> | undefined;
 
@@ -105,21 +105,19 @@ export async function POST(req: NextRequest) {
     }
 
     // Transaction: delete existing + insert new
-    const deleteStmt = sqlite.prepare(
-      "DELETE FROM team_captains WHERE tournament_id = ? AND team_id = ? AND match_id IS NULL"
-    );
-    const insertStmt = sqlite.prepare(
-      "INSERT INTO team_captains (tournament_id, team_id, player_id, role, match_id) VALUES (?, ?, ?, ?, NULL)"
-    );
+    await withTransaction(async (tx) => {
+      const deleteStmt = tx.prepare(
+        "DELETE FROM team_captains WHERE tournament_id = ? AND team_id = ? AND match_id IS NULL"
+      );
+      const insertStmt = tx.prepare(
+        "INSERT INTO team_captains (tournament_id, team_id, player_id, role, match_id) VALUES (?, ?, ?, ?, NULL)"
+      );
 
-    const transaction = sqlite.transaction(() => {
-      deleteStmt.run(tournamentId, teamId);
+      await deleteStmt.run(tournamentId, teamId);
       for (const cap of captains) {
-        insertStmt.run(tournamentId, teamId, cap.playerId, cap.role);
+        await insertStmt.run(tournamentId, teamId, cap.playerId, cap.role);
       }
     });
-
-    transaction();
 
     return NextResponse.json({ success: true });
   } catch (error) {

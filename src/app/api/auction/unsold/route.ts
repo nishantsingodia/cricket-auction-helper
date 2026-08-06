@@ -17,13 +17,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  sqlite.prepare(`
+  await sqlite.prepare(`
     UPDATE auction_pool
     SET status = 'UNSOLD', sold_to_team = NULL, sold_price = NULL, sold_at = NULL
     WHERE id = ? AND tournament_id = ?
   `).run(poolId, tournamentId);
 
-  recalculateValuations(tournamentId);
+  await recalculateValuations(tournamentId);
 
   return NextResponse.json({ success: true });
 }

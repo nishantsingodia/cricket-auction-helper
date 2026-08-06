@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sqlite } from "@/db";
+import { sqlite, withTransaction } from "@/db";
 
 /**
  * POST /api/auction/sell
@@ -35,7 +35,7 @@ async function sellToParticipant(body: {
   const { auctionId, playerId, participantId, price } = body;
 
   // Get pool entry
-  const poolEntry = sqlite
+  const poolEntry = await sqlite
     .prepare(
       "SELECT * FROM auction_pool WHERE auction_id = ? AND player_id = ?"
     )
@@ -53,7 +53,7 @@ async function sellToParticipant(body: {
   }
 
   // Get participant
-  const participant = sqlite
+  const participant = await sqlite
     .prepare(
       "SELECT * FROM auction_participants WHERE id = ? AND auction_id = ?"
     )
@@ -77,11 +77,11 @@ async function sellToParticipant(body: {
   }
 
   // Check players per friend limit
-  const auction = sqlite
+  const auction = await sqlite
     .prepare("SELECT * FROM auctions WHERE id = ?")
     .get(auctionId) as Record<string, unknown>;
 
-  const currentCount = sqlite
+  const currentCount = await sqlite
     .prepare(
       `SELECT COUNT(*) as cnt FROM auction_pool
        WHERE auction_id = ? AND sold_to_participant = ? AND status = 'SOLD'`
@@ -95,23 +95,29 @@ async function sellToParticipant(body: {
     );
   }
 
-  // Execute sale
+  // Execute sale.
+  // The sold row and the purse debit MUST land together. They were two independent statements when
+  // the DB was a local file and the gap was microseconds; against Turso they are two network
+  // round-trips, so a drop in between would leave money debited with no matching sale — the silent
+  // over-charge CLAUDE.md warns about (`remaining_purse = purse − SUM(sold_price)` no longer holds).
   const now = new Date().toISOString();
 
-  sqlite
-    .prepare(
-      `UPDATE auction_pool
-       SET status = 'SOLD', sold_to_participant = ?, sold_price = ?, sold_at = ?
-       WHERE auction_id = ? AND player_id = ?`
-    )
-    .run(participantId, price, now, auctionId, playerId);
+  await withTransaction(async (tx) => {
+    await tx
+      .prepare(
+        `UPDATE auction_pool
+         SET status = 'SOLD', sold_to_participant = ?, sold_price = ?, sold_at = ?
+         WHERE auction_id = ? AND player_id = ?`
+      )
+      .run(participantId, price, now, auctionId, playerId);
 
-  // Update participant purse
-  sqlite
-    .prepare(
-      `UPDATE auction_participants SET remaining_purse = remaining_purse - ? WHERE id = ?`
-    )
-    .run(price, participantId);
+    // Update participant purse
+    await tx
+      .prepare(
+        `UPDATE auction_participants SET remaining_purse = remaining_purse - ? WHERE id = ?`
+      )
+      .run(price, participantId);
+  });
 
   return NextResponse.json({ success: true });
 }
@@ -124,7 +130,7 @@ async function sellToTeamLegacy(body: {
 }) {
   const { poolId, teamId, price, tournamentId } = body;
 
-  const poolEntry = sqlite
+  const poolEntry = await sqlite
     .prepare("SELECT * FROM auction_pool WHERE id = ? AND tournament_id = ?")
     .get(poolId, tournamentId) as Record<string, unknown> | undefined;
 
@@ -138,7 +144,7 @@ async function sellToTeamLegacy(body: {
     );
   }
 
-  const team = sqlite
+  const team = await sqlite
     .prepare(
       "SELECT * FROM tournament_teams WHERE id = ? AND tournament_id = ?"
     )
@@ -156,18 +162,21 @@ async function sellToTeamLegacy(body: {
     );
   }
 
+  // Sold row + purse debit are atomic — see the note in sellToParticipant above.
   const now = new Date().toISOString();
-  sqlite
-    .prepare(
-      `UPDATE auction_pool SET status = 'SOLD', sold_to_team = ?, sold_price = ?, sold_at = ? WHERE id = ?`
-    )
-    .run(teamId, price, now, poolId);
+  await withTransaction(async (tx) => {
+    await tx
+      .prepare(
+        `UPDATE auction_pool SET status = 'SOLD', sold_to_team = ?, sold_price = ?, sold_at = ? WHERE id = ?`
+      )
+      .run(teamId, price, now, poolId);
 
-  sqlite
-    .prepare(
-      `UPDATE tournament_teams SET remaining_purse = remaining_purse - ? WHERE id = ?`
-    )
-    .run(price, teamId);
+    await tx
+      .prepare(
+        `UPDATE tournament_teams SET remaining_purse = remaining_purse - ? WHERE id = ?`
+      )
+      .run(price, teamId);
+  });
 
   return NextResponse.json({ success: true });
 }

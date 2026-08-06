@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const matches = sqlite
+    const matches = await sqlite
       .prepare(
         `SELECT mr.*, v.name as venue_name, v.city as venue_city
          FROM match_results mr
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Count existing matches to auto-generate matchId
-    const countResult = sqlite
+    const countResult = await sqlite
       .prepare(
         "SELECT COUNT(*) as count FROM match_results WHERE tournament_id = ?"
       )
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
 
     const matchId = `T${tournamentId}_M${countResult.count + 1}`;
 
-    const result = sqlite
+    const result = await sqlite
       .prepare(
         `INSERT INTO match_results (tournament_id, match_id, match_date, venue_id, team1, team2, status)
          VALUES (?, ?, ?, ?, ?, ?, 'UPCOMING')`

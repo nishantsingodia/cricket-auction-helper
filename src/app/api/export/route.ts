@@ -28,7 +28,7 @@ function csvResponse(csv: string, filename: string): NextResponse {
   });
 }
 
-function exportSummary(tournamentId: string): NextResponse {
+async function exportSummary(tournamentId: string): Promise<NextResponse> {
   const tid = Number(tournamentId);
   if (isNaN(tid)) {
     return NextResponse.json(
@@ -37,7 +37,7 @@ function exportSummary(tournamentId: string): NextResponse {
     );
   }
 
-  const rows = sqlite
+  const rows = await sqlite
     .prepare(
       `SELECT p.name, p.role, p.is_overseas, p.country,
               ap.sold_price, ap.expected_price, ap.efppm, ap.status,
@@ -67,7 +67,7 @@ function exportSummary(tournamentId: string): NextResponse {
   return csvResponse(csv, `auction-summary-${tid}.csv`);
 }
 
-function exportPlayers(format: string, minMatches: string): NextResponse {
+async function exportPlayers(format: string, minMatches: string): Promise<NextResponse> {
   const min = Number(minMatches);
   if (isNaN(min)) {
     return NextResponse.json(
@@ -76,7 +76,7 @@ function exportPlayers(format: string, minMatches: string): NextResponse {
     );
   }
 
-  const rows = sqlite
+  const rows = await sqlite
     .prepare(
       `SELECT p.name, p.country, p.role, p.bat_style, p.bowl_style, p.is_overseas,
               cs.format, cs.bat_matches, cs.bat_runs, cs.bat_avg, cs.bat_sr, cs.bat_50s, cs.bat_100s,

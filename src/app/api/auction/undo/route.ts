@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sqlite } from "@/db";
+import { sqlite, withTransaction } from "@/db";
 
 /**
  * POST /api/auction/undo
@@ -25,10 +25,10 @@ export async function POST(req: NextRequest) {
   );
 }
 
-function undoParticipant(body: { auctionId: number; playerId: number }) {
+async function undoParticipant(body: { auctionId: number; playerId: number }) {
   const { auctionId, playerId } = body;
 
-  const poolEntry = sqlite
+  const poolEntry = await sqlite
     .prepare(
       "SELECT * FROM auction_pool WHERE auction_id = ? AND player_id = ?"
     )
@@ -45,31 +45,35 @@ function undoParticipant(body: { auctionId: number; playerId: number }) {
     );
   }
 
-  // Restore participant purse
-  if (poolEntry.sold_to_participant && poolEntry.sold_price) {
-    sqlite
-      .prepare(
-        `UPDATE auction_participants SET remaining_purse = remaining_purse + ? WHERE id = ?`
-      )
-      .run(poolEntry.sold_price, poolEntry.sold_to_participant);
-  }
+  // Refund and un-sell atomically. Split across two network round-trips (Turso), a failure between
+  // them would refund the purse while the player stayed SOLD — money created from nothing.
+  await withTransaction(async (tx) => {
+    // Restore participant purse
+    if (poolEntry.sold_to_participant && poolEntry.sold_price) {
+      await tx
+        .prepare(
+          `UPDATE auction_participants SET remaining_purse = remaining_purse + ? WHERE id = ?`
+        )
+        .run(poolEntry.sold_price, poolEntry.sold_to_participant);
+    }
 
-  // Revert to available
-  sqlite
-    .prepare(
-      `UPDATE auction_pool
-       SET status = 'AVAILABLE', sold_to_participant = NULL, sold_price = NULL, sold_at = NULL
-       WHERE auction_id = ? AND player_id = ?`
-    )
-    .run(auctionId, playerId);
+    // Revert to available
+    await tx
+      .prepare(
+        `UPDATE auction_pool
+         SET status = 'AVAILABLE', sold_to_participant = NULL, sold_price = NULL, sold_at = NULL
+         WHERE auction_id = ? AND player_id = ?`
+      )
+      .run(auctionId, playerId);
+  });
 
   return NextResponse.json({ success: true });
 }
 
-function undoLegacy(body: { poolId: number; tournamentId: number }) {
+async function undoLegacy(body: { poolId: number; tournamentId: number }) {
   const { poolId, tournamentId } = body;
 
-  const poolEntry = sqlite
+  const poolEntry = await sqlite
     .prepare("SELECT * FROM auction_pool WHERE id = ? AND tournament_id = ?")
     .get(poolId, tournamentId) as Record<string, unknown> | undefined;
 
@@ -84,25 +88,28 @@ function undoLegacy(body: { poolId: number; tournamentId: number }) {
     );
   }
 
-  if (
-    poolEntry.status === "SOLD" &&
-    poolEntry.sold_to_team &&
-    poolEntry.sold_price
-  ) {
-    sqlite
-      .prepare(
-        `UPDATE tournament_teams SET remaining_purse = remaining_purse + ? WHERE id = ?`
-      )
-      .run(poolEntry.sold_price, poolEntry.sold_to_team);
-  }
+  // Refund + un-sell atomically — see the note in undoParticipant above.
+  await withTransaction(async (tx) => {
+    if (
+      poolEntry.status === "SOLD" &&
+      poolEntry.sold_to_team &&
+      poolEntry.sold_price
+    ) {
+      await tx
+        .prepare(
+          `UPDATE tournament_teams SET remaining_purse = remaining_purse + ? WHERE id = ?`
+        )
+        .run(poolEntry.sold_price, poolEntry.sold_to_team);
+    }
 
-  sqlite
-    .prepare(
-      `UPDATE auction_pool
-       SET status = 'AVAILABLE', sold_to_team = NULL, sold_price = NULL, sold_at = NULL
-       WHERE id = ?`
-    )
-    .run(poolId);
+    await tx
+      .prepare(
+        `UPDATE auction_pool
+         SET status = 'AVAILABLE', sold_to_team = NULL, sold_price = NULL, sold_at = NULL
+         WHERE id = ?`
+      )
+      .run(poolId);
+  });
 
   return NextResponse.json({ success: true });
 }

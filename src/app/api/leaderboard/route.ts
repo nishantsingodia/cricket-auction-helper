@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const rows = sqlite
+    const rows = await sqlite
       .prepare(
         `SELECT
            lb.id,
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
       .all(tournamentId) as Record<string, unknown>[];
 
     // Get captains for badge display
-    const captains = sqlite
+    const captains = await sqlite
       .prepare(
         `SELECT tc.team_id, tc.player_id, tc.role
          FROM team_captains tc
@@ -61,10 +61,10 @@ export async function GET(req: NextRequest) {
     );
 
     return NextResponse.json({
-      leaderboard: rows.map((r) => {
+      leaderboard: await Promise.all(rows.map(async (r) => {
         const teamId = r.team_id as number;
 
-        const scorers = topScorerStmt.all(tournamentId, teamId, tournamentId) as Record<string, unknown>[];
+        const scorers = await topScorerStmt.all(tournamentId, teamId, tournamentId) as Record<string, unknown>[];
 
         return {
           id: r.id,
@@ -89,7 +89,7 @@ export async function GET(req: NextRequest) {
             };
           }),
         };
-      }),
+      })),
     });
   } catch (error) {
     console.error("Error fetching leaderboard:", error);

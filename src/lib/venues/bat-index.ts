@@ -60,9 +60,9 @@ interface Row {
 // SUM + COUNT per RAW spelling, then folded onto the canonical ground — cricsheet stores one ground
 // under up to four names, so averaging per raw string measures each ground on a fragment of its
 // history (see src/lib/registry/venues.ts).
-function read(months: number, gender: "male" | "female"): Map<string, Row> {
+async function read(months: number, gender: "male" | "female"): Promise<Map<string, Row>> {
   const fmt = BAT_INDEX_FORMATS.map((f) => `'${f}'`).join(",");
-  const rows = sqlite
+  const rows = await sqlite
     .prepare(
       `SELECT mp.venue_name AS venue,
          SUM(CASE WHEN p.role = 'BOWL' THEN 0 ELSE mp.fantasy_points END) AS bat_sum,
@@ -98,12 +98,14 @@ const ratioOf = (r: Row | undefined) =>
     : null;
 
 /** Bat Index for every ground we have a usable sample for, plus the league median for comparison. */
-export function computeBatIndex(gender: "male" | "female" = "male"): {
+export async function computeBatIndex(gender: "male" | "female" = "male"): Promise<{
   byGround: Map<string, BatIndexEntry>;
   median: number;
-} {
-  const recent = read(RECENT_MONTHS, gender);
-  const wide = read(WIDE_MONTHS, gender);
+}> {
+  const [recent, wide] = await Promise.all([
+    read(RECENT_MONTHS, gender),
+    read(WIDE_MONTHS, gender),
+  ]);
 
   const byGround = new Map<string, BatIndexEntry>();
   for (const ground of new Set([...recent.keys(), ...wide.keys()])) {
@@ -226,11 +228,11 @@ export interface TeamVenueMix {
   unknown: number; // grounds with no usable sample
 }
 
-export function teamVenueMix(
+export async function teamVenueMix(
   teamSchedule: Record<string, Array<{ venue: string; games: number }>>,
   gender: "male" | "female" = "male"
-): TeamVenueMix[] {
-  const { byGround, median } = computeBatIndex(gender);
+): Promise<TeamVenueMix[]> {
+  const { byGround, median } = await computeBatIndex(gender);
   const out: TeamVenueMix[] = [];
   for (const [team, sched] of Object.entries(teamSchedule)) {
     const m: TeamVenueMix = { team, games: 0, batRoad: 0, balanced: 0, bowlFriendly: 0, unknown: 0 };

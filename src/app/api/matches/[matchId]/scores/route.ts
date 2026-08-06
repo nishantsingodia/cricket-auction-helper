@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sqlite } from "@/db";
+import { sqlite, withTransaction } from "@/db";
 import { calculateFantasyPoints } from "@/lib/fantasy-points/calculator";
 import type { MatchPerformance, PlayerRole } from "@/lib/fantasy-points/types";
 
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const scores = sqlite
+    const scores = await sqlite
       .prepare(
         `SELECT mfs.*, p.name as player_name, p.role as player_role, p.country
          FROM match_fantasy_scores mfs
@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify match result exists and get tournament info
-    const matchResult = sqlite
+    const matchResult = await sqlite
       .prepare("SELECT id, tournament_id FROM match_results WHERE id = ?")
       .get(matchResultId) as { id: number; tournament_id: number } | undefined;
 
@@ -120,11 +120,13 @@ export async function POST(req: NextRequest) {
 
     const tournamentId = matchResult.tournament_id;
 
+    // Run everything in a transaction
+    await withTransaction(async (tx) => {
     // Prepare statements
-    const getPlayerRole = sqlite.prepare(
+    const getPlayerRole = tx.prepare(
       "SELECT role FROM players WHERE id = ?"
     );
-    const insertScore = sqlite.prepare(
+    const insertScore = tx.prepare(
       `INSERT INTO match_fantasy_scores
         (match_result_id, player_id, bat_runs, bat_balls, bat_4s, bat_6s,
          bat_dismissed, dismissal_type, bowl_balls, bowl_runs, bowl_wickets,
@@ -132,19 +134,19 @@ export async function POST(req: NextRequest) {
          run_outs, direct_run_outs, fantasy_points, in_starting_xi)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
-    const updateMatchStatus = sqlite.prepare(
+    const updateMatchStatus = tx.prepare(
       "UPDATE match_results SET status = 'COMPLETED' WHERE id = ?"
     );
 
     // Leaderboard recalculation queries
-    const getTeams = sqlite.prepare(
+    const getTeams = tx.prepare(
       "SELECT id FROM tournament_teams WHERE tournament_id = ?"
     );
 
     // For each team, compute total fantasy points across all completed matches,
     // applying C/VC multipliers from team_captains.
     // Team roster = sold players (auction_pool) + retained players (retained_players).
-    const getTeamPoints = sqlite.prepare(
+    const getTeamPoints = tx.prepare(
       `SELECT
          COALESCE(SUM(
            CASE
@@ -166,19 +168,17 @@ export async function POST(req: NextRequest) {
        WHERE mr.status = 'COMPLETED'`
     );
 
-    const deleteLeaderboardEntry = sqlite.prepare(
+    const deleteLeaderboardEntry = tx.prepare(
       "DELETE FROM leaderboard WHERE tournament_id = ? AND team_id = ?"
     );
-    const insertLeaderboardEntry = sqlite.prepare(
+    const insertLeaderboardEntry = tx.prepare(
       `INSERT INTO leaderboard (tournament_id, team_id, total_points, matches_played)
        VALUES (?, ?, ?, ?)`
     );
 
-    // Run everything in a transaction
-    const transaction = sqlite.transaction(() => {
       // Insert all scores
       for (const entry of scores) {
-        const player = getPlayerRole.get(entry.playerId) as
+        const player = await getPlayerRole.get(entry.playerId) as
           | { role: PlayerRole }
           | undefined;
 
@@ -210,7 +210,7 @@ export async function POST(req: NextRequest) {
         const breakdown = calculateFantasyPoints(perf, player.role);
         const fantasyPoints = inXi ? breakdown.total : 0;
 
-        insertScore.run(
+        await insertScore.run(
           matchResultId,
           entry.playerId,
           perf.batRuns,
@@ -235,12 +235,12 @@ export async function POST(req: NextRequest) {
       }
 
       // Mark match as completed
-      updateMatchStatus.run(matchResultId);
+      await updateMatchStatus.run(matchResultId);
 
       // Recalculate leaderboard for all teams in the tournament
-      const teams = getTeams.all(tournamentId) as { id: number }[];
+      const teams = await getTeams.all(tournamentId) as { id: number }[];
       for (const team of teams) {
-        const result = getTeamPoints.get(
+        const result = await getTeamPoints.get(
           tournamentId,
           team.id,
           tournamentId,
@@ -250,8 +250,8 @@ export async function POST(req: NextRequest) {
           team.id
         ) as { total_points: number; matches_played: number };
 
-        deleteLeaderboardEntry.run(tournamentId, team.id);
-        insertLeaderboardEntry.run(
+        await deleteLeaderboardEntry.run(tournamentId, team.id);
+        await insertLeaderboardEntry.run(
           tournamentId,
           team.id,
           result.total_points,
@@ -259,8 +259,6 @@ export async function POST(req: NextRequest) {
         );
       }
     });
-
-    transaction();
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -28,7 +28,7 @@ export function ThemeToggle() {
   return (
     <button
       onClick={toggle}
-      className="px-2 py-1.5 rounded-md border border-border text-sm hover:bg-muted transition-colors"
+      className="w-10 h-10 flex items-center justify-center md:block md:w-auto md:h-auto px-2 py-1.5 rounded-md border border-border text-sm hover:bg-muted transition-colors"
       title={dark ? "Switch to light mode" : "Switch to dark mode"}
     >
       {dark ? "\u2600\uFE0F" : "\uD83C\uDF19"}

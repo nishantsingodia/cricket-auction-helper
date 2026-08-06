@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
   `;
   params.push(limit, offset);
 
-  const rows = sqlite.prepare(query).all(...params) as Record<string, unknown>[];
+  const rows = await sqlite.prepare(query).all(...params) as Record<string, unknown>[];
 
   // Count total
   const countQuery = `
@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
     ${whereClause}
   `;
   const countParams = params.slice(0, -2); // remove limit/offset
-  const totalRow = sqlite.prepare(countQuery).get(...countParams) as { total: number };
+  const totalRow = await sqlite.prepare(countQuery).get(...countParams) as { total: number };
 
   const result = rows.map((r) => ({
     id: r.id,

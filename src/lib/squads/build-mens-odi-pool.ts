@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import { withTransaction, type DbHandle } from "@/db";
 import {
   NZ_VS_WI_MEN_ODI_2026,
   NZ_WI_MEN_ODI_NAME_ALIASES,
@@ -43,29 +43,14 @@ function matchPlayer(squadName: string, pool: DbPlayer[]): number | null {
   return match !== null ? pool.find((p) => p.name === match)?.id ?? null : null;
 }
 
-export function buildMensOdiPool(
-  sqlite: Database.Database,
+export async function buildMensOdiPool(
+  sqlite: DbHandle,
   opts: { auctionId: number; tournamentId: number; teams?: MensOdiTeam[] }
-): BuildResult {
+): Promise<BuildResult> {
   const teams = opts.teams ?? NZ_VS_WI_MEN_ODI_2026;
 
-  const insertPool = sqlite.prepare(
-    `INSERT OR IGNORE INTO auction_pool
-       (tournament_id, player_id, base_price, status, auction_id, ipl_team, squad_number, efppm, risk_note)
-     VALUES (?, ?, ?, 'AVAILABLE', ?, ?, ?, ?, ?)`
-  );
-  const insertPlayer = sqlite.prepare(
-    `INSERT INTO players (name, country, role, is_overseas, gender)
-     VALUES (?, ?, ?, 0, 'male')`
-  );
-  const getEfppm = sqlite.prepare(
-    `SELECT avg_fantasy_points FROM career_stats
-     WHERE player_id = ? AND format = 'ODI'
-     LIMIT 1`
-  );
-
   // Matching pool: every MALE player with ODI match data.
-  const pool = sqlite
+  const pool = await sqlite
     .prepare(
       `SELECT DISTINCT p.id, p.name, p.cricsheet_id AS cricsheetId FROM players p
        JOIN match_performances mp ON mp.player_id = p.id AND mp.format = 'ODI'
@@ -77,7 +62,22 @@ export function buildMensOdiPool(
     teams: 0, players: 0, matched: 0, created: 0, unmatched: [], teamBreakdown: [],
   };
 
-  const transaction = sqlite.transaction(() => {
+  await withTransaction(async (tx) => {
+    const insertPool = tx.prepare(
+      `INSERT OR IGNORE INTO auction_pool
+       (tournament_id, player_id, base_price, status, auction_id, ipl_team, squad_number, efppm, risk_note)
+     VALUES (?, ?, ?, 'AVAILABLE', ?, ?, ?, ?, ?)`
+    );
+    const insertPlayer = tx.prepare(
+      `INSERT INTO players (name, country, role, is_overseas, gender)
+     VALUES (?, ?, ?, 0, 'male')`
+    );
+    const getEfppm = tx.prepare(
+      `SELECT avg_fantasy_points FROM career_stats
+     WHERE player_id = ? AND format = 'ODI'
+     LIMIT 1`
+    );
+
     for (const team of teams) {
       let squadNumber = 1;
       for (const sp of team.players) {
@@ -86,16 +86,16 @@ export function buildMensOdiPool(
         if (playerId) {
           result.matched++;
         } else {
-          const ins = insertPlayer.run(sp.name, team.country, sp.role);
+          const ins = await insertPlayer.run(sp.name, team.country, sp.role);
           playerId = Number(ins.lastInsertRowid);
           result.created++;
           result.unmatched.push({ team: team.short, name: sp.name });
           pool.push({ id: playerId, name: sp.name, cricsheetId: null });
         }
 
-        const efppmRow = getEfppm.get(playerId) as { avg_fantasy_points: number } | undefined;
+        const efppmRow = (await getEfppm.get(playerId)) as { avg_fantasy_points: number } | undefined;
         const sn = squadNumber++;
-        insertPool.run(
+        await insertPool.run(
           opts.tournamentId, playerId, 0, opts.auctionId,
           team.short, sn, efppmRow?.avg_fantasy_points || 0, sp.note ?? ""
         );
@@ -105,6 +105,5 @@ export function buildMensOdiPool(
     }
   });
 
-  transaction();
   return result;
 }

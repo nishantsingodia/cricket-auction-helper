@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sqlite } from "@/db";
+import { sqlite, withTransaction } from "@/db";
 import { CPL_2026_NAME, cplAvailability } from "@/lib/squads/cpl-2026";
 import { resolveCplSquads } from "@/lib/squads/build-cpl-pool";
 
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "auctionId required" }, { status: 400 });
     }
 
-    const auction = sqlite
+    const auction = await sqlite
       .prepare(`SELECT id, tournament_id, tournament_name FROM auctions WHERE id = ?`)
       .get(auctionId) as
       | { id: number; tournament_id: number | null; tournament_name: string }
@@ -53,13 +53,13 @@ export async function POST(request: NextRequest) {
     }
 
     // squad entry -> player_id, resolved exactly as the builder does
-    const resolved = resolveCplSquads(sqlite);
+    const resolved = await resolveCplSquads(sqlite);
     const noteByPlayerId = new Map<number, string>();
     for (const r of resolved) {
       if (r.playerId !== null) noteByPlayerId.set(r.playerId, r.sp.note ?? "");
     }
 
-    const poolRows = sqlite
+    const poolRows = await sqlite
       .prepare(
         `SELECT ap.id, ap.player_id, p.name AS name, COALESCE(ap.risk_note,'') AS risk_note,
                 COALESCE(ap.availability,'FIT') AS availability
@@ -74,8 +74,6 @@ export async function POST(request: NextRequest) {
       availability: string;
     }>;
 
-    const updNote = sqlite.prepare(`UPDATE auction_pool SET risk_note = ? WHERE id = ?`);
-    const updAvail = sqlite.prepare(`UPDATE auction_pool SET availability = ? WHERE id = ?`);
 
     let notesWritten = 0;
     let availWritten = 0;
@@ -84,7 +82,9 @@ export async function POST(request: NextRequest) {
 
     const inPool = new Set(poolRows.map((r) => r.player_id));
 
-    sqlite.transaction(() => {
+    await withTransaction(async (tx) => {
+      const updNote = tx.prepare(`UPDATE auction_pool SET risk_note = ? WHERE id = ?`);
+      const updAvail = tx.prepare(`UPDATE auction_pool SET availability = ? WHERE id = ?`);
       for (const row of poolRows) {
         const wantNote = noteByPlayerId.get(row.player_id) ?? "";
         const wantAvail = cplAvailability(row.name);
@@ -99,30 +99,30 @@ export async function POST(request: NextRequest) {
             skippedManual.push(`${row.name} (kept: ${row.risk_note.slice(0, 60)})`);
           } else {
             if (row.risk_note) replaced.push({ player: row.name, from: row.risk_note.slice(0, 80) });
-            updNote.run(wantNote, row.id);
+            await updNote.run(wantNote, row.id);
             notesWritten++;
           }
         }
 
         // availability: never downgrade a manual flag
         if (wantAvail !== row.availability && (row.availability === "FIT" || !row.availability)) {
-          updAvail.run(wantAvail, row.id);
+          await updAvail.run(wantAvail, row.id);
           availWritten++;
         }
       }
-    })();
+    });
 
     // Additive: squad players absent from this pool (added to the squad file after the build)
-    const insertPool = sqlite.prepare(
-      `INSERT OR IGNORE INTO auction_pool
-         (tournament_id, player_id, base_price, status, auction_id, ipl_team, squad_number, efppm, risk_note, availability)
-       VALUES (?, ?, 0, 'AVAILABLE', ?, ?, ?, 0, ?, ?)`
-    );
     const added: string[] = [];
-    sqlite.transaction(() => {
+    await withTransaction(async (tx) => {
+      const insertPool = tx.prepare(
+        `INSERT OR IGNORE INTO auction_pool
+           (tournament_id, player_id, base_price, status, auction_id, ipl_team, squad_number, efppm, risk_note, availability)
+         VALUES (?, ?, 0, 'AVAILABLE', ?, ?, ?, 0, ?, ?)`
+      );
       for (const r of resolved) {
         if (r.playerId === null || inPool.has(r.playerId)) continue;
-        insertPool.run(
+        await insertPool.run(
           auction.tournament_id,
           r.playerId,
           auctionId,
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
         );
         added.push(`${r.team.short}/${r.sp.name}`);
       }
-    })();
+    });
 
     return NextResponse.json({
       success: true,

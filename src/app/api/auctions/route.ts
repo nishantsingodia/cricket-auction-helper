@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sqlite } from "@/db";
+import { sqlite, withTransaction } from "@/db";
 
 const DEFAULT_COLORS = [
   "#3B82F6", // blue
@@ -14,7 +14,7 @@ const DEFAULT_COLORS = [
 
 export async function GET() {
   try {
-    const auctions = sqlite
+    const auctions = await sqlite
       .prepare(
         `SELECT a.*,
            (SELECT COUNT(*) FROM auction_pool ap WHERE ap.auction_id = a.id) as total_players,
@@ -86,9 +86,9 @@ export async function POST(request: NextRequest) {
 
     let auctionId: number;
 
-    const transaction = sqlite.transaction(() => {
+    await withTransaction(async (tx) => {
       // Create auction
-      const result = sqlite
+      const result = await tx
         .prepare(
           `INSERT INTO auctions (name, tournament_name, match_format, num_friends, purse_per_friend, players_per_friend, num_captains, num_vice_captains, changes_allowed, status)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'SETUP')`
@@ -107,14 +107,14 @@ export async function POST(request: NextRequest) {
       auctionId = Number(result.lastInsertRowid);
 
       // Create participants
-      const insertParticipant = sqlite.prepare(
+      const insertParticipant = tx.prepare(
         `INSERT INTO auction_participants (auction_id, name, short_name, color, purse, remaining_purse, is_me)
          VALUES (?, ?, ?, ?, ?, ?, ?)`
       );
 
       for (let i = 0; i < friends.length; i++) {
         const f = friends[i];
-        insertParticipant.run(
+        await insertParticipant.run(
           auctionId,
           f.name,
           f.shortName || f.name.substring(0, 3).toUpperCase(),
@@ -125,8 +125,6 @@ export async function POST(request: NextRequest) {
         );
       }
     });
-
-    transaction();
 
     return NextResponse.json({ success: true, auctionId: auctionId! });
   } catch (err) {
