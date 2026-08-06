@@ -1,12 +1,17 @@
 # Cricket Auction Helper — Working Notes & Setup Runbook
 
-Next.js + better-sqlite3 + Drizzle fantasy-cricket auction app. Friends bid on
+Next.js + libsql (local SQLite / Turso) + Drizzle fantasy-cricket auction app. Friends bid on
 real players; each owner accrues the players' real-tournament fantasy points
 (NO playing-XI to field, NO role quotas, NO max-per-team — pure points
 accumulation).
 
-- **Real DB:** `db/cricket-auction.db` (other root `*.db` files are empty stubs).
-- **Dev:** `npm run dev` → http://localhost:3000
+- **Real DB:** `db/cricket-auction.db` (other root `*.db` files are empty stubs). The cloud copy is
+  a Turso replica of it — see **Deploy & the local ⇄ cloud split** below before touching either.
+- **Dev:** `npm run dev` → http://localhost:3000 · **Live:** https://cricket-auction-helper.vercel.app
+- **UI:** **light** mode by default — a pre-paint inline script in `src/app/layout.tsx` re-applies a
+  stored dark choice (`localStorage.theme`, toggled by `src/components/ThemeToggle.tsx`) before first
+  paint. The board is mobile-first (it's run from a phone now); every mobile change reverts at `md:`,
+  so the desktop layout is unchanged.
 - **Data pipeline:** `data/refresh.sh` → `download_cricsheet.py` + `etl_cricsheet.py` + `seed_venues.py`
   - ⚠️ `data/wc_fps_to_csv.py` is a **STALE copy** — the live points generator now lives in the
     standalone **wwc-points-bot** repo (runs in CI, writes the Google Sheet). Delete or re-sync it;
@@ -26,6 +31,53 @@ accumulation).
 - **Squad data:** `src/lib/squads/*.ts` · **Valuation:** `src/lib/valuation/engine.ts`
 
 ---
+
+## Deploy & the local ⇄ cloud split (Turso)
+Live at **https://cricket-auction-helper.vercel.app** — the board is run from a phone now. Same code
+in both places: `src/db/index.ts` opens `file:db/cricket-auction.db` locally, or **Turso** when
+`TURSO_DATABASE_URL` (+ `TURSO_AUTH_TOKEN`) is set. Local dev needs neither — see `.env.example`.
+
+**Which copy is master depends on the table. Get this backwards and you lose data.**
+- **Local is master for reference data** — `players`, `match_performances`, `career_stats`, `venues`,
+  the registry. The ETL and the valuation pipeline only ever run on the laptop.
+- **The cloud is master for auction state while you're running an auction from your phone** —
+  `auctions`, `auction_participants`, `auction_pool`, `watchlist`.
+
+So:
+- **`npm run turso:push`** (`scripts/turso-push.sh`) — snapshot local → **REPLACE** the Turso DB.
+  Run after any local ETL / re-valuation / squad work. It **refuses** to run when the cloud has more
+  SOLD rows than local (i.e. a phone auction you haven't pulled back yet).
+- **`npm run turso:pull`** (`scripts/turso-pull.sh`) — bring back **ONLY those four mutable auction
+  tables**; reference data is left alone. Run after every auction run from the phone, before doing
+  anything locally. Backs up to `db/cricket-auction.db.bak-preTursoPull-<stamp>` first, and aborts
+  rather than wiping local if nothing comes back.
+- **`npm run go-live`** (`scripts/go-live.sh`) — push the DB → mint a Turso token → set
+  `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` on Vercel (production + preview) → `vercel deploy --prod`.
+  One-time interactive prereq: `turso auth login` (and `vercel login`).
+
+Deploy gotchas, both already paid for:
+- **`.vercelignore` paths MUST stay root-anchored** — `/db/`, `/data/`, `/docs/`, `/scripts/`. A bare
+  `db/` also matches `src/db/`, which strips the DB client and fails the build with 38×
+  `Can't resolve '@/db'`. (Without the ignore file at all, a deploy uploads ~2.2GB of DB backups and
+  raw cricsheet JSON.)
+- **`vercel.json` pins `regions: ["bom1"]`** (Mumbai) because the Turso DB is in `aws-ap-south-1`.
+  Unpinned, every single query crossed to Washington and back.
+- A cloud deploy with **no** `TURSO_DATABASE_URL` **throws at boot** on purpose — there's no local
+  file up there, and the alternative is cryptic "no such table" on every route.
+
+## DB access — everything is async now
+better-sqlite3's synchronous `sqlite.transaction(fn)` **NO LONGER EXISTS.** `src/db/index.ts` exports
+`sqlite`, `withTransaction()`, `client`, `isRemote` and the `DbHandle` type.
+- `sqlite.prepare(sql)` keeps the old `.all()` / `.get()` / `.run()` call shape (that's why ~190 call
+  sites survived the migration) but they now return **Promises** — `await` every one, and the
+  enclosing function must be `async`. `DbHandle` replaces `Database.Database` in the pool builders.
+- Atomic writes → **`await withTransaction(async (tx) => …)`**, and **prepare from `tx`**. A statement
+  prepared off the module-level `sqlite` inside that callback runs OUTSIDE the transaction — it looks
+  right and gives you no atomicity at all.
+- **`node scripts/driver-parity.mjs`** is the differential test: better-sqlite3 vs libsql, same
+  queries, same file, deep-compared (NULLs, bigints, REAL precision, empty result sets,
+  `undefined`→NULL binding). Run it if you touch the shim. better-sqlite3 is still a dependency only
+  for this script.
 
 ## ⛔ Player identity / name-matching — READ before touching it
 The LPL 2026 saga (18 Jul) burned a full day on this. Rules, in order:
@@ -51,6 +103,17 @@ The LPL 2026 saga (18 Jul) burned a full day on this. Rules, in order:
    anchoring: two "Wanindu Hasaranga" rows → the matcher's tie-breaker rejects both → star left unanchored).
 
 ## ⛔ CRITICAL — never break a live auction
+- **⚠️ `turso:push` / `turso:pull` DIRECTION — now the easiest way to destroy an auction.**
+  `push` **REPLACES the cloud DB**: run it while an auction is being run from the phone and every
+  sale made there is gone, while the purses stay debited — the same silent over-charge as a pool
+  rebuild, in one command. `pull` **REPLACES local auction state** from the cloud: run it when the
+  cloud is stale and you throw away the laptop's sales instead.
+  **Rule: pull after the phone, push after the laptop.** The push script blocks the obvious case
+  (cloud SOLD > local SOLD) — treat that as a backstop, not as your guard.
+- **The live auction may not be in the copy you're looking at.** If it's being run from the phone,
+  local SOLD counts are stale, so the gate check below passes on a laptop DB that knows nothing about
+  it. Check the copy that's actually live (`turso db shell cricket-auction "SELECT COUNT(*) FROM
+  auction_pool WHERE status='SOLD';"`) or `turso:pull` first.
 - **NEVER `DELETE`/rebuild `auction_pool` or run the ETL on an auction that has
   sales.** Purses live on `auction_participants` and are NOT reset by a pool
   rebuild → wiping sold rows leaves money debited with no matching sale (silent
@@ -58,6 +121,10 @@ The LPL 2026 saga (18 Jul) burned a full day on this. Rules, in order:
   (`INSERT OR IGNORE`, the `teamsFilter` path in `/api/pool/fetch`).
 - **Re-valuing is safe** (`/api/auction/start` only writes `val_expected`/`efppm`,
   never sold rows or purses). Pool rebuild is NOT safe.
+- **The sale + the purse debit are now ONE transaction** in `sell`, `quick-sell` and `undo`
+  (`withTransaction`). On a local file those two statements were microseconds apart; against Turso
+  they're two network round-trips, so a drop between them debits a purse with no matching sale.
+  Any new write that touches `auction_pool` **and** a purse must go in a transaction too.
 - **Always back up first:** `cp db/cricket-auction.db db/cricket-auction.db.bak-<reason>`
 - **Reconcile a drifted purse:** `remaining_purse = purse − SUM(their sold_price)`.
 - Before any pool/ETL op, check: `SELECT COUNT(*) FROM auction_pool WHERE auction_id=? AND status='SOLD'`.

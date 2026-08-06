@@ -1,8 +1,8 @@
 # Cricket Auction Helper
 
-A self-hosted **live auction room** for the fantasy-cricket draft my friends run every tournament — with a data-driven player valuation engine underneath it, so bidding starts from real fair-value estimates instead of vibes.
+A **live auction room** for the fantasy-cricket draft my friends run every tournament — with a data-driven player valuation engine underneath it, so bidding starts from real fair-value estimates instead of vibes.
 
-> **Live demo:** not currently hosted. It runs locally against a Cricsheet-derived SQLite database (the engine needs ball-by-ball history that I don't ship in the repo). See [Run it locally](#run-it-locally).
+> **Live:** **[cricket-auction-helper.vercel.app](https://cricket-auction-helper.vercel.app)** — deployed on Vercel against a [Turso](https://turso.tech) copy of the database, so the auction can be run from a phone at the table instead of one laptop. It also runs entirely offline against the local SQLite file; see [Run it locally](#run-it-locally).
 
 ---
 
@@ -40,7 +40,7 @@ I wanted a board that runs the auction live, tracks every purse to the rupee, an
 
 ## How it's built
 
-**Stack:** Next.js 16 (App Router) · React 19 · TypeScript · Drizzle ORM over `better-sqlite3` (local SQLite, WAL mode) · Tailwind v4 with shadcn / Base UI components · dnd-kit · Zustand · Recharts · Cheerio (scraping) · Anthropic SDK (advisor). The data pipeline is a small set of Python scripts that ingest Cricsheet ball-by-ball match files and compute Dream11-style fantasy points per performance.
+**Stack:** Next.js 16 (App Router) · React 19 · TypeScript · Drizzle ORM over `@libsql/client` — the *same* code path opens a local SQLite file in dev and Turso in production · Tailwind v4 with shadcn / Base UI components · dnd-kit · Zustand · Recharts · Cheerio (scraping) · Anthropic SDK (advisor). The data pipeline is a small set of Python scripts that ingest Cricsheet ball-by-ball match files and compute Dream11-style fantasy points per performance.
 
 A few pieces I'm happy with:
 
@@ -52,7 +52,7 @@ A few pieces I'm happy with:
 
 - **Stable cross-project player identity.** Player matching is *registry-first*: announced squad names resolve to database players by a stable Cricsheet ID via a shared global registry, with fuzzy name-matching only as a fallback. The fuzzy matcher (`src/lib/fuzzy-name-match.ts`) and the player registry are deliberately kept in sync with my companion drafting and points-feed projects — one canonical identity across all three, so a married-name change or a transliteration quirk is fixed once, everywhere.
 
-- **Operational safety rails for a live auction.** Purses live on the participant rows, not on the pool, which means rebuilding the pool mid-auction would leave money debited with no matching sale. The pool-fetch path is therefore strictly *additive* (`INSERT OR IGNORE`), re-valuing never touches sold rows or purses, and the working notes (`CLAUDE.md`, `AUCTION_SETUP.md`) document the don't-break-a-live-auction invariants — a habit from shipping things people actually depend on mid-event.
+- **Operational safety rails for a live auction.** Purses live on the participant rows, not on the pool, which means rebuilding the pool mid-auction would leave money debited with no matching sale. The pool-fetch path is therefore strictly *additive* (`INSERT OR IGNORE`), re-valuing never touches sold rows or purses, and the working notes (`CLAUDE.md`, `AUCTION_SETUP.md`) document the don't-break-a-live-auction invariants — a habit from shipping things people actually depend on mid-event. Going remote sharpened this: writing the sale and debiting the purse used to be two statements microseconds apart on local disk, but over the network they're two round-trips, so sell / quick-sell / undo each became a single transaction. The database-sync scripts refuse the destructive direction for the same reason.
 
 ## Run it locally
 
@@ -64,10 +64,22 @@ npm run dev
 
 The app reads a local SQLite database at `db/cricket-auction.db` (override with `DB_PATH`). That database is **not** committed — it's built by the Python ETL under `data/` from Cricsheet match archives (`data/refresh.sh` → download + ETL + venue seed). The AI advisor is optional and only activates if you set `ANTHROPIC_API_KEY` in `.env.local`.
 
+### Local vs. cloud
+
+Local and hosted run the same code: with `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` unset it opens the SQLite file directly, and with them set it talks to Turso. **The laptop stays the master for reference data** (players, match history, career stats, venues) because the ETL and valuation pipeline run there; **the cloud is the master for auction state** while an auction is actually being run from a phone. Three scripts move data between them:
+
+```bash
+npm run turso:push   # local DB  → cloud (replaces it). Run after any ETL or re-valuation.
+npm run turso:pull   # cloud → local, auction tables ONLY. Run after an auction run from the phone.
+npm run go-live      # push the DB, mint a token, set the Vercel env vars, deploy to production.
+```
+
+`turso:push` refuses to run if the cloud has more sold rows than the local copy, so a phone-run auction can't be silently clobbered; `turso:pull` backs up the local database before it touches anything. Both need the [Turso CLI](https://docs.turso.tech) and a one-time `turso auth login`.
+
 ## Honest limitations / scope
 
-- **Personal-scale, single-room.** It's a self-hosted tool for one auction table at a time, driven by one operator marking sales on a shared screen — not a multi-tenant SaaS, no auth, no real-time multi-device bidding.
-- **No live demo without the data.** The valuation engine depends on a Cricsheet-derived database I don't publish, so there's no zero-setup hosted instance.
+- **Personal-scale, single-room.** It's a tool for one auction table at a time, driven by one operator marking sales on a shared screen — not a multi-tenant SaaS, no auth, no real-time multi-device bidding.
+- **The hosted instance is a snapshot, not a service.** The valuation engine depends on a Cricsheet-derived database I don't publish; what's deployed is a copy of my local database pushed up before an auction and pulled back down after, not a continuously-updated pipeline.
 - **No sample-size shrinkage in the engine (known gap).** A player with a few but explosive matches can over-price, because empty form buckets redistribute weight onto the matches that *do* exist. I chose to handle these with per-player manual price caps rather than baking Bayesian shrinkage into the model — a deliberate scope call, but a real edge.
 - **Venue conditioning is IPL-only.** Score2 needs a hard-coded fixture list and enough per-venue history; for the Women's WC and MLC it effectively resolves to 1.0, so those valuations are pure form.
 - **Scraping is brittle.** IPL squads are scraped from the official site and will break when the page markup changes; announced-squad tournaments are hand-curated TypeScript files.

@@ -60,36 +60,66 @@ interface Row {
 // SUM + COUNT per RAW spelling, then folded onto the canonical ground — cricsheet stores one ground
 // under up to four names, so averaging per raw string measures each ground on a fragment of its
 // history (see src/lib/registry/venues.ts).
-async function read(months: number, gender: "male" | "female"): Promise<Map<string, Row>> {
+//
+// PERF: both windows are read by ONE query (one network round-trip) instead of two. The 24-month set
+// is a strict SUBSET of the 48-month set, so we scan the wide window once and split the aggregates
+// with CASE. This is exact, not an approximation: every aggregate is SUM / COUNT(DISTINCT) — no AVG
+// is being merged (which would NOT fold) — and `fantasy_points` holds whole numbers, so the sums are
+// bit-identical to the two separate queries this replaces. A raw spelling with no rows inside the
+// 24-month window is skipped for `recent`, so that map has exactly the same keys it had before.
+async function readWindows(
+  gender: "male" | "female"
+): Promise<{ recent: Map<string, Row>; wide: Map<string, Row> }> {
   const fmt = BAT_INDEX_FORMATS.map((f) => `'${f}'`).join(",");
+  const inWindow = (months: number) => `mp.match_date >= date('now', '-${months} months')`;
+  // NOTE the inner CASE keeps the original `WHEN p.role = 'BOWL' THEN … ELSE …` shape rather than
+  // `p.role != 'BOWL'`: role can be NULL, and a NULL role must keep landing on the BATTING side.
+  const cols = (prefix: string, months: number) => `
+         SUM(CASE WHEN ${inWindow(months)} THEN (CASE WHEN p.role = 'BOWL' THEN 0 ELSE mp.fantasy_points END) ELSE 0 END) AS ${prefix}bat_sum,
+         SUM(CASE WHEN ${inWindow(months)} THEN (CASE WHEN p.role = 'BOWL' THEN 0 ELSE 1 END) ELSE 0 END) AS ${prefix}bat_n,
+         SUM(CASE WHEN ${inWindow(months)} THEN (CASE WHEN p.role = 'BOWL' THEN mp.fantasy_points ELSE 0 END) ELSE 0 END) AS ${prefix}bowl_sum,
+         SUM(CASE WHEN ${inWindow(months)} THEN (CASE WHEN p.role = 'BOWL' THEN 1 ELSE 0 END) ELSE 0 END) AS ${prefix}bowl_n,
+         COUNT(DISTINCT CASE WHEN ${inWindow(months)} THEN mp.match_id END) AS ${prefix}matches`;
+
   const rows = await sqlite
     .prepare(
       `SELECT mp.venue_name AS venue,
-         SUM(CASE WHEN p.role = 'BOWL' THEN 0 ELSE mp.fantasy_points END) AS bat_sum,
-         SUM(CASE WHEN p.role = 'BOWL' THEN 0 ELSE 1 END) AS bat_n,
-         SUM(CASE WHEN p.role = 'BOWL' THEN mp.fantasy_points ELSE 0 END) AS bowl_sum,
-         SUM(CASE WHEN p.role = 'BOWL' THEN 1 ELSE 0 END) AS bowl_n,
-         COUNT(DISTINCT mp.match_id) AS matches
+${cols("r_", RECENT_MONTHS)},
+${cols("w_", WIDE_MONTHS)}
        FROM match_performances mp
        JOIN players p ON p.id = mp.player_id
        WHERE mp.format IN (${fmt})
          AND mp.venue_name IS NOT NULL
          AND mp.fantasy_points IS NOT NULL
-         AND mp.match_date >= date('now', '-${months} months')
+         AND mp.match_date >= date('now', '-${WIDE_MONTHS} months')
          AND ${gender === "female" ? "p.gender = 'female'" : "(p.gender != 'female' OR p.gender IS NULL)"}
        GROUP BY mp.venue_name`
     )
-    .all() as Array<{ venue: string } & Omit<Row, "ground">>;
+    .all() as Array<{
+    venue: string;
+    r_bat_sum: number; r_bat_n: number; r_bowl_sum: number; r_bowl_n: number; r_matches: number;
+    w_bat_sum: number; w_bat_n: number; w_bowl_sum: number; w_bowl_n: number; w_matches: number;
+  }>;
 
-  const out = new Map<string, Row>();
+  const fold = (
+    out: Map<string, Row>,
+    g: string,
+    bat_sum: number, bat_n: number, bowl_sum: number, bowl_n: number, matches: number
+  ) => {
+    const cur = out.get(g) ?? { ground: g, bat_sum: 0, bat_n: 0, bowl_sum: 0, bowl_n: 0, matches: 0 };
+    cur.bat_sum += bat_sum; cur.bat_n += bat_n;
+    cur.bowl_sum += bowl_sum; cur.bowl_n += bowl_n; cur.matches += matches;
+    out.set(g, cur);
+  };
+
+  const recent = new Map<string, Row>();
+  const wide = new Map<string, Row>();
   for (const r of rows) {
     const g = canonicalVenue(r.venue);
-    const cur = out.get(g) ?? { ground: g, bat_sum: 0, bat_n: 0, bowl_sum: 0, bowl_n: 0, matches: 0 };
-    cur.bat_sum += r.bat_sum; cur.bat_n += r.bat_n;
-    cur.bowl_sum += r.bowl_sum; cur.bowl_n += r.bowl_n; cur.matches += r.matches;
-    out.set(g, cur);
+    if (r.r_matches > 0) fold(recent, g, r.r_bat_sum, r.r_bat_n, r.r_bowl_sum, r.r_bowl_n, r.r_matches);
+    fold(wide, g, r.w_bat_sum, r.w_bat_n, r.w_bowl_sum, r.w_bowl_n, r.w_matches);
   }
-  return out;
+  return { recent, wide };
 }
 
 const ratioOf = (r: Row | undefined) =>
@@ -102,10 +132,8 @@ export async function computeBatIndex(gender: "male" | "female" = "male"): Promi
   byGround: Map<string, BatIndexEntry>;
   median: number;
 }> {
-  const [recent, wide] = await Promise.all([
-    read(RECENT_MONTHS, gender),
-    read(WIDE_MONTHS, gender),
-  ]);
+  // Both windows come back from a single query — see readWindows().
+  const { recent, wide } = await readWindows(gender);
 
   const byGround = new Map<string, BatIndexEntry>();
   for (const ground of new Set([...recent.keys(), ...wide.keys()])) {

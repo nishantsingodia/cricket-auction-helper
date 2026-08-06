@@ -20,7 +20,12 @@ import {
   LPL_VENUES,
   LPL_TEAM_SCHEDULE,
 } from "@/lib/squads/lpl-2026";
-import { computeBatIndex, describeBatIndex, venueTypeFromBatIndex } from "./bat-index";
+import {
+  computeBatIndex,
+  describeBatIndex,
+  venueTypeFromBatIndex,
+  type BatIndexEntry,
+} from "./bat-index";
 import { canonicalVenue } from "@/lib/registry/venues";
 import {
   CPL_2026_NAME,
@@ -150,17 +155,29 @@ export interface TourVenueContext {
   // League median Bat Index — read every ground RELATIVE to this (it is ~0.90, not 1.0, because a
   // wicket is worth 30 points so bowlers out-earn batters on average).
   batIndexMedian?: number;
+  // The full canonical-ground -> Bat Index map this context was built from. Carried on the context
+  // purely so a caller that needs the raw entries (/api/venues wants batFp/bowlFp, which the
+  // per-venue fields above don't carry) can reuse it instead of re-running computeBatIndex — that's
+  // a second full scan of match_performances, i.e. a whole extra network round-trip on Turso.
+  // Same object, same numbers; NOT serialized into any API response.
+  batIndexByGround?: Map<string, BatIndexEntry>;
 }
 
 // Decorates each venue with its Bat Index (reporting only — it never affects a price).
 async function withBatIndex(
   venues: TourVenue[],
   gender: "male" | "female"
-): Promise<{ venues: TourVenue[]; batIndexMedian: number }> {
+): Promise<{
+  venues: TourVenue[];
+  batIndexMedian: number;
+  batIndexByGround: Map<string, BatIndexEntry>;
+}> {
   const { byGround, median } = await computeBatIndex(gender);
   return {
     median,
     batIndexMedian: median,
+    // handed back so callers can reuse this computation rather than repeat the scan
+    batIndexByGround: byGround,
     venues: venues.map((v) => {
       // The tour files' canonical spelling may differ from the registry's, so map it first.
       const e = byGround.get(canonicalVenue(v.canonical));
@@ -179,7 +196,12 @@ async function withBatIndex(
           e.source === "neutral" ? "No usable sample" : describeBatIndex(e.batIndex, median).label,
       };
     }),
-  } as { venues: TourVenue[]; batIndexMedian: number; median: number };
+  } as {
+    venues: TourVenue[];
+    batIndexMedian: number;
+    median: number;
+    batIndexByGround: Map<string, BatIndexEntry>;
+  };
 }
 
 // Returns the venue context for a tour name, or null if the tour has no home/venue model here yet.
@@ -208,7 +230,7 @@ export async function getTourVenueContext(tournamentName: string): Promise<TourV
       gender: isHundredMen ? "male" : "female",
       venueFormats: ["HUN", "T20"],
       venueWindowMonths: 30,
-      ...(await (async () => { const d = await withBatIndex(HUNDRED_VENUES.map((v) => ({ canonical: v.canonical, variants: v.variants, type: v.type })), isHundredWomen ? "female" : "male"); return { venues: d.venues, batIndexMedian: d.batIndexMedian }; })()),
+      ...(await (async () => { const d = await withBatIndex(HUNDRED_VENUES.map((v) => ({ canonical: v.canonical, variants: v.variants, type: v.type })), isHundredWomen ? "female" : "male"); return { venues: d.venues, batIndexMedian: d.batIndexMedian, batIndexByGround: d.batIndexByGround }; })()),
       teamSchedule,
       homeOf,
     };
@@ -224,7 +246,7 @@ export async function getTourVenueContext(tournamentName: string): Promise<TourV
       venueFormats: ["LPL", "T20"],
       venueWindowMonths: 60,
       // Only the 3 league grounds carry a per-team schedule; Premadasa is a playoffs-only venue.
-      ...(await (async () => { const d = await withBatIndex(LPL_VENUES.map((v) => ({ canonical: v.canonical, variants: v.variants, type: v.type })), "male"); return { venues: d.venues, batIndexMedian: d.batIndexMedian }; })()),
+      ...(await (async () => { const d = await withBatIndex(LPL_VENUES.map((v) => ({ canonical: v.canonical, variants: v.variants, type: v.type })), "male"); return { venues: d.venues, batIndexMedian: d.batIndexMedian, batIndexByGround: d.batIndexByGround }; })()),
       teamSchedule: LPL_TEAM_SCHEDULE,
       homeOf,
     };
@@ -248,7 +270,7 @@ export async function getTourVenueContext(tournamentName: string): Promise<TourV
       gender: "male",
       venueFormats: ["CPL", "T20"],
       venueWindowMonths: 60,
-      ...(await (async () => { const d = await withBatIndex(CPL_VENUES.map((v) => ({ canonical: v.canonical, variants: v.variants, type: v.type })), "male"); return { venues: d.venues, batIndexMedian: d.batIndexMedian }; })()),
+      ...(await (async () => { const d = await withBatIndex(CPL_VENUES.map((v) => ({ canonical: v.canonical, variants: v.variants, type: v.type })), "male"); return { venues: d.venues, batIndexMedian: d.batIndexMedian, batIndexByGround: d.batIndexByGround }; })()),
       // Mirror the engine: honour CPL_VENUE_BASIS so the header chip never disagrees with valuations.
       teamSchedule:
         CPL_VENUE_BASIS === "tournament"

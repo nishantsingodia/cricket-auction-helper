@@ -17,6 +17,7 @@ import {
 import { PlayerDetailModal } from "@/components/player/PlayerDetailModal";
 import { VenueDetailModal } from "@/components/venue/VenueDetailModal";
 import { SellDialog } from "@/components/auction/SellDialog";
+import { LineupsBoard, useMediaQuery } from "@/components/auction/LineupsBoard";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   DndContext,
@@ -36,7 +37,7 @@ import { CSS } from "@dnd-kit/utilities";
 
 // ── Types ──────────────────────────────────────────────────────────
 
-interface Participant {
+export interface Participant {
   id: number;
   name: string;
   short_name: string;
@@ -46,7 +47,7 @@ interface Participant {
   is_me: boolean | number;
 }
 
-interface PoolPlayer {
+export interface PoolPlayer {
   pool_id: number;
   player_id: number;
   name: string;
@@ -118,8 +119,8 @@ interface TourConsensus {
   gender: "male" | "female";
 }
 
-type VenueClass = "bat_road" | "balanced" | "bowl_friendly";
-interface TeamVenueSummary {
+export type VenueClass = "bat_road" | "balanced" | "bowl_friendly";
+export interface TeamVenueSummary {
   neutral: boolean;
   home: string | null;
   homeGames: number;
@@ -137,20 +138,20 @@ interface TeamVenueSummary {
 }
 
 // bat/bowl class → short pill label + color (bowl-friendly=green, balanced=amber, bat=red).
-const VENUE_CLASS_META: Record<VenueClass, { short: string; cls: string }> = {
+export const VENUE_CLASS_META: Record<VenueClass, { short: string; cls: string }> = {
   bat_road: { short: "Bat-friendly", cls: "bg-red-600/80" },
   balanced: { short: "Balanced", cls: "bg-amber-600/80" },
   bowl_friendly: { short: "Bowl-friendly", cls: "bg-emerald-600/80" },
 };
 
 // "Lord's, London" -> "Lord's"; "The Rose Bowl, Southampton" -> "The Rose Bowl".
-function shortVenue(canonical: string | null): string {
+export function shortVenue(canonical: string | null): string {
   if (!canonical) return "—";
   return canonical.split(",")[0].trim();
 }
 
 // IPL Best-of-12: top 12 are "Playing XII", rest are bench
-const PLAYING_XI_SIZE = 12;
+export const PLAYING_XI_SIZE = 12;
 
 // ── IPL Team Colors ────────────────────────────────────────────────
 
@@ -254,7 +255,7 @@ function getSlabLegend(slabs: PriceSlab[]) {
 }
 
 // Short role tag for the board cell.
-const ROLE_SHORT: Record<string, string> = { WK: "WK", BAT: "BAT", AR: "AR", BOWL: "BWL" };
+export const ROLE_SHORT: Record<string, string> = { WK: "WK", BAT: "BAT", AR: "AR", BOWL: "BWL" };
 
 // Bowling-type icon. PACE = comet ☄️ (right-arm) / horizontally mirrored (left-arm). SPIN = spiral
 // 🌀 whose handedness shows the ball-turn: default = "clockwise" (off-spin / left-arm wrist-spin
@@ -285,7 +286,13 @@ export default function AuctionPage() {
 
   const [data, setData] = useState<AuctionData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<"grid" | "list">("grid");
+  // View: `null` = "user has not chosen", which resolves to Lineups on a phone and Grid on desktop.
+  // The breakpoint comes from useMediaQuery (useSyncExternalStore) whose SERVER snapshot is false,
+  // so SSR + hydration both render Grid and React swaps in the phone default afterwards — no
+  // window read during render, no hydration mismatch, no setState-in-an-effect.
+  const [view, setView] = useState<"grid" | "list" | "lineups" | null>(null);
+  const isPhone = useMediaQuery("(max-width: 767px)");
+  const activeView = view ?? (isPhone ? "lineups" : "grid");
 
   // Modal states
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
@@ -604,7 +611,7 @@ export default function AuctionPage() {
             <button
               onClick={() => setView("grid")}
               className={`px-3 py-1.5 text-sm min-h-[40px] md:min-h-0 ${
-                view === "grid"
+                activeView === "grid"
                   ? "bg-primary text-primary-foreground"
                   : "hover:bg-muted"
               }`}
@@ -612,9 +619,19 @@ export default function AuctionPage() {
               Grid
             </button>
             <button
+              onClick={() => setView("lineups")}
+              className={`px-3 py-1.5 text-sm min-h-[40px] md:min-h-0 border-l border-border ${
+                activeView === "lineups"
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-muted"
+              }`}
+            >
+              Lineups
+            </button>
+            <button
               onClick={() => setView("list")}
-              className={`px-3 py-1.5 text-sm min-h-[40px] md:min-h-0 ${
-                view === "list"
+              className={`px-3 py-1.5 text-sm min-h-[40px] md:min-h-0 border-l border-border ${
+                activeView === "list"
                   ? "bg-primary text-primary-foreground"
                   : "hover:bg-muted"
               }`}
@@ -699,7 +716,7 @@ export default function AuctionPage() {
       {/* Content */}
       <div className="flex">
         <div className="flex-1 min-w-0">
-          {view === "grid" ? (
+          {activeView === "grid" ? (
             <SquadGrid
               sortedTeams={sortedTeams}
               watchlist={watchlist}
@@ -719,6 +736,15 @@ export default function AuctionPage() {
               marketFactor={marketFactor}
               teamPitchBreakdown={teamPitchBreakdown}
               teamVenueSummary={teamVenueSummary}
+              onVenueClick={setSelectedVenue}
+            />
+          ) : activeView === "lineups" ? (
+            <LineupsBoard
+              sortedTeams={sortedTeams}
+              participants={participants}
+              myId={myId}
+              teamVenueSummary={teamVenueSummary}
+              onPlayerClick={setSelectedPlayerId}
               onVenueClick={setSelectedVenue}
             />
           ) : (
@@ -1070,15 +1096,18 @@ function TeamColumn({
               ].join("\n");
             })()}
           >
-            <span className={venueSummary.batGames ? "text-emerald-300" : "text-white/35"}>
+            {/* Colours MUST track VENUE_CLASS_META (bat = red, balanced = amber, bowl = emerald),
+                which is what the class pill directly above uses. These were inverted — a team with a
+                green "Bowl-friendly" pill showed its Bo count in red, in the same header. */}
+            <span className={venueSummary.batGames ? "text-rose-300" : "text-white/35"}>
               {venueSummary.batGames} Ba
             </span>
             <span className="text-white/25">·</span>
-            <span className={venueSummary.bowlGames ? "text-rose-300" : "text-white/35"}>
+            <span className={venueSummary.bowlGames ? "text-emerald-300" : "text-white/35"}>
               {venueSummary.bowlGames} Bo
             </span>
             <span className="text-white/25">·</span>
-            <span className={venueSummary.balancedGames ? "text-sky-300" : "text-white/35"}>
+            <span className={venueSummary.balancedGames ? "text-amber-300" : "text-white/35"}>
               {venueSummary.balancedGames} Ne
             </span>
           </div>

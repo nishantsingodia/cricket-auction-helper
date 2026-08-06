@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sqlite } from "@/db";
+import { client, sqlite } from "@/db";
 import {
   getTourVenueContext,
   VENUE_PROFILES,
@@ -39,16 +39,30 @@ export async function GET(request: NextRequest) {
     // (2yr if >=15 matches, else 4yr) while this route printed its own ratio over 2020-onward, so
     // Warner Park displayed "Bat-friendly" next to a 0.85 ratio and a "<0.95 = bowl-friendly" note.
     // Venue no longer affects any price, so this is purely a reporting surface.
-    const { byGround: batIdx, median: batIdxMedian } = await computeBatIndex(ctx.gender);
+    // PERF: reuse the Bat Index getTourVenueContext() already computed (it decorates ctx.venues from
+    // exactly this map) rather than re-scanning match_performances. Same object, same numbers.
+    const { byGround: batIdx, median: batIdxMedian } =
+      ctx.batIndexByGround
+        ? { byGround: ctx.batIndexByGround, median: ctx.batIndexMedian ?? 1.0 }
+        : await computeBatIndex(ctx.gender);
 
-    // Each ground's stats are independent, so the per-venue query fan-out runs concurrently.
-    const venues = await Promise.all(ctx.venues.map(async (v) => {
+    // Tour-level bat vs bowl consensus — the SAME number shown on the auction header chip
+    // (shared helper, scoped by the tour's format+gender), so the two never disagree.
+    // It shares nothing with the per-venue reads, so it is fired off alongside them below.
+    const scope = getTourStatScope(ctx.tour) ?? { formats: ctx.venueFormats, gender: ctx.gender };
+
+    // PERF: every ground needs the same four independent queries. Instead of 4 sequential
+    // round-trips per ground (each `.get()`/`.all()` is one network hop to Turso), all
+    // 4 x nVenues statements go out as ONE `client.batch(..., "read")`. Results come back in the
+    // order queued, so venue i owns indices [4i, 4i+3]. The SQL is untouched — same statements,
+    // same params, just delivered in one packet.
+    const stmts: Array<{ sql: string; args: Array<string> }> = [];
+    for (const v of ctx.venues) {
       const vp = v.variants.map(() => "?").join(",");
 
       // 1) Character + aggregate behavior from ball-by-ball derived performances.
-      const agg = await sqlite
-        .prepare(
-          `SELECT
+      stmts.push({
+        sql: `SELECT
              AVG(CASE WHEN p.role IN ('BAT','WK') THEN mp.fantasy_points END) AS bat_fp,
              AVG(CASE WHEN p.role = 'BOWL' THEN mp.fantasy_points END) AS bowl_fp,
              COUNT(DISTINCT mp.match_id) AS matches,
@@ -64,33 +78,22 @@ export async function GET(request: NextRequest) {
            WHERE mp.venue_name IN (${vp})
              AND mp.format IN (${fmtPlaceholders})
              AND p.gender = ?
-             AND mp.match_date >= ?`
-        )
-        .get(...v.variants, ...ctx.venueFormats, ctx.gender, SINCE) as {
-        bat_fp: number | null;
-        bowl_fp: number | null;
-        matches: number;
-        from_date: string | null;
-        to_date: string | null;
-        fours: number;
-        sixes: number;
-        wkts: number;
-        bruns: number;
-        bballs: number;
-      };
+             AND mp.match_date >= ?`,
+        args: [...v.variants, ...ctx.venueFormats, ctx.gender, SINCE],
+      });
 
       // 2) Avg 1st-innings score from the seeded venues table (variants merged by mean). NOTE: the
       // venues table's avg_run_rate column is actually AVG(fantasy_points) (misnamed in seed_venues.py)
       // and avg_second_innings_score is only hand-seeded for a few grounds — so we deliberately DON'T
       // surface either; the real scoring rate comes from the computed bowling economy below.
-      const inns = await sqlite
-        .prepare(`SELECT AVG(avg_first_innings_score) AS fis FROM venues WHERE name IN (${vp})`)
-        .get(...v.variants) as { fis: number | null };
+      stmts.push({
+        sql: `SELECT AVG(avg_first_innings_score) AS fis FROM venues WHERE name IN (${vp})`,
+        args: [...v.variants],
+      });
 
       // 3) Recent matches at the ground (aggregated per match) + its top fantasy performer.
-      const recentRows = await sqlite
-        .prepare(
-          `SELECT mp.match_id AS match_id,
+      stmts.push({
+        sql: `SELECT mp.match_id AS match_id,
                   MAX(mp.match_date) AS date,
                   MAX(mp.format) AS format,
                   SUM(COALESCE(mp.bat_runs,0)) AS runs,
@@ -103,45 +106,16 @@ export async function GET(request: NextRequest) {
              AND p.gender = ?
            GROUP BY mp.match_id
            ORDER BY date DESC
-           LIMIT 6`
-        )
-        .all(...v.variants, ...ctx.venueFormats, ctx.gender) as Array<{
-        match_id: string;
-        date: string;
-        format: string;
-        runs: number;
-        sixes: number;
-        wkts: number;
-      }>;
-
-      let topByMatch: Record<string, { name: string; fp: number }> = {};
-      if (recentRows.length) {
-        const idPlaceholders = recentRows.map(() => "?").join(",");
-        const tops = await sqlite
-          .prepare(
-            `SELECT match_id, name, fantasy_points FROM (
-               SELECT mp.match_id AS match_id, p.name AS name, mp.fantasy_points AS fantasy_points,
-                 ROW_NUMBER() OVER (PARTITION BY mp.match_id ORDER BY mp.fantasy_points DESC) AS rn
-               FROM match_performances mp
-               JOIN players p ON mp.player_id = p.id
-               WHERE mp.match_id IN (${idPlaceholders})
-             ) WHERE rn = 1`
-          )
-          .all(...recentRows.map((r) => r.match_id)) as Array<{
-          match_id: string;
-          name: string;
-          fantasy_points: number;
-        }>;
-        topByMatch = Object.fromEntries(tops.map((t) => [t.match_id, { name: t.name, fp: t.fantasy_points }]));
-      }
+           LIMIT 6`,
+        args: [...v.variants, ...ctx.venueFormats, ctx.gender],
+      });
 
       // 4) Spin vs pace effectiveness — sum wickets/runs/balls per bowler, classify via the
       // cricsheet_id-keyed style map, then derive average (runs/wkt), strike rate (balls/wkt) and
       // economy (runs/over) per type. Coverage = share of wickets where the bowler's style is known
       // (reported so a partial map stays honest). bowl_wickets excludes run-outs (bowler credits only).
-      const wktRows = await sqlite
-        .prepare(
-          `SELECT p.cricsheet_id AS cid,
+      stmts.push({
+        sql: `SELECT p.cricsheet_id AS cid,
                   p.bowl_style AS bowl_style,
                   SUM(mp.bowl_wickets) AS w,
                   SUM(COALESCE(mp.bowl_runs,0)) AS r,
@@ -153,15 +127,77 @@ export async function GET(request: NextRequest) {
              AND p.gender = ?
              AND mp.match_date >= ?
              AND mp.bowl_balls > 0
-           GROUP BY p.id`
+           GROUP BY p.id`,
+        args: [...v.variants, ...ctx.venueFormats, ctx.gender, SINCE],
+      });
+    }
+
+    // One round-trip for all the per-venue stats; the tour consensus rides alongside it.
+    const [batched, consensus] = await Promise.all([
+      client.batch(stmts, "read"),
+      computeTourConsensus(scope),
+    ]);
+
+    const aggOf = (i: number) => batched[i * 4].rows[0] as unknown as {
+      bat_fp: number | null;
+      bowl_fp: number | null;
+      matches: number;
+      from_date: string | null;
+      to_date: string | null;
+      fours: number;
+      sixes: number;
+      wkts: number;
+      bruns: number;
+      bballs: number;
+    };
+    const innsOf = (i: number) => batched[i * 4 + 1].rows[0] as unknown as { fis: number | null };
+    const recentOf = (i: number) => batched[i * 4 + 2].rows as unknown as Array<{
+      match_id: string;
+      date: string;
+      format: string;
+      runs: number;
+      sixes: number;
+      wkts: number;
+    }>;
+    const wktRowsOf = (i: number) => batched[i * 4 + 3].rows as unknown as Array<{
+      cid: string | null;
+      bowl_style: string | null;
+      w: number;
+      r: number;
+      b: number;
+    }>;
+
+    // Top performer per recent match. This query keys on match_id ONLY (no venue predicate), so the
+    // per-ground lookups it used to do are folded into a single IN (...) over every ground's recent
+    // match ids and grouped back in JS — one round-trip instead of one per ground.
+    const allRecentIds = [...new Set(ctx.venues.flatMap((_, i) => recentOf(i).map((r) => r.match_id)))];
+    const topByMatch: Record<string, { name: string; fp: number }> = {};
+    if (allRecentIds.length) {
+      const idPlaceholders = allRecentIds.map(() => "?").join(",");
+      const tops = await sqlite
+        .prepare(
+          `SELECT match_id, name, fantasy_points FROM (
+             SELECT mp.match_id AS match_id, p.name AS name, mp.fantasy_points AS fantasy_points,
+               ROW_NUMBER() OVER (PARTITION BY mp.match_id ORDER BY mp.fantasy_points DESC) AS rn
+             FROM match_performances mp
+             JOIN players p ON mp.player_id = p.id
+             WHERE mp.match_id IN (${idPlaceholders})
+           ) WHERE rn = 1`
         )
-        .all(...v.variants, ...ctx.venueFormats, ctx.gender, SINCE) as Array<{
-        cid: string | null;
-        bowl_style: string | null;
-        w: number;
-        r: number;
-        b: number;
+        .all(...allRecentIds) as Array<{
+        match_id: string;
+        name: string;
+        fantasy_points: number;
       }>;
+      for (const t of tops) topByMatch[t.match_id] = { name: t.name, fp: t.fantasy_points };
+    }
+
+    const venues = ctx.venues.map((v, i) => {
+      const agg = aggOf(i);
+      const inns = innsOf(i);
+      const recentRows = recentOf(i);
+      const wktRows = wktRowsOf(i);
+
       let spinWkts = 0, paceWkts = 0, totalWkts = 0;
       let spinRuns = 0, spinBalls = 0, paceRuns = 0, paceBalls = 0;
       for (const row of wktRows) {
@@ -239,12 +275,7 @@ export async function GET(request: NextRequest) {
           top: topByMatch[r.match_id] ?? null,
         })),
       };
-    }));
-
-    // Tour-level bat vs bowl consensus — the SAME number shown on the auction header chip
-    // (shared helper, scoped by the tour's format+gender), so the two never disagree.
-    const scope = getTourStatScope(ctx.tour) ?? { formats: ctx.venueFormats, gender: ctx.gender };
-    const consensus = await computeTourConsensus(scope);
+    });
 
     return NextResponse.json({
       tour: ctx.tour,

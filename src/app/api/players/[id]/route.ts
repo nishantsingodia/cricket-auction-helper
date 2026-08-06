@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sqlite } from "@/db";
+import { client } from "@/db";
 import { calculateFantasyPoints } from "@/lib/fantasy-points/calculator";
 import type { MatchPerformance, PlayerRole } from "@/lib/fantasy-points/types";
 import { getTourVenueContext } from "@/lib/venues/tour-venues";
@@ -15,30 +15,6 @@ export async function GET(
     return NextResponse.json({ error: "Invalid player ID" }, { status: 400 });
   }
 
-  // Player basic info
-  const player = await sqlite
-    .prepare("SELECT * FROM players WHERE id = ?")
-    .get(playerId) as Record<string, unknown> | undefined;
-
-  if (!player) {
-    return NextResponse.json({ error: "Player not found" }, { status: 404 });
-  }
-
-  // Career stats (all formats)
-  const careerStats = await sqlite
-    .prepare("SELECT * FROM career_stats WHERE player_id = ? ORDER BY format")
-    .all(playerId) as Record<string, unknown>[];
-
-  // Recent match performances (last 20)
-  const recentMatches = await sqlite
-    .prepare(`
-      SELECT * FROM match_performances
-      WHERE player_id = ?
-      ORDER BY match_date DESC
-      LIMIT 40
-    `)
-    .all(playerId) as Record<string, unknown>[];
-
   // Venue stats. When a tour is supplied AND we have a venue model for it (The Hundred / LPL
   // today), restrict to just the grounds used in that tour. The pre-aggregated player_venue_stats
   // table is keyed per cricsheet name-variant (one physical ground -> several rows, e.g.
@@ -48,18 +24,116 @@ export async function GET(
   // Otherwise fall back to the player's career top-10 venues (used by /compare and by tours with
   // no venue model).
   const tour = req.nextUrl.searchParams.get("tour") ?? "";
-  const tourVenues = tour ? await getTourVenueContext(tour) : null;
 
-  const venueStats: Record<string, unknown>[] = tourVenues
-    ? (
-        // One aggregation query per ground — issued concurrently, since each
-        // venue's variants are independent.
-        await Promise.all(
-          tourVenues.venues.map(async (v): Promise<Record<string, unknown>> => {
-          const vp = v.variants.map(() => "?").join(",");
-          // Per-ground aggregation mirrors compute_venue_stats() in data/etl_cricsheet.py.
-          const agg = await sqlite
-            .prepare(`
+  // PERF: every player-scoped read below is independent of the others, so they all go out as ONE
+  // `client.batch(..., "read")` instead of 7 sequential network round-trips. The tour venue context
+  // (its own query) runs concurrently with that batch. Results come back in the order queued.
+  // Only the no-tour venue fallback is conditional, so it is appended last.
+  const mainStmts: Array<{ sql: string; args: Array<number> }> = [
+    // Player basic info
+    { sql: "SELECT * FROM players WHERE id = ?", args: [playerId] },
+    // Career stats (all formats)
+    { sql: "SELECT * FROM career_stats WHERE player_id = ? ORDER BY format", args: [playerId] },
+    // Recent match performances (last 20)
+    {
+      sql: `
+      SELECT * FROM match_performances
+      WHERE player_id = ?
+      ORDER BY match_date DESC
+      LIMIT 40
+    `,
+      args: [playerId],
+    },
+    // Opposition stats (top 10 by matches)
+    {
+      sql: `
+      SELECT * FROM player_opposition_stats
+      WHERE player_id = ?
+      ORDER BY matches DESC
+      LIMIT 10
+    `,
+      args: [playerId],
+    },
+    // Fantasy points trend (last 20 matches)
+    {
+      sql: `
+      SELECT match_date, fantasy_points, format, opposition, venue_name,
+             bat_runs, bat_balls, bat_4s, bat_6s,
+             bowl_wickets, bowl_balls, bowl_runs, bowl_dots,
+             catches, stumpings, run_outs
+      FROM match_performances
+      WHERE player_id = ?
+      ORDER BY match_date DESC
+      LIMIT 20
+    `,
+      args: [playerId],
+    },
+    // Match performances the fantasy breakdown is computed from (IPL/T20 matches)
+    {
+      sql: `
+      SELECT format, bat_runs, bat_balls, bat_4s, bat_6s, bat_dismissed, dismissal_type,
+             bowl_balls, bowl_runs, bowl_wickets, bowl_maidens, bowl_dots, bowl_lbw_bowled,
+             catches, stumpings, run_outs, direct_run_outs, fantasy_points
+      FROM match_performances
+      WHERE player_id = ? AND format IN ('IPL', 'T20I', 'T20', 'ODI')
+      ORDER BY match_date DESC
+      LIMIT 50
+    `,
+      args: [playerId],
+    },
+    // Avg batting position across white-ball franchise/T20 (excludes did-not-bat: bat_position null).
+    {
+      sql: `SELECT ROUND(AVG(bat_position), 1) AS avg_pos, COUNT(*) AS inns
+       FROM match_performances
+       WHERE player_id = ? AND bat_position IS NOT NULL
+         AND format IN ('HUN','WPL','T20','WBBL','BLAST')`,
+      args: [playerId],
+    },
+  ];
+  if (!tour) {
+    mainStmts.push({
+      sql: `
+          SELECT pvs.*, v.name as venue_name, v.city, v.country, v.pitch_type
+          FROM player_venue_stats pvs
+          JOIN venues v ON pvs.venue_id = v.id
+          WHERE pvs.player_id = ?
+          ORDER BY pvs.matches DESC
+          LIMIT 10
+        `,
+      args: [playerId],
+    });
+  }
+
+  const [mainRows, tourVenues] = await Promise.all([
+    client.batch(mainStmts, "read"),
+    tour ? getTourVenueContext(tour) : Promise.resolve(null),
+  ]);
+
+  const player = mainRows[0].rows[0] as unknown as Record<string, unknown> | undefined;
+
+  if (!player) {
+    return NextResponse.json({ error: "Player not found" }, { status: 404 });
+  }
+
+  const careerStats = mainRows[1].rows as unknown as Record<string, unknown>[];
+  const recentMatches = mainRows[2].rows as unknown as Record<string, unknown>[];
+  const oppositionStats = mainRows[3].rows as unknown as Record<string, unknown>[];
+  const fantasyTrend = mainRows[4].rows as unknown as Record<string, unknown>[];
+  const breakdownMatches = mainRows[5].rows as unknown as Record<string, unknown>[];
+  const batPosRow = mainRows[6].rows[0] as unknown as { avg_pos: number | null; inns: number };
+
+  let venueStats: Record<string, unknown>[];
+  if (tourVenues) {
+    // PERF: the two per-ground queries used to be awaited in sequence inside a Promise.all fan-out,
+    // i.e. 2 round-trips deep per ground. They're all independent, so the whole 2 x nVenues set is
+    // sent as ONE batch; ground i owns indices [2i, 2i+1]. Same SQL, same params, same order — the
+    // filter/sort below is unchanged, so the row set is identical.
+    const venueStmts: Array<{ sql: string; args: Array<string | number> }> = [];
+    for (const v of tourVenues.venues) {
+      const vp = v.variants.map(() => "?").join(",");
+      // Per-ground aggregation mirrors compute_venue_stats() in data/etl_cricsheet.py.
+      venueStmts.push({
+        sql: `
               SELECT
                 COUNT(*) AS matches,
                 SUM(COALESCE(bat_runs, 0)) AS bat_runs,
@@ -76,66 +150,29 @@ export async function GET(
                 AVG(COALESCE(fantasy_points, 0)) AS avg_fantasy_points
               FROM match_performances
               WHERE player_id = ? AND venue_name IN (${vp})
-            `)
-            .get(playerId, ...v.variants) as Record<string, unknown>;
-          // city + pitch_type come from the venues catalog. Seed data populates these on only some
-          // name variants, so MAX() (which skips NULLs in SQLite) prefers a populated value.
-          const meta = ((await sqlite
-            .prepare(`SELECT MAX(city) AS city, MAX(pitch_type) AS pitch_type FROM venues WHERE name IN (${vp})`)
-            .get(...v.variants)) as Record<string, unknown> | undefined) ?? {};
-          return { venue_name: v.canonical, ...meta, ...agg };
-          })
-        )
-      )
-        .filter((r) => (r.matches as number) > 0)
-        .sort((a, b) => (b.matches as number) - (a.matches as number))
-    : (await sqlite
-        .prepare(`
-          SELECT pvs.*, v.name as venue_name, v.city, v.country, v.pitch_type
-          FROM player_venue_stats pvs
-          JOIN venues v ON pvs.venue_id = v.id
-          WHERE pvs.player_id = ?
-          ORDER BY pvs.matches DESC
-          LIMIT 10
-        `)
-        .all(playerId) as Record<string, unknown>[]);
-
-  // Opposition stats (top 10 by matches)
-  const oppositionStats = await sqlite
-    .prepare(`
-      SELECT * FROM player_opposition_stats
-      WHERE player_id = ?
-      ORDER BY matches DESC
-      LIMIT 10
-    `)
-    .all(playerId) as Record<string, unknown>[];
-
-  // Fantasy points trend (last 20 matches)
-  const fantasyTrend = await sqlite
-    .prepare(`
-      SELECT match_date, fantasy_points, format, opposition, venue_name,
-             bat_runs, bat_balls, bat_4s, bat_6s,
-             bowl_wickets, bowl_balls, bowl_runs, bowl_dots,
-             catches, stumpings, run_outs
-      FROM match_performances
-      WHERE player_id = ?
-      ORDER BY match_date DESC
-      LIMIT 20
-    `)
-    .all(playerId) as Record<string, unknown>[];
-
-  // Compute fantasy breakdown from match performances (IPL/T20 matches)
-  const breakdownMatches = await sqlite
-    .prepare(`
-      SELECT format, bat_runs, bat_balls, bat_4s, bat_6s, bat_dismissed, dismissal_type,
-             bowl_balls, bowl_runs, bowl_wickets, bowl_maidens, bowl_dots, bowl_lbw_bowled,
-             catches, stumpings, run_outs, direct_run_outs, fantasy_points
-      FROM match_performances
-      WHERE player_id = ? AND format IN ('IPL', 'T20I', 'T20', 'ODI')
-      ORDER BY match_date DESC
-      LIMIT 50
-    `)
-    .all(playerId) as Record<string, unknown>[];
+            `,
+        args: [playerId, ...v.variants],
+      });
+      // city + pitch_type come from the venues catalog. Seed data populates these on only some
+      // name variants, so MAX() (which skips NULLs in SQLite) prefers a populated value.
+      venueStmts.push({
+        sql: `SELECT MAX(city) AS city, MAX(pitch_type) AS pitch_type FROM venues WHERE name IN (${vp})`,
+        args: [...v.variants],
+      });
+    }
+    const venueRows = await client.batch(venueStmts, "read");
+    venueStats = tourVenues.venues
+      .map((v, i): Record<string, unknown> => {
+        const agg = venueRows[i * 2].rows[0] as unknown as Record<string, unknown>;
+        const meta =
+          (venueRows[i * 2 + 1].rows[0] as unknown as Record<string, unknown> | undefined) ?? {};
+        return { venue_name: v.canonical, ...meta, ...agg };
+      })
+      .filter((r) => (r.matches as number) > 0)
+      .sort((a, b) => (b.matches as number) - (a.matches as number));
+  } else {
+    venueStats = mainRows[7].rows as unknown as Record<string, unknown>[];
+  }
 
   let fantasyBreakdown = null;
   if (breakdownMatches.length > 0) {
@@ -191,16 +228,7 @@ export async function GET(
     };
   }
 
-  // Avg batting position across white-ball franchise/T20 (excludes did-not-bat: bat_position null).
-  const batPosRow = await sqlite
-    .prepare(
-      `SELECT ROUND(AVG(bat_position), 1) AS avg_pos, COUNT(*) AS inns
-       FROM match_performances
-       WHERE player_id = ? AND bat_position IS NOT NULL
-         AND format IN ('HUN','WPL','T20','WBBL','BLAST')`
-    )
-    .get(playerId) as { avg_pos: number | null; inns: number };
-
+  // (avg batting position — `batPosRow` — came back in the batch above)
   return NextResponse.json({
     avgBatPosition: batPosRow.avg_pos,
     batPositionInns: batPosRow.inns,
