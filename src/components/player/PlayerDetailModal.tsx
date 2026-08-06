@@ -300,7 +300,12 @@ export function PlayerDetailModal({ playerId, onClose, tour, riskNote, poolId, p
             {/* min-w-0 so a wide stats table scrolls inside its own box instead of
                 stretching the dialog (and the page) sideways on a phone. */}
             <Tabs defaultValue="fantasy" className="mt-4 min-w-0">
-              <TabsList className="flex-wrap h-auto w-full gap-1 sm:w-fit sm:gap-0 [&>button]:min-h-[34px] sm:[&>button]:min-h-0">
+              {/* One scrolling row, never wrapped. The TabsList primitive pins its height with
+                  `group-data-horizontal/tabs:h-8`, which out-specifies a plain `h-auto` — so a
+                  wrapped second row rendered OUTSIDE the 32px box and sat on top of the tab
+                  content ("Recent Matches / Venue Stats / vs Opposition" over the panel text).
+                  Scrolling sideways keeps it one row, so the height is never wrong. */}
+              <TabsList className="w-full max-w-full flex-nowrap justify-start gap-1 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>button]:shrink-0 [&>button]:min-h-[34px] sm:w-fit sm:gap-0 sm:overflow-visible sm:[&>button]:min-h-0 h-auto! py-1 sm:py-[3px]">
                 <TabsTrigger value="fantasy">Fantasy Breakdown</TabsTrigger>
                 <TabsTrigger value="career">Career Stats</TabsTrigger>
                 <TabsTrigger value="seasons">Season Stats</TabsTrigger>
