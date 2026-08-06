@@ -14,7 +14,7 @@
 // why it is pinned above the pager. Availability (DOUBTFUL/INJURED) is an amber `!` on the meta
 // line, never a colour. There are no owner-initial chips — the owner asked for those to go.
 
-import { useCallback, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useRef, useState, useSyncExternalStore, useLayoutEffect } from "react";
 import type { CSSProperties } from "react";
 import {
   PLAYING_XI_SIZE,
@@ -76,6 +76,7 @@ export function LineupsBoard({
   onVenueClick: (canonical: string) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const [page, setPage] = useState(0);
   const isMdUp = useMediaQuery("(min-width: 768px)");
   const pagesInView = isMdUp ? 2 : 1;
@@ -107,12 +108,42 @@ export function LineupsBoard({
 
   const walletOrder = [...participants].sort((a, b) => b.remaining_purse - a.remaining_purse);
 
+  // How much vertical room the columns actually get. A fixed reserve was guessed at 280px and was
+  // badly wrong on a phone — the auction header wraps to 5–6 rows there, so the XI started ~350px
+  // down and each column silently scrolled inside itself, which is exactly what "11 in a fold" is
+  // supposed to prevent. Measure the board's real top instead and publish it as a CSS variable.
+  // Written straight to the DOM rather than through setState: this is layout, it must not trigger a
+  // render, and the repo lints setState-in-effect as an error.
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const apply = () => {
+      const top = root.getBoundingClientRect().top;
+      // Legend + range header + pager dots sit inside the board, above/below the columns.
+      const chromeInsideBoard = 88;
+      root.style.setProperty(
+        "--lineups-col-h",
+        `${Math.max(240, window.innerHeight - top - chromeInsideBoard)}px`
+      );
+    };
+    apply();
+    window.addEventListener("resize", apply);
+    window.addEventListener("orientationchange", apply);
+    const ro = new ResizeObserver(apply);
+    ro.observe(document.body); // the header wraps as purses/toggles change — re-measure when it does
+    return () => {
+      window.removeEventListener("resize", apply);
+      window.removeEventListener("orientationchange", apply);
+      ro.disconnect();
+    };
+  }, []);
+
   if (sortedTeams.length === 0) {
     return <div className="p-6 text-sm text-muted-foreground">No squads in this pool yet.</div>;
   }
 
   return (
-    <div className="pb-2">
+    <div ref={rootRef} className="pb-2">
       {/* ── Wallet legend ──
           Sorted by purse left, descending: "who can still outbid me" reads top-to-left. Doubles as
           the ONLY colour → friend key on this screen, so it stays above the fold at all times. */}
@@ -322,7 +353,7 @@ function TeamLineup({
       {/* ── Players ── the column scrolls inside itself so the XI always fills the fold. */}
       {/* The reserve below (chrome: sticky auction header + legend + range line + dots) is tuned so
           11 rows × 44px still clear the fold on a 390×844 phone. */}
-      <div className="min-h-0 overflow-y-auto overscroll-contain max-h-[calc(100dvh-280px)] md:max-h-[calc(100dvh-215px)]">
+      <div className="min-h-0 overflow-y-auto overscroll-contain max-h-[var(--lineups-col-h,calc(100dvh-280px))]">
         {xi.map((p) => (
           <LineupRow
             key={p.player_id}

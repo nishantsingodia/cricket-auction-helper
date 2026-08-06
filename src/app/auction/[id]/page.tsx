@@ -554,7 +554,10 @@ export default function AuctionPage() {
           {/* Purse — the live-critical info, given more weight.
               Phone: one full-width row that scrolls sideways inside itself, so a 6-friend
               auction can't stack six chips and push the board off-screen. */}
-          <div className="flex items-center gap-1.5 w-full order-last overflow-x-auto md:w-auto md:order-none md:flex-wrap md:overflow-visible">
+          {/* On a phone in Lineups the wallet legend inside the board already shows every purse AND
+              doubles as the colour key, so this strip would be the same numbers twice — and the fold
+              is exactly what the XI needs. Desktop keeps it. */}
+          <div className={`${activeView === "lineups" ? "hidden md:flex" : "flex"} items-center gap-1.5 w-full order-last overflow-x-auto md:w-auto md:order-none md:flex-wrap md:overflow-visible`}>
             {participants.map((p) => {
               const pct = p.purse > 0 ? Math.max(0, Math.min(1, p.remaining_purse / p.purse)) : 0;
               const low = pct < 0.2;
@@ -583,8 +586,11 @@ export default function AuctionPage() {
 
         {/* Row 2 — controls */}
         <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 md:px-4 border-t border-border/60">
-          {/* Price tiers — click to edit */}
-          <div className="relative">
+          {/* Price tiers — click to edit.
+              Hidden on a phone in Lineups: those bands colour the Grid/Masterlist cards by price,
+              but in Lineups colour means OWNERSHIP, so showing a second colour scale next to it is
+              actively misleading as well as costing a row of the fold. */}
+          <div className={`relative ${activeView === "lineups" ? "hidden md:block" : ""}`}>
             <div
               className="flex flex-wrap items-center gap-1 cursor-pointer min-h-[40px] md:flex-nowrap md:min-h-0"
               onClick={() => setEditingSlabs((v) => !v)}
