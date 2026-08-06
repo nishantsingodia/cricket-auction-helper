@@ -174,7 +174,7 @@ export const CPL_2026: CPLTeam[] = [
       { name: "Naseem Shah", role: "BOWL", overseas: true, note: "AVAILABILITY: PLAYS 7 OF 10 — misses the FIRST 3 (8, 12, 18 Aug) for domestic commitments, per the chart. I had him at 10 after confirming he was not in Pakistan's England Test squad: right conclusion, wrong reason — the absence is domestic, not international." }, // 8  (2025: 10 games, pos 9)
       { name: "Obed McCoy", role: "BOWL", overseas: false }, // 9
       { name: "Ashmead Nedd", role: "BOWL", overseas: false }, // 10
-      { name: "Waqar Salamkheil", role: "BOWL", overseas: true }, // 11
+      { name: "Waqar Salamkheil", role: "BOWL", overseas: true, note: "AVAILABILITY: PLAYS 10 OF 10 — and he is the SAFEST overseas pick in this pool. Zero white-ball caps for Afghanistan (no T20Is, no ODIs; one Test in March 2019), so unlike Gurbaz, Nabi, Mujeeb and Noor Ahmad he carries NO call-up risk from either the Ireland ODIs or the India T20Is. That is why the T20Tracker chart gives him no caveat at all. Form is well sampled too: 79 franchise games across 7 leagues (ILT20 32, CPL 29, MLC 6, BBL 5, SA20 4, PSL 2, LPL 1), 41 CPL wickets at 7.94 econ, and St Kitts' leading wicket-taker in 2025 with 15." }, // 11
       // Depth. 2025 medians: Fletcher 2 (10 games), Wickham 4, Bidaisee 7 (7 games) — all three are
       // established squad members rather than fringe, hence the order here.
       { name: "Navin Bidaisee", role: "AR", overseas: false, note: "Breakout pick on paper but a 2025 regular — 7 games, median position 7, bowled in all 7." }, // 12
