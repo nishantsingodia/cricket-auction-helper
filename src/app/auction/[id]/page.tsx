@@ -126,6 +126,13 @@ interface TeamVenueSummary {
   batGames: number;
   balancedGames: number;
   bowlGames: number;
+  breakdown?: Array<{
+    venue: string;
+    games: number;
+    type: VenueClass | null;
+    batIndex: number | null;
+    batIndexMatches: number | null;
+  }>;
 }
 
 // bat/bowl class → short pill label + color (bowl-friendly=green, balanced=amber, bat=red).
@@ -1012,7 +1019,24 @@ function TeamColumn({
         {venueSummary && (venueSummary.batGames + venueSummary.balancedGames + venueSummary.bowlGames) > 0 && (
           <div
             className="mt-0.5 w-full flex items-center justify-center gap-1.5 text-[10px] leading-tight"
-            title="Games by ground type — Ba = bat-friendly, Bo = bowl-friendly, Ne = neutral. From the measured Bat Index; reporting only, not priced in."
+            title={(() => {
+              // Ground-by-ground detail: how many games where, and that ground's Bat Index.
+              const rows = (venueSummary.breakdown ?? []).map((b) => {
+                const cls = b.type === "bat_road" ? "Ba" : b.type === "bowl_friendly" ? "Bo" : "Ne";
+                const idx = b.batIndex != null ? b.batIndex.toFixed(3) : "no sample";
+                const n = b.batIndexMatches != null ? ` from ${b.batIndexMatches}m` : "";
+                return `${b.games}g  ${shortVenue(b.venue)} — ${idx} ${cls}${n}`;
+              });
+              return [
+                "Games by ground, with each ground's Bat Index",
+                ...rows,
+                "",
+                "Bat Index = batting-FP / bowling-FP at that ground.",
+                "Above the league median (~0.91) favours batting, below favours bowling.",
+                "Ba = bat-friendly · Bo = bowl-friendly · Ne = neutral.",
+                "Reporting only — venue does not affect any price.",
+              ].join("\n");
+            })()}
           >
             <span className={venueSummary.batGames ? "text-emerald-300" : "text-white/35"}>
               {venueSummary.batGames} Ba

@@ -274,12 +274,22 @@ export interface TeamVenueSummary {
   batGames: number;
   balancedGames: number;
   bowlGames: number;
+  // Per-ground detail for the header tooltip: which grounds, how many games at each, and each
+  // ground's measured Bat Index. Sorted most-played first.
+  breakdown: Array<{
+    venue: string; // canonical
+    games: number;
+    type: VenueType | null;
+    batIndex: number | null;
+    batIndexMatches: number | null;
+  }>;
 }
 
 export function buildTeamVenueSummaries(
   ctx: TourVenueContext
 ): Record<string, TeamVenueSummary> {
   const typeOf = new Map(ctx.venues.map((v) => [v.canonical, v.type]));
+  const idxOf = new Map(ctx.venues.map((v) => [v.canonical, v] as const));
   const out: Record<string, TeamVenueSummary> = {};
   for (const [team, schedule] of Object.entries(ctx.teamSchedule)) {
     let bat = 0, bal = 0, bowl = 0;
@@ -298,6 +308,18 @@ export function buildTeamVenueSummaries(
       batGames: Math.round(bat),
       balancedGames: Math.round(bal),
       bowlGames: Math.round(bowl),
+      breakdown: [...schedule]
+        .sort((a, b) => b.games - a.games)
+        .map(({ venue, games }) => {
+          const v = idxOf.get(venue);
+          return {
+            venue,
+            games: Math.round(games * 10) / 10, // Hundred away games are fractional
+            type: typeOf.get(venue) ?? null,
+            batIndex: v?.batIndex != null ? Math.round(v.batIndex * 1000) / 1000 : null,
+            batIndexMatches: v?.batIndexMatches ?? null,
+          };
+        }),
     };
   }
   return out;
