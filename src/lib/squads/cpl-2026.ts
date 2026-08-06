@@ -85,7 +85,7 @@ export const CPL_2026: CPLTeam[] = [
       { name: "Daniel Sams", role: "AR", overseas: true }, // 5
       { name: "Chris Green", role: "AR", overseas: true }, // 6
       { name: "Gudakesh Motie", role: "BOWL", overseas: false, note: "Signed from Guyana after five seasons at his home franchise." }, // 7
-      { name: "Mujeeb Ur Rahman", role: "BOWL", overseas: true, note: "AVAILABILITY: PLAYS 10 OF 10 as priced, but the chart marks him UNCLEAR — could miss the final 2-3 group games (10, 12, 13 Sep) and the playoffs IF Afghanistan schedule a series vs India. That series is not on the calendar, so not priced; worst case 7 of 10." }, // 8
+      { name: "Mujeeb Ur Rahman", role: "BOWL", overseas: true, note: "AVAILABILITY: PLAYS 8 OF 10 — misses BAR's last two (12, 13 Sep). Afghanistan's 3 T20Is vs India in Delhi from 13 Sep are now SCHEDULED (Asian Games prep), so the chart's conditional caveat is live. If he departs a day earlier the 10 Sep game goes too = 7. He also misses the playoffs, which are not priced here." }, // 8
       { name: "Zachary Carter", role: "BOWL", overseas: false }, // 9
       { name: "Ramon Simmonds", role: "BOWL", overseas: false, note: "Retained." }, // 10
       { name: "Johann Layne", role: "BOWL", overseas: false, note: "Breakout pick." }, // 11
@@ -105,11 +105,11 @@ export const CPL_2026: CPLTeam[] = [
       // 2025 medians: Hope 3, Hetmyer 4, Shepherd 7, Pretorius 7, Sampson 8, Pierre 8, S Joseph 10,
       // Tahir 11. Imran Tahir captains (as in 2025) and was the league's leading wicket-taker with
       // 23 in 12 — hence the bowlers sit high in this order despite batting low.
-      { name: "Rahmanullah Gurbaz", role: "WK", overseas: true, note: "AVAILABILITY: PLAYS 9 OF 10 — misses the opening game (13 Aug) as vice-captain/keeper on Afghanistan's Ireland ODI tour. ⚠️ The chart adds a second risk: he could also miss the final 2 group games (11, 13 Sep) AND the playoffs if Afghanistan schedule a series vs India — that would take him to 7. Not priced, as that series is unscheduled." }, // 1
+      { name: "Rahmanullah Gurbaz", role: "WK", overseas: true, note: "AVAILABILITY: PLAYS 9 OF 10 — misses the opening game (13 Aug) as vice-captain/keeper on Afghanistan's Ireland ODI tour. PLUS Afghanistan's 3 T20Is vs India in Delhi from 13 Sep are now SCHEDULED (Asian Games prep), costing GAW's last two (11, 13 Sep). So 10 - 1 - 2 = 7, and he misses the playoffs too (not priced). He is the only CPL Afghan hit by BOTH tours." }, // 1
       { name: "Shai Hope", role: "WK", overseas: false }, // 2  (2025: pos 3, all 12 games)
       { name: "Glenn Phillips", role: "BAT", overseas: true, note: "AVAILABILITY: PLAYS 10 OF 10 — the chart now lists him Fully Available, so the side injury is resolved." }, // 3
       { name: "Shimron Hetmyer", role: "BAT", overseas: false }, // 4  (2025: pos 4, all 12)
-      { name: "Mohammad Nabi", role: "AR", overseas: true, note: "AVAILABILITY: PLAYS 10 OF 10 as priced, but the chart marks him UNCLEAR — could miss the final 2 group games (11, 13 Sep) and the playoffs IF Afghanistan schedule a series vs India. Unscheduled, so not priced; worst case 8 of 10. He is NOT in Afghanistan's Ireland ODI squad, so the August tour does not affect him." }, // 5
+      { name: "Mohammad Nabi", role: "AR", overseas: true, note: "AVAILABILITY: PLAYS 8 OF 10 — misses GAW's last two (11, 13 Sep) for Afghanistan's 3 T20Is vs India in Delhi from 13 Sep, which are now SCHEDULED (Asian Games prep). Also misses the playoffs, not priced here. He is NOT in Afghanistan's Ireland ODI squad, so the August tour does not affect him." }, // 5
       { name: "Romario Shepherd", role: "AR", overseas: false }, // 6  (2025: pos 7, bowled all 12)
       { name: "Quentin Sampson", role: "AR", overseas: false, note: "Listed as a breakout pick but he is a 2025 REGULAR — 9 games at median position 8. T20Tracker lists him at the top of Guyana's squad. Promoted out of the reserves accordingly." }, // 7
       { name: "Imran Tahir", role: "BOWL", overseas: true, note: "CAPTAIN. 47 years old, re-signed for a 14th CPL season; led the league with 23 wickets in 12 games in 2025." }, // 8
@@ -200,7 +200,7 @@ export const CPL_2026: CPLTeam[] = [
       { name: "Roston Chase", role: "AR", overseas: false, note: "CAPTAIN. 2025: 10 games, pos 4, bowled in 9." }, // 5
       { name: "Kamil Pooran", role: "BAT", overseas: false, note: "NOT Nicholas Pooran (TKR) — no shared stats record." }, // 6
       { name: "Matthew Forde", role: "AR", overseas: false }, // 7
-      { name: "Noor Ahmad", role: "BOWL", overseas: true, note: "AVAILABILITY: PLAYS 9 OF 10 — misses the opening game (9 Aug). ⚠️ WORST CASE 6 OF 10 if Manchester Super Giants reach the Hundred final (also 12, 14, 16 Aug). Chart also flags he could miss the PLAYOFFS if Afghanistan schedule a series vs India — playoffs are not priced here." }, // 8
+      { name: "Noor Ahmad", role: "BOWL", overseas: true, note: "AVAILABILITY: PLAYS 9 OF 10 — misses the opening game (9 Aug). ⚠️ WORST CASE 6 OF 10 if Manchester Super Giants reach the Hundred final (also 12, 14, 16 Aug). Chart also flags the PLAYOFFS for Afghanistan's India T20Is (13 Sep on) — playoffs are not priced, and Saint Lucia's league season ends 9 Sep, so those T20Is cost him NO group games." }, // 8
       { name: "Maheesh Theekshana", role: "BOWL", overseas: true, note: "AVAILABILITY: PLAYS 10 OF 10 — the chart has him missing the PLAYOFFS only (national commitments), which are not priced here. A white-ball specialist, so the India Tests do not take him." }, // 9
       { name: "Joshua Bishop", role: "BOWL", overseas: false }, // 10
       { name: "McKenny Clarke", role: "BOWL", overseas: false }, // 11
@@ -327,10 +327,14 @@ const CPL_EXPECTED_GAMES: Record<string, number> = {
   // Hundred final (7, 9, 14 Aug), so 7 is the availability-consistent figure. Revise to 10 if he
   // actually lands early.
   // Guyana Amazon Warriors — INTERNATIONAL clash (checked 5 Aug 2026 against the actual calendar)
-  rahmanullahgurbaz: 9, // Afghanistan's 5-ODI tour of Ireland runs 5-15 Aug and Gurbaz is in that
-  // squad as vice-captain/keeper. GAW play just ONE league game inside that window (13 Aug), so the
-  // hit is small: 1 game, allowing 9 of 10. Nabi, Mujeeb, Noor Ahmad and Salamkheil are all CPL
-  // Afghans but are NOT in the Ireland squad, so they are unaffected.
+  rahmanullahgurbaz: 7, // TWO separate Afghanistan commitments. (a) The 5-ODI tour of Ireland,
+  // 5-15 Aug, where he is vice-captain/keeper — GAW play one league game in that window (13 Aug).
+  // (b) India v Afghanistan, 3 T20Is in Delhi from 13 Sep — now SCHEDULED, so squad members must
+  // leave ~11-12 Sep, costing GAW's last two (11 and 13 Sep). 10 - 1 - 2 = 7.
+  // Nabi, Mujeeb, Noor Ahmad and Salamkheil are NOT in the Ireland squad, so (a) is Gurbaz alone.
+  mohammadnabi: 8, // misses GAW's last 2 (11, 13 Sep) for the India T20Is
+  mujeeburrahman: 8, // misses BAR's last 2 (12, 13 Sep) for the India T20Is. The chart says
+  // "final 2-3": 8 assumes he leaves ~11-12 Sep; if he goes a day earlier the 10 Sep game falls too, = 7.
   // Jamaica Kingsmen — phase 1 (start → 18 Aug) is 5 games, phase 2 (from 19 Aug) is 5 games
   shayanjahangir: 5,
   tayyabarif: 5,
