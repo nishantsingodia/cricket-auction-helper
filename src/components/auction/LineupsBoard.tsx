@@ -465,20 +465,26 @@ function LineupRow({
         {p.squad_number || "–"}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[13px] font-semibold leading-tight truncate">{p.name}</span>
+        <span className="flex items-center gap-1 min-w-0">
+          {/* Same caution glyph the grid uses, so an availability risk reads identically in both
+              views — and it stays legible on the dark-green "mine" ground, which a tinted amber
+              character would not. */}
+          {notFit && (
+            <span
+              className="shrink-0 text-[12px] leading-none"
+              title={p.availability ?? undefined}
+              aria-label={p.availability ?? "Not fully fit"}
+            >
+              {"\u26A0\uFE0F"}
+            </span>
+          )}
+          <span className="block text-[13px] font-semibold leading-tight truncate">{p.name}</span>
+        </span>
         <span
           className={`block text-[10px] leading-tight truncate tabular-nums ${
             mineSold ? "text-white/75" : "text-muted-foreground"
           }`}
         >
-          {notFit && (
-            <span
-              className={`font-bold ${mineSold ? "text-amber-300" : "text-amber-500"}`}
-              title={p.availability ?? undefined}
-            >
-              !{" "}
-            </span>
-          )}
           {ROLE_SHORT[p.role] ?? p.role} · {price}
           {p.efppm > 0 ? ` · e${p.efppm.toFixed(1)}` : ""}
         </span>

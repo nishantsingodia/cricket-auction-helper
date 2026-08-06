@@ -585,8 +585,12 @@ export default function AuctionPage() {
           </div>
         </div>{/* end Row 1 */}
 
-        {/* Row 2 — controls */}
-        <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 md:px-4 border-t border-border/60">
+        {/* Row 2 — controls.
+            On a phone in Lineups every child of this row has moved to the bottom bar, so the row
+            itself would render as an empty band holding just the settings and theme icons — a whole
+            row of a fold that exists to show eleven players. Collapse it and put those two icons in
+            the bottom bar's More sheet instead. */}
+        <div className={`${activeView === "lineups" ? "hidden md:flex" : "flex"} flex-wrap items-center gap-2 px-3 py-1.5 md:px-4 border-t border-border/60`}>
           {/* Price tiers — click to edit.
               Hidden on a phone in Lineups: those bands colour the Grid/Masterlist cards by price,
               but in Lineups colour means OWNERSHIP, so showing a second colour scale next to it is
@@ -708,6 +712,10 @@ export default function AuctionPage() {
                 {alert && <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-red-500" />}
               </button>
             ))}
+            {/* Row 2 is collapsed on a phone, so the theme toggle lives here rather than nowhere. */}
+            <div className="min-h-[42px] flex items-center justify-center rounded-lg bg-muted/60">
+              <ThemeToggle />
+            </div>
           </div>
         )}
         <div className="grid grid-cols-5">
