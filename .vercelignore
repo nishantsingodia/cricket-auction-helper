@@ -1,0 +1,13 @@
+# The runtime reads Turso, never a local file — so none of the data belongs in the bundle.
+# Without this, `vercel deploy` uploads ~2.2GB of DB backups and raw cricsheet JSON.
+db/
+data/
+*.db
+*.db-*
+*.sqlite
+
+# Build output and local-only tooling
+.next/
+docs/
+scripts/
+*.log
