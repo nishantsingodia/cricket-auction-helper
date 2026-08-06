@@ -19,6 +19,7 @@
 import { useCallback, useRef, useState, useSyncExternalStore, useLayoutEffect } from "react";
 import type { CSSProperties } from "react";
 import {
+  hexA,
   rampStyle,
   PLAYING_XI_SIZE,
   ROLE_SHORT,
@@ -72,12 +73,14 @@ export function LineupsBoard({
   teamVenueSummary,
   getAdjustedPrice,
   slabLegend,
+  onEditSlabs,
   onPlayerClick,
   onVenueClick,
 }: {
   /** Market-adjusted expected price — the same number the grid colours its cards by. */
   getAdjustedPrice: (p: PoolPlayer) => number;
   slabLegend: { label: string; hex: string }[];
+  onEditSlabs: () => void;
   /** Already grouped + ordered upstream (XI first, by squad_number). Presentation only. */
   sortedTeams: [string, PoolPlayer[]][];
   participants: Participant[];
@@ -200,7 +203,12 @@ export function LineupsBoard({
         {/* Worth bands — the key for the colour every AVAILABLE row is painted in. Lives on this
             line rather than its own row: the header strip it used to sit in is collapsed on a phone,
             and this row was mostly empty space. */}
-        <span className="flex items-center gap-0.5 overflow-x-auto mx-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <button
+          type="button"
+          onClick={onEditSlabs}
+          title="Edit the worth bands"
+          className="flex items-center gap-0.5 overflow-x-auto mx-2 min-h-[28px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
           {slabLegend.map((sl) => (
             <span
               key={sl.label}
@@ -210,7 +218,8 @@ export function LineupsBoard({
               {sl.label}
             </span>
           ))}
-        </span>
+          <span className="shrink-0 text-[9px] text-muted-foreground/60 ml-0.5">✎</span>
+        </button>
         <span className="tabular-nums">
           {firstTeam}
           {lastTeam > firstTeam ? `–${lastTeam}` : ""} of {sortedTeams.length}
@@ -462,12 +471,17 @@ function LineupRow({
   const style: CSSProperties = mineSold
     ? { backgroundColor: MINE_BG, borderLeftColor: "#4ade80" }
     : sold
-    ? ({
-        ["--own" as string]: ownColor,
-        borderLeftColor: ownColor,
-        backgroundImage:
-          "linear-gradient(90deg, color-mix(in srgb, var(--own) var(--own-a), transparent), color-mix(in srgb, var(--own) var(--own-b), transparent))",
-      } as CSSProperties)
+    ? {
+        // A RIGHT-edge accent bar (~25% of the row) fading out leftwards — the identical treatment
+        // getPlayerBg gives an opponent's pick on the grid. A full-row wash pulled the eye to
+        // players who are already gone; this says "owned by X" while leaving the row quiet, so
+        // attention stays on the band-coloured players still up for grabs.
+        backgroundImage: `linear-gradient(to left, ${hexA(ownColor, 0.72)} 0%, ${hexA(
+          ownColor,
+          0.72
+        )} 20%, ${hexA(ownColor, 0)} 27%)`,
+        borderLeftColor: "transparent",
+      }
     : { ...(bandStyle ?? {}), borderLeftColor: bandStyle?.backgroundColor };
 
   const price = sold
@@ -487,7 +501,7 @@ function LineupRow({
         mineSold
           ? "[border-left-style:solid] text-white font-medium ring-1 ring-inset ring-green-400/60"
           : sold
-          ? "[border-left-style:solid] [--own-a:26%] [--own-b:5%] dark:[--own-a:42%] dark:[--own-b:8%]"
+          ? "[border-left-style:solid] opacity-80"
           : "[border-left-style:solid] hover:brightness-95"
       }`}
       title={`${p.name}${sold ? ` — sold to ${owner?.name ?? "?"}` : " — available"}`}

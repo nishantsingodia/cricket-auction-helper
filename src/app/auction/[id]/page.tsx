@@ -233,7 +233,7 @@ function priceRampHex(price: number): string | null {
 }
 
 // Convert a #RRGGBB hex to an rgba() string at alpha `a` (for owner-colour tints).
-function hexA(hex: string, a: number): string {
+export function hexA(hex: string, a: number): string {
   const h = hex.replace("#", "");
   if (h.length < 6) return hex;
   return `rgba(${parseInt(h.slice(0, 2), 16)},${parseInt(h.slice(2, 4), 16)},${parseInt(h.slice(4, 6), 16)},${a})`;
@@ -684,6 +684,21 @@ export default function AuctionPage() {
         </div>
       </header>
 
+      {editingSlabs && (
+        <div
+          className="md:hidden fixed inset-0 z-50 bg-black/40 p-4 pt-24"
+          onClick={() => setEditingSlabs(false)}
+        >
+          <div className="relative mx-auto w-64 max-w-full" onClick={(e) => e.stopPropagation()}>
+            <SlabEditor
+              slabs={priceSlabs}
+              onChange={updateSlabs}
+              onClose={() => setEditingSlabs(false)}
+            />
+          </div>
+        </div>
+      )}
+
       {/* ── Mobile bottom nav ──────────────────────────────────────────
           On a phone the header's toolbars (view toggle, panel toggles, Quick Sell) are hidden and
           live down here instead. They were costing ~3 rows of a screen whose whole job is showing an
@@ -827,6 +842,7 @@ export default function AuctionPage() {
             <LineupsBoard
               getAdjustedPrice={getAdjustedPrice}
               slabLegend={getSlabLegend(priceSlabs)}
+              onEditSlabs={() => setEditingSlabs(true)}
               sortedTeams={sortedTeams}
               participants={participants}
               myId={myId}
