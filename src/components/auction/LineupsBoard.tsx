@@ -19,6 +19,7 @@
 import { useCallback, useRef, useState, useSyncExternalStore, useLayoutEffect } from "react";
 import type { CSSProperties } from "react";
 import {
+  rampStyle,
   PLAYING_XI_SIZE,
   ROLE_SHORT,
   VENUE_CLASS_META,
@@ -69,9 +70,14 @@ export function LineupsBoard({
   participants,
   myId,
   teamVenueSummary,
+  getAdjustedPrice,
+  slabLegend,
   onPlayerClick,
   onVenueClick,
 }: {
+  /** Market-adjusted expected price — the same number the grid colours its cards by. */
+  getAdjustedPrice: (p: PoolPlayer) => number;
+  slabLegend: { label: string; hex: string }[];
   /** Already grouped + ordered upstream (XI first, by squad_number). Presentation only. */
   sortedTeams: [string, PoolPlayer[]][];
   participants: Participant[];
@@ -190,7 +196,21 @@ export function LineupsBoard({
 
       {/* ── Range header ── */}
       <div className="flex items-center justify-between px-3 pt-1.5 pb-1 text-[10px] text-muted-foreground">
-        <span className="font-medium tracking-wide uppercase">Lineups</span>
+        <span className="font-medium tracking-wide uppercase shrink-0">Lineups</span>
+        {/* Worth bands — the key for the colour every AVAILABLE row is painted in. Lives on this
+            line rather than its own row: the header strip it used to sit in is collapsed on a phone,
+            and this row was mostly empty space. */}
+        <span className="flex items-center gap-0.5 overflow-x-auto mx-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {slabLegend.map((sl) => (
+            <span
+              key={sl.label}
+              style={{ backgroundColor: sl.hex }}
+              className="shrink-0 rounded px-1 py-px text-[8px] font-semibold text-white/90 tabular-nums"
+            >
+              {sl.label}
+            </span>
+          ))}
+        </span>
         <span className="tabular-nums">
           {firstTeam}
           {lastTeam > firstTeam ? `–${lastTeam}` : ""} of {sortedTeams.length}
@@ -211,6 +231,7 @@ export function LineupsBoard({
                 team={team}
                 players={players}
                 ownerById={ownerById}
+              getAdjustedPrice={getAdjustedPrice}
                 myId={myId}
                 venueSummary={teamVenueSummary?.[team]}
                 onPlayerClick={onPlayerClick}
@@ -260,6 +281,7 @@ function TeamLineup({
   team,
   players,
   ownerById,
+  getAdjustedPrice,
   myId,
   venueSummary,
   onPlayerClick,
@@ -268,6 +290,7 @@ function TeamLineup({
   team: string;
   players: PoolPlayer[];
   ownerById: Map<number, Participant>;
+  getAdjustedPrice: (p: PoolPlayer) => number;
   myId: number | undefined;
   venueSummary?: TeamVenueSummary;
   onPlayerClick: (playerId: number) => void;
@@ -377,6 +400,7 @@ function TeamLineup({
             p={p}
             owner={p.sold_to_participant ? ownerById.get(p.sold_to_participant) : undefined}
             isMine={p.status === "SOLD" && p.sold_to_participant === myId}
+            adjustedPrice={getAdjustedPrice(p)}
             onClick={() => onPlayerClick(p.player_id)}
           />
         ))}
@@ -391,6 +415,7 @@ function TeamLineup({
             p={p}
             owner={p.sold_to_participant ? ownerById.get(p.sold_to_participant) : undefined}
             isMine={p.status === "SOLD" && p.sold_to_participant === myId}
+            adjustedPrice={getAdjustedPrice(p)}
             onClick={() => onPlayerClick(p.player_id)}
           />
         ))}
@@ -405,11 +430,13 @@ function LineupRow({
   p,
   owner,
   isMine,
+  adjustedPrice,
   onClick,
 }: {
   p: PoolPlayer;
   owner: Participant | undefined;
   isMine: boolean;
+  adjustedPrice: number;
   onClick: () => void;
 }) {
   const sold = p.status === "SOLD";
@@ -424,6 +451,14 @@ function LineupRow({
   // to be findable at a glance, which a sixth pastel among five others isn't. Opponents keep the
   // gradient in their own colour.
   const mineSold = sold && isMine;
+
+  // THE TWO CHANNELS, and why they can coexist:
+  //   AVAILABLE -> the PRICE BAND (rampStyle, the same ramp and slabs the grid uses). "What is he
+  //                worth" is the whole point of the board while he's still biddable.
+  //   SOLD      -> the owner's colour, faded. He's gone, so his band no longer matters; the only
+  //                live question is who took him.
+  // Identical split to the grid's getPlayerBg/rampStyle, so a player reads the same in both views.
+  const bandStyle = !sold && adjustedPrice > 0 ? rampStyle(adjustedPrice) : undefined;
   const style: CSSProperties = mineSold
     ? { backgroundColor: MINE_BG, borderLeftColor: "#4ade80" }
     : sold
@@ -433,7 +468,7 @@ function LineupRow({
         backgroundImage:
           "linear-gradient(90deg, color-mix(in srgb, var(--own) var(--own-a), transparent), color-mix(in srgb, var(--own) var(--own-b), transparent))",
       } as CSSProperties)
-    : {};
+    : { ...(bandStyle ?? {}), borderLeftColor: bandStyle?.backgroundColor };
 
   const price = sold
     ? p.sold_price != null
@@ -453,7 +488,7 @@ function LineupRow({
           ? "[border-left-style:solid] text-white font-medium ring-1 ring-inset ring-green-400/60"
           : sold
           ? "[border-left-style:solid] [--own-a:26%] [--own-b:5%] dark:[--own-a:42%] dark:[--own-b:8%]"
-          : "[border-left-style:dashed] border-l-muted-foreground/50 hover:bg-muted/40"
+          : "[border-left-style:solid] hover:brightness-95"
       }`}
       title={`${p.name}${sold ? ` — sold to ${owner?.name ?? "?"}` : " — available"}`}
     >
@@ -478,7 +513,13 @@ function LineupRow({
               {"\u26A0\uFE0F"}
             </span>
           )}
-          <span className="block text-[13px] font-semibold leading-tight truncate">{p.name}</span>
+          <span
+            className={`block text-[13px] font-semibold leading-tight truncate ${
+              sold && !mineSold ? "line-through text-muted-foreground" : ""
+            }`}
+          >
+            {p.name}
+          </span>
         </span>
         <span
           className={`block text-[10px] leading-tight truncate tabular-nums ${

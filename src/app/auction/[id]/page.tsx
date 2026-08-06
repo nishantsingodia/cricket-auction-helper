@@ -241,12 +241,12 @@ function hexA(hex: string, a: number): string {
 
 // Inline background for an AVAILABLE player cell. Text stays the default light foreground — every
 // ramp colour is dark enough for it (and the muted secondary text) to read. undefined = base tier.
-function rampStyle(price: number): { backgroundColor: string } | undefined {
+export function rampStyle(price: number): { backgroundColor: string } | undefined {
   const hex = priceRampHex(price);
   return hex ? { backgroundColor: hex } : undefined;
 }
 
-function getSlabLegend(slabs: PriceSlab[]) {
+export function getSlabLegend(slabs: PriceSlab[]) {
   const sorted = [...slabs].sort((a, b) => b.min - a.min);
   return sorted.map((s, i) => ({
     label: i === 0 ? `${s.min}+` : `${s.min}-${sorted[i - 1].min}`,
@@ -825,6 +825,8 @@ export default function AuctionPage() {
             />
           ) : activeView === "lineups" ? (
             <LineupsBoard
+              getAdjustedPrice={getAdjustedPrice}
+              slabLegend={getSlabLegend(priceSlabs)}
               sortedTeams={sortedTeams}
               participants={participants}
               myId={myId}
