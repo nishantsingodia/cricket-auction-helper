@@ -35,10 +35,14 @@ fi
 
 # WAL pages aren't in the main file until checkpointed; VACUUM INTO also gives a compact snapshot.
 echo "Snapshotting local DB (checkpoint + vacuum)…"
-rm -f "$STAGE"
+rm -f "$STAGE" "$STAGE-wal" "$STAGE-shm"
 sqlite3 "$LOCAL_DB" "PRAGMA wal_checkpoint(TRUNCATE);" >/dev/null
 sqlite3 "$LOCAL_DB" "VACUUM INTO '$STAGE';"
-echo "  snapshot: $(du -h "$STAGE" | cut -f1)"
+# VACUUM INTO always writes a rollback-journal database; `turso db create --from-file`
+# only accepts WAL. Flip it, then checkpoint so everything is back in the main file.
+sqlite3 "$STAGE" "PRAGMA journal_mode = WAL;" >/dev/null
+sqlite3 "$STAGE" "PRAGMA wal_checkpoint(TRUNCATE);" >/dev/null
+echo "  snapshot: $(du -h "$STAGE" | cut -f1)  ($(sqlite3 "$STAGE" 'PRAGMA journal_mode;'))"
 
 if turso db list 2>/dev/null | awk '{print $1}' | grep -qx "$DB_NAME"; then
   echo "Destroying + recreating '$DB_NAME' from the snapshot…"
@@ -46,7 +50,7 @@ if turso db list 2>/dev/null | awk '{print $1}' | grep -qx "$DB_NAME"; then
 fi
 turso db create "$DB_NAME" --from-file "$STAGE"
 
-rm -f "$STAGE"
+rm -f "$STAGE" "$STAGE-wal" "$STAGE-shm"
 echo
 echo "✅ Pushed to Turso db '$DB_NAME'."
 turso db show "$DB_NAME" --url
