@@ -20,6 +20,20 @@ const DB_PATH =
 const url = process.env.TURSO_DATABASE_URL || `file:${DB_PATH}`;
 const authToken = process.env.TURSO_AUTH_TOKEN;
 
+// A serverless deploy has no persistent local disk, so a `file:` URL there means the env vars were
+// never set — fail loudly at boot rather than serving cryptic "no such table" errors on every route.
+if (
+  process.env.NODE_ENV === "production" &&
+  process.env.NEXT_PHASE !== "phase-production-build" &&
+  !process.env.TURSO_DATABASE_URL &&
+  (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME)
+) {
+  throw new Error(
+    "TURSO_DATABASE_URL is not set. A cloud deploy has no local SQLite file — " +
+      "run `npm run turso:push`, then set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN in the project's env."
+  );
+}
+
 export const client: Client = createClient({ url, authToken });
 
 /** True when talking to Turso (cloud) rather than the local file. */

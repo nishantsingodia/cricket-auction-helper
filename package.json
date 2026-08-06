@@ -9,7 +9,8 @@
     "lint": "eslint",
     "turso:push": "bash scripts/turso-push.sh",
     "turso:pull": "bash scripts/turso-pull.sh",
-    "sync-registry": "curl -fsSL https://raw.githubusercontent.com/nishantsingodia/wwc-points-bot/main/registry/players.json -o src/lib/registry/players.json && echo 'Registry synced from wwc-points-bot (canonical).'"
+    "sync-registry": "curl -fsSL https://raw.githubusercontent.com/nishantsingodia/wwc-points-bot/main/registry/players.json -o src/lib/registry/players.json && echo 'Registry synced from wwc-points-bot (canonical).'",
+    "go-live": "bash scripts/go-live.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.79.0",
