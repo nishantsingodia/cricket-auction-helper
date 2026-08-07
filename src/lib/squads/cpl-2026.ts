@@ -232,13 +232,13 @@ export const CPL_2026: CPLTeam[] = [
       { name: "Sunil Narine", role: "AR", overseas: false }, // 8  (2025: pos 8, bowled all 13)
       { name: "Dominic Drakes", role: "AR", overseas: false }, // 9
       { name: "Usman Tariq", role: "BOWL", overseas: true, note: "AVAILABILITY: PLAYS 9 OF 10 — misses the opening game (8 Aug) per the chart; 8 if Birmingham Phoenix reach the Hundred FINAL. TKR's leading wicket-taker in 2025 (20 in 10)." }, // 10
-      { name: "Terrance Hinds", role: "BOWL", overseas: false }, // 11
+      { name: "Nathan Edward", role: "BOWL", overseas: false, note: "⚠️ BREAKOUT-RULE STARTER. CPL requires at least ONE breakout player in every XI, and Trinbago's other two breakouts are Joshua Da Silva (2 games, 10.5 FP) and Abdul-Raheem Toppin (no senior record) — so the 21-year-old left-arm seamer is the one who plays. He is also simply the best of the three: 4 games in 2025, 6 wickets at average 19, 71.0 avg FP, and the franchise preview names him their young prospect. I originally had him at 16 = 1 expected game; under the rule he plays ~10." }, // 11
       // Depth
       { name: "Joshua Da Silva", role: "WK", overseas: false, note: "Breakout pick." }, // 12
       { name: "Jyd Goolie", role: "BAT", overseas: false }, // 13
       { name: "Amshi de Silva", role: "BOWL", overseas: true, note: "Sri Lankan leg-spinner — NOT Joshua Da Silva (TKR)." }, // 14
       { name: "Dexter Sween", role: "BAT", overseas: false }, // 15
-      { name: "Nathan Edward", role: "BOWL", overseas: false, note: "Breakout pick." }, // 16
+      { name: "Terrance Hinds", role: "BOWL", overseas: false, note: "Dropped out of the XI for Nathan Edward, who both satisfies the breakout-player rule and outperformed him in 2025 (71.0 avg FP to 33.7)." }, // 16
       { name: "Abdul-Raheem Toppin", role: "AR", overseas: false, note: "Breakout pick." }, // 17
     ],
   },
@@ -252,6 +252,12 @@ export const CPL_2026: CPLTeam[] = [
 //  - Probable XI (1–11): 10 games.
 //  - Rotation cover (12–14): 2 games.
 //  - Reserves (15+): 1 game.
+// ⚠️ BREAKOUT-PLAYER RULE: CPL 2026 squads carry 3 "breakout" players and at least ONE must be in
+// every XI. So each franchise has a breakout who effectively plays the full campaign, and he must be
+// inside squad_number 1-11 or the XI is illegal. Audited across all 7 teams: six were already
+// compliant (Gore 5, Layne 11, Sampson 7, K McKenzie 5, Bidaisee 10, Auguste 2) — several only
+// because of earlier promotions — but TRINBAGO had NO breakout in the XI, which cannot happen.
+// Nathan Edward was promoted 16 -> 11 to fix it. Re-run this audit if any XI order changes.
 export function cplExpectedMatches(squadNumber: number): number {
   if (squadNumber <= 11) return 10;
   if (squadNumber <= 14) return 2;
