@@ -142,11 +142,72 @@ type BatIndexResult = { byGround: Map<string, BatIndexEntry>; median: number };
 const BAT_INDEX_TTL_MS = 10 * 60 * 1000;
 const batIndexCache = new Map<string, { at: number; value: BatIndexResult }>();
 
+// Second tier: a PERSISTED cache, because the in-process memo only helps a warm lambda and a cold
+// one paid the full ~370k-row sweep again. Written once on first compute, then read as ~200 rows.
+// It is invalidated by construction: `turso:push` clears this table in the snapshot it uploads, so a
+// refreshed match_performances can never be served against a stale index.
+const BAT_INDEX_TABLE = `CREATE TABLE IF NOT EXISTS bat_index_cache (
+  gender TEXT NOT NULL, ground TEXT NOT NULL, bat_index REAL NOT NULL, matches INTEGER NOT NULL,
+  source TEXT NOT NULL, bat_fp REAL, bowl_fp REAL, median REAL NOT NULL,
+  PRIMARY KEY (gender, ground)
+)`;
+
+async function readPersisted(gender: string): Promise<BatIndexResult | null> {
+  try {
+    const rows = (await sqlite
+      .prepare(
+        `SELECT ground, bat_index, matches, source, bat_fp, bowl_fp, median
+           FROM bat_index_cache WHERE gender = ?`
+      )
+      .all(gender)) as Array<{
+      ground: string; bat_index: number; matches: number; source: string;
+      bat_fp: number | null; bowl_fp: number | null; median: number;
+    }>;
+    if (!rows.length) return null;
+    const byGround = new Map<string, BatIndexEntry>();
+    for (const r of rows) {
+      byGround.set(r.ground, {
+        ground: r.ground, batIndex: r.bat_index, matches: r.matches,
+        source: r.source as BatIndexEntry["source"], batFp: r.bat_fp, bowlFp: r.bowl_fp,
+      });
+    }
+    return { byGround, median: rows[0].median };
+  } catch {
+    return null; // table not there yet — fall through and compute
+  }
+}
+
+async function writePersisted(gender: string, res: BatIndexResult): Promise<void> {
+  try {
+    await sqlite.prepare(BAT_INDEX_TABLE).run();
+    await sqlite.prepare(`DELETE FROM bat_index_cache WHERE gender = ?`).run(gender);
+    const ins = sqlite.prepare(
+      `INSERT OR REPLACE INTO bat_index_cache
+         (gender, ground, bat_index, matches, source, bat_fp, bowl_fp, median)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    for (const e of res.byGround.values()) {
+      await ins.run(gender, e.ground, e.batIndex, e.matches, e.source, e.batFp, e.bowlFp, res.median);
+    }
+  } catch {
+    // Caching is an optimisation, never a correctness requirement — a read-only replica or a
+    // migration in flight must not take the venue model down.
+  }
+}
+
 export async function computeBatIndex(gender: "male" | "female" = "male"): Promise<BatIndexResult> {
-  const cached = batIndexCache.get(gender);
-  if (cached && Date.now() - cached.at < BAT_INDEX_TTL_MS) return cached.value;
+  const memo = batIndexCache.get(gender);
+  if (memo && Date.now() - memo.at < BAT_INDEX_TTL_MS) return memo.value;
+
+  const persisted = await readPersisted(gender);
+  if (persisted) {
+    batIndexCache.set(gender, { at: Date.now(), value: persisted });
+    return persisted;
+  }
+
   const fresh = await computeBatIndexUncached(gender);
   batIndexCache.set(gender, { at: Date.now(), value: fresh });
+  await writePersisted(gender, fresh);
   return fresh;
 }
 

@@ -40,6 +40,9 @@ sqlite3 "$LOCAL_DB" "PRAGMA wal_checkpoint(TRUNCATE);" >/dev/null
 sqlite3 "$LOCAL_DB" "VACUUM INTO '$STAGE';"
 # VACUUM INTO always writes a rollback-journal database; `turso db create --from-file`
 # only accepts WAL. Flip it, then checkpoint so everything is back in the main file.
+# Drop the derived Bat Index cache: match_performances may have just been re-ingested, and serving a
+# stale venue model would be worse than recomputing it once in the cloud (it repopulates on first use).
+sqlite3 "$STAGE" "DROP TABLE IF EXISTS bat_index_cache;" >/dev/null
 sqlite3 "$STAGE" "PRAGMA journal_mode = WAL;" >/dev/null
 sqlite3 "$STAGE" "PRAGMA wal_checkpoint(TRUNCATE);" >/dev/null
 echo "  snapshot: $(du -h "$STAGE" | cut -f1)  ($(sqlite3 "$STAGE" 'PRAGMA journal_mode;'))"
