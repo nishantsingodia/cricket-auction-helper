@@ -118,7 +118,7 @@ export const CPL_2026: CPLTeam[] = [
       { name: "Khary Pierre", role: "BOWL", overseas: false }, // 10 (2025: 10 games for St Lucia)
       { name: "Veerasammy Permaul", role: "BOWL", overseas: false }, // 11
       // Depth
-      { name: "Dwaine Pretorius", role: "AR", overseas: true, note: "The 5th overseas player and only 4 can field, so he ROTATES rather than starts — expect roughly 4-6 of 10 depending on team balance, not a full campaign. Was a 2025 regular though (12 games, median pos 7)." }, // 12
+      { name: "Dwaine Pretorius", role: "AR", overseas: true, note: "AVAILABILITY: PLAYS ~7 OF 10 — the positional default of 2 badly understated him. He is the 5th overseas and only 4 can field, BUT he played all 12 games in 2025 with 196 runs and 17 wickets at 88.8 avg FP — the BEST of Guyana's five overseas, ahead of even Imran Tahir (85.0). The other three (Gurbaz, Phillips, Nabi) have never played a game for Guyana. And the squeeze eases by itself: Gurbaz misses 3 to Afghanistan duty and Nabi 2, so there are at least five games where Pretorius walks in unopposed. 7 is the rotation-realistic figure." }, // 12
       { name: "Matthew Nandu", role: "AR", overseas: false }, // 13
       { name: "Ronaldo Alimohamed", role: "AR", overseas: false }, // 14
       { name: "Jonathan van Lange", role: "BOWL", overseas: false }, // 15
@@ -173,11 +173,11 @@ export const CPL_2026: CPLTeam[] = [
       { name: "Wanindu Hasaranga", role: "AR", overseas: true, note: "AVAILABILITY: PLAYS 10 OF 10 league games — CONFIRMED by the T20Tracker chart, which has him missing the PLAYOFFS only (national commitments). Playoffs are excluded from this model, so no discount. Retired from Tests, so India's tour of Sri Lanka does not affect him either." }, // 7
       { name: "Naseem Shah", role: "BOWL", overseas: true, note: "AVAILABILITY: PLAYS 7 OF 10 — misses the FIRST 3 (8, 12, 18 Aug) for domestic commitments, per the chart. I had him at 10 after confirming he was not in Pakistan's England Test squad: right conclusion, wrong reason — the absence is domestic, not international." }, // 8  (2025: 10 games, pos 9)
       { name: "Obed McCoy", role: "BOWL", overseas: false }, // 9
-      { name: "Ashmead Nedd", role: "BOWL", overseas: false }, // 10
+      { name: "Navin Bidaisee", role: "AR", overseas: false, note: "Listed as a breakout pick but he was a 2025 REGULAR — 7 games, median position 7, bowled in all 7, 73.4 avg FP. Promoted into the XI ahead of Ashmead Nedd (5 games, position 10) on that evidence." }, // 10
       { name: "Waqar Salamkheil", role: "BOWL", overseas: true, note: "AVAILABILITY: PLAYS 10 OF 10 — and he is the SAFEST overseas pick in this pool. Zero white-ball caps for Afghanistan (no T20Is, no ODIs; one Test in March 2019), so unlike Gurbaz, Nabi, Mujeeb and Noor Ahmad he carries NO call-up risk from either the Ireland ODIs or the India T20Is. That is why the T20Tracker chart gives him no caveat at all. Form is well sampled too: 79 franchise games across 7 leagues (ILT20 32, CPL 29, MLC 6, BBL 5, SA20 4, PSL 2, LPL 1), 41 CPL wickets at 7.94 econ, and St Kitts' leading wicket-taker in 2025 with 15." }, // 11
       // Depth. 2025 medians: Fletcher 2 (10 games), Wickham 4, Bidaisee 7 (7 games) — all three are
       // established squad members rather than fringe, hence the order here.
-      { name: "Navin Bidaisee", role: "AR", overseas: false, note: "Breakout pick on paper but a 2025 regular — 7 games, median position 7, bowled in all 7." }, // 12
+      { name: "Ashmead Nedd", role: "BOWL", overseas: false, note: "5 games in 2025 at median position 10. Swapped below Navin Bidaisee, who played more and scored better." }, // 12
       { name: "Mikyle Louis", role: "BAT", overseas: false, note: "Breakout pick — and genuinely fringe: 2 games and 9 runs in 2025. Was at 2 in my first cut, which was wrong (see Andre Fletcher)." }, // 13
       { name: "Nikhil Chaudhary", role: "AR", overseas: true, note: "AVAILABILITY: PLAYS 9 OF 10 — misses the opening game (8 Aug) per the chart, and 8 if Southern Brave reach the Hundred playoffs (would also cost 12 Aug). Bench player, so little value at stake." }, // 14
       { name: "Kevin Wickham", role: "BAT", overseas: false }, // 15
@@ -320,6 +320,9 @@ const CPL_EXPECTED_GAMES: Record<string, number> = {
   // Pakistan's England Test squad — right conclusion, wrong reason, the absence is domestic.
   mdshanaka: 9, // Dasun Shanaka — misses the opening game (8 Aug) + playoffs (playoffs not priced)
   nikhilchaudhary: 9, // misses the opening game; 8 if Southern Brave reach the Hundred playoffs
+  // Guyana Amazon Warriors — rotation, not absence
+  dpretorius: 7, // 5th overseas of 5, but the best of them in 2025 (12 games, 88.8 FP) and the
+  // squeeze eases when Gurbaz (-3) and Nabi (-2) are away on Afghanistan duty.
   // Trinbago Knight Riders
   usmantariq: 9, // misses the opening game (8 Aug); 8 if Birmingham Phoenix reach the Hundred final
   // Saint Lucia Kings
