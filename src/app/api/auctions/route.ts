@@ -16,10 +16,21 @@ export async function GET() {
   try {
     const auctions = await sqlite
       .prepare(
+        // One grouped pass, NOT two correlated subqueries per auction. Those scanned the whole
+        // auction_pool for every auction — 23 auctions x 3,221 rows x 2 = ~148k rows read on a
+        // request that returns 23 of them. Harmless on a local file, but Turso bills rows read and
+        // this single endpoint was the biggest consumer on the account.
         `SELECT a.*,
-           (SELECT COUNT(*) FROM auction_pool ap WHERE ap.auction_id = a.id) as total_players,
-           (SELECT COUNT(*) FROM auction_pool ap WHERE ap.auction_id = a.id AND ap.sold_to_participant IS NOT NULL) as sold_players
+           COALESCE(p.total_players, 0) AS total_players,
+           COALESCE(p.sold_players, 0)  AS sold_players
          FROM auctions a
+         LEFT JOIN (
+           SELECT auction_id,
+                  COUNT(*)                                                    AS total_players,
+                  COUNT(CASE WHEN sold_to_participant IS NOT NULL THEN 1 END) AS sold_players
+           FROM auction_pool
+           GROUP BY auction_id
+         ) p ON p.auction_id = a.id
          ORDER BY a.created_at DESC`
       )
       .all();

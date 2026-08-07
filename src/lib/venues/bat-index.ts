@@ -128,10 +128,29 @@ const ratioOf = (r: Row | undefined) =>
     : null;
 
 /** Bat Index for every ground we have a usable sample for, plus the league median for comparison. */
-export async function computeBatIndex(gender: "male" | "female" = "male"): Promise<{
-  byGround: Map<string, BatIndexEntry>;
-  median: number;
-}> {
+type BatIndexResult = { byGround: Map<string, BatIndexEntry>; median: number };
+
+// The Bat Index sweeps four years of match_performances across EVERY ground — the league median it
+// compares against is only meaningful over the whole set, so it cannot be narrowed to one tour. That
+// is ~370k rows read per call, and it is reached by /api/venues, /api/players/[id]?tour= and the
+// board's own /api/auction/[id]. Against a local file that was free; against Turso, which bills rows
+// read, it was the single largest consumer on the account.
+//
+// It is derived PURELY from reference data (match_performances + players), which only changes when
+// the ETL runs on the laptop and the result is pushed. So it is safe to memoise per process. The TTL
+// exists only so a `turso:push` is picked up without waiting for the lambda to recycle.
+const BAT_INDEX_TTL_MS = 10 * 60 * 1000;
+const batIndexCache = new Map<string, { at: number; value: BatIndexResult }>();
+
+export async function computeBatIndex(gender: "male" | "female" = "male"): Promise<BatIndexResult> {
+  const cached = batIndexCache.get(gender);
+  if (cached && Date.now() - cached.at < BAT_INDEX_TTL_MS) return cached.value;
+  const fresh = await computeBatIndexUncached(gender);
+  batIndexCache.set(gender, { at: Date.now(), value: fresh });
+  return fresh;
+}
+
+async function computeBatIndexUncached(gender: "male" | "female"): Promise<BatIndexResult> {
   // Both windows come back from a single query — see readWindows().
   const { recent, wide } = await readWindows(gender);
 
