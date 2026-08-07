@@ -91,8 +91,16 @@ export async function GET(
       watchlistMap[w.player_id] = { color: w.color, priority: w.priority, notes: w.notes };
     }
 
-    // Team pitch breakdown: classify venues then count per team schedule
-    const venueClassRows = await sqlite
+    // Resolve the venue model BEFORE the IPL pitch work below, because it decides whether that work
+    // is needed at all. Tours WITH a venue model (CPL, The Hundred, LPL) render teamVenueSummary and
+    // never look at teamPitchBreakdown — yet the query behind it scanned IPL+T20 since 2020 (~151k
+    // rows) on EVERY board load and threw the result away. That was the single largest rows-read
+    // consumer on the account, on the most-requested endpoint in the app.
+    const tourName = (auction as { tournament_name?: string }).tournament_name ?? "";
+    const venueCtx = await getTourVenueContext(tourName);
+
+    // Team pitch breakdown: classify venues then count per team schedule. IPL-only fallback.
+    const venueClassRows = venueCtx ? [] : await sqlite
       .prepare(
         `SELECT mp.venue_name,
           AVG(CASE WHEN p.role IN ('BAT','WK') THEN mp.fantasy_points END) as bat_fp,
@@ -163,7 +171,7 @@ export async function GET(
 
     // Count pitch types per team from IPL 2026 schedule
     const teamPitchBreakdown: Record<string, { F: number; B: number; T: number }> = {};
-    for (const [t1, t2, city] of IPL_2026_SCHEDULE) {
+    for (const [t1, t2, city] of venueCtx ? [] : IPL_2026_SCHEDULE) {
       const venueName = CITY_TO_VENUE[city] || city;
       const vt = venueType[venueName] || "B";
       for (const team of [t1, t2]) {
@@ -177,8 +185,6 @@ export async function GET(
     // Per-team venue summary (home ground + games + bat/bowl character) — Hundred & LPL for now.
     // Reads the SAME schedules + authoritative venue classes the EFPPM engine uses (#transparency).
     // IPL keeps its inline teamPitchBreakdown above; other tours fall through to null.
-    const tourName = (auction as { tournament_name?: string }).tournament_name ?? "";
-    const venueCtx = await getTourVenueContext(tourName);
     const teamVenueSummary = venueCtx ? buildTeamVenueSummaries(venueCtx) : null;
 
     // Tour-level bat/bowl "general stats" for the header chip (works for all tours, venue or not).
