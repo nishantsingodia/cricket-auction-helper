@@ -52,7 +52,8 @@ export const CPL_2026: CPLTeam[] = [
       // Gore 3, Moeen 4, Allen 6, Springer 7.5, A Joseph 9, Seales 10.
       { name: "Evin Lewis", role: "BAT", overseas: false }, // 1  (2025: opened, pos 1)
       { name: "Kusal Perera", role: "WK", overseas: true, note: "AVAILABILITY: PLAYS 10 OF 10 — the chart lists him Fully Available, noting he could miss the opening game (7 Aug) at most. The India Tests in Sri Lanka do not take him." }, // 2
-      { name: "Amir Jangoo", role: "WK", overseas: false }, // 3  (2025: pos 1 for Antigua)
+      { name: "Tim Robinson", role: "BAT", overseas: true, note: "⚠️ WAS MISSING FROM MY SQUAD ENTIRELY — the NZ batter played the 7 Aug opener, scored 40 and put on 64 for the 3rd wicket with Tajinder Singh. He appears in no squad list I had (Wikipedia, Wisden, T20Tracker, franchise release). Timing suggests he is covering Moeen Ali, who is at the Hundred until ~16 Aug, so treat him as a short-stint cover until that is confirmed." }, // 3
+      { name: "Amir Jangoo", role: "WK", overseas: false }, // 4  (2025: pos 1 for Antigua)
       { name: "Moeen Ali", role: "AR", overseas: true, note: "AVAILABILITY: PLAYS 8 OF 10 — misses the opening TWO (7, 9 Aug) per the chart, and 7 if Southern Brave reach the Hundred playoffs (also 14 Aug). CAPTAIN, so ABF open under interim leadership; he is at the Hundred with Southern Brave as Thomas Rew's injury replacement." }, // 4  (2025: pos 4)
       { name: "Karima Gore", role: "AR", overseas: false, note: "Breakout pick, but a 2025 regular — 10 games at median position 3." }, // 5
       { name: "Rahkeem Cornwall", role: "AR", overseas: false }, // 6  (2025: pos 2 — used up the order)
@@ -149,10 +150,10 @@ export const CPL_2026: CPLTeam[] = [
       { name: "Hunain Shah", role: "BOWL", overseas: true, note: "AVAILABILITY: PLAYS 10 OF 10 — fully available for the entire tournament (franchise release)." }, // 10
       { name: "Jediah Blades", role: "BOWL", overseas: false }, // 11
       // Depth + the phase-2 overseas group (each ~5 games from 19 Aug — see CPL_EXPECTED_GAMES)
-      { name: "Saim Ayub", role: "BAT", overseas: true, note: "AVAILABILITY: PLAYS 5 OF 10 — MISSES the first 5. Joins from 19 Aug (franchise release), so his games are 21, 27, 31 Aug, 4 and 12 Sep. Marquee bat, but you are buying half a campaign." }, // 12
+      { name: "Saim Ayub", role: "BAT", overseas: true, note: "AVAILABILITY: PLAYS 5 OF 10 — MISSES the first 5. He is CAPTAINING a team at Pakistan's National Champions Cup (Multan, 11-18 Aug, final on the 18th), and PCB grants CPL NOCs only after it — so 19 Aug is the release date, and his games are 21, 27, 31 Aug, 4 and 12 Sep. RISK: the NOC has not been issued yet; if it slips he plays fewer, or none. Marquee bat, but you are buying half a campaign at best." }, // 12
       { name: "Usman Khan", role: "WK", overseas: true, note: "AVAILABILITY: PLAYS 5 OF 10 — MISSES the first 5. Joins from 19 Aug (franchise release): 21, 27, 31 Aug, 4 and 12 Sep." }, // 13
       { name: "Maaz Sadaqat", role: "AR", overseas: true, note: "PHASE 2 — joins from 19 Aug, ~5 of 10 games." }, // 14
-      { name: "Reeza Hendricks", role: "BAT", overseas: true, note: "AVAILABILITY: PLAYS ~5 OF 10 — a later SA signing (announced after the franchise's overseas release); T20Tracker has him taking Usman Khan's phase-2 slot, so 21 Aug onward. Phase unconfirmed by the franchise, so treat 5 as the estimate." }, // 15
+      { name: "Reeza Hendricks", role: "BAT", overseas: true, note: "AVAILABILITY: PLAYS ~5 OF 10 — the FIRST 5 (to 18 Aug), not the last 5. He is a TEMPORARY COVER for the Pakistan trio, not their replacement afterwards: he played the 7 Aug opener and made 42. I originally had this backwards (21 Aug onward). Same game count so the price is unchanged, but the direction matters — if the Pakistanis' NOCs slip past the National Champions Cup final on 18 Aug, Hendricks keeps playing and this becomes 10, not 5." }, // 15
       { name: "Tayyab Arif", role: "BOWL", overseas: true, note: "AVAILABILITY: PLAYS 5 OF 10 — MISSES 5. Phase 1 only: 7, 11, 13, 15, 18 Aug, then replaced from 19 Aug (franchise release)." }, // 16
       { name: "Vitel Lawes", role: "BOWL", overseas: false, note: "U19 World Cup leg-spinner; third pick of the expansion draft. No senior ball-by-ball in our data — prices at baseline." }, // 17
       { name: "Romaine Morris", role: "BOWL", overseas: false }, // 18
@@ -168,19 +169,22 @@ export const CPL_2026: CPLTeam[] = [
       { name: "Andre Fletcher", role: "WK", overseas: false, note: "St Kitts' TOP RUN-SCORER in 2025 — 310 runs in 10 games, opening at median position 2. I originally had him at 13 on the assumption Johnson Charles keeping squeezed him out; our own data, the franchise preview and T20Tracker's squad order all put him near the top, so he moves up. Charles keeps; Fletcher bats." }, // 2
       { name: "Alick Athanaze", role: "BAT", overseas: false }, // 3
       { name: "Kyle Mayers", role: "AR", overseas: false }, // 4
+      { name: "Kevin Wickham", role: "BAT", overseas: false, note: "CONFIRMED XI — batted 5 and TOP-SCORED with 38 in the 8 Aug match. I had him at 15 (reserve); promoted on match evidence." }, // 5
       { name: "Dasun Shanaka", role: "AR", overseas: true }, // 5
       { name: "Jason Holder", role: "AR", overseas: false, note: "CAPTAIN for 2026 (arriving from LA Knight Riders). St Kitts have won only 9 of their last 40 CPL games and finished 6th in 2025, so the leadership change is the franchise's main bet." }, // 6
       { name: "Wanindu Hasaranga", role: "AR", overseas: true, note: "AVAILABILITY: PLAYS 10 OF 10 league games — CONFIRMED by the T20Tracker chart, which has him missing the PLAYOFFS only (national commitments). Playoffs are excluded from this model, so no discount. Retired from Tests, so India's tour of Sri Lanka does not affect him either." }, // 7
+      { name: "Ashmead Nedd", role: "BOWL", overseas: false, note: "CONFIRMED XI — batted 8 and bowled in the 8 Aug match. I had demoted him to 12; the selectors disagree." }, // 8
+      { name: "Saurabh Netravalkar", role: "BOWL", overseas: true, note: "⚠️ WAS MISSING FROM MY SQUAD ENTIRELY — appeared in the 8 Aug XI at 9 and opened the bowling. USA left-arm seamer; he is not in Wikipedia, Wisden, T20Tracker or the franchise release for 2026. Added on match evidence." }, // 9
       { name: "Naseem Shah", role: "BOWL", overseas: true, note: "AVAILABILITY: PLAYS 7 OF 10 — misses the FIRST 3 (8, 12, 18 Aug) for domestic commitments, per the chart. I had him at 10 after confirming he was not in Pakistan's England Test squad: right conclusion, wrong reason — the absence is domestic, not international." }, // 8  (2025: 10 games, pos 9)
       { name: "Obed McCoy", role: "BOWL", overseas: false }, // 9
       { name: "Navin Bidaisee", role: "AR", overseas: false, note: "Listed as a breakout pick but he was a 2025 REGULAR — 7 games, median position 7, bowled in all 7, 73.4 avg FP. Promoted into the XI ahead of Ashmead Nedd (5 games, position 10) on that evidence." }, // 10
       { name: "Waqar Salamkheil", role: "BOWL", overseas: true, note: "AVAILABILITY: PLAYS 10 OF 10 — and he is the SAFEST overseas pick in this pool. Zero white-ball caps for Afghanistan (no T20Is, no ODIs; one Test in March 2019), so unlike Gurbaz, Nabi, Mujeeb and Noor Ahmad he carries NO call-up risk from either the Ireland ODIs or the India T20Is. That is why the T20Tracker chart gives him no caveat at all. Form is well sampled too: 79 franchise games across 7 leagues (ILT20 32, CPL 29, MLC 6, BBL 5, SA20 4, PSL 2, LPL 1), 41 CPL wickets at 7.94 econ, and St Kitts' leading wicket-taker in 2025 with 15." }, // 11
       // Depth. 2025 medians: Fletcher 2 (10 games), Wickham 4, Bidaisee 7 (7 games) — all three are
       // established squad members rather than fringe, hence the order here.
-      { name: "Ashmead Nedd", role: "BOWL", overseas: false, note: "5 games in 2025 at median position 10. Swapped below Navin Bidaisee, who played more and scored better." }, // 12
+
       { name: "Mikyle Louis", role: "BAT", overseas: false, note: "Breakout pick — and genuinely fringe: 2 games and 9 runs in 2025. Was at 2 in my first cut, which was wrong (see Andre Fletcher)." }, // 13
       { name: "Nikhil Chaudhary", role: "AR", overseas: true, note: "AVAILABILITY: PLAYS 9 OF 10 — misses the opening game (8 Aug) per the chart, and 8 if Southern Brave reach the Hundred playoffs (would also cost 12 Aug). Bench player, so little value at stake." }, // 14
-      { name: "Kevin Wickham", role: "BAT", overseas: false }, // 15
+
       { name: "Jeremiah Louis", role: "BOWL", overseas: false }, // 16
       { name: "Micah McKenzie", role: "BOWL", overseas: false, note: "Breakout pick — NOT Kirk McKenzie (JAM) or Neil McKenzie (SA)." }, // 17
     ],
@@ -232,13 +236,15 @@ export const CPL_2026: CPLTeam[] = [
       { name: "Sunil Narine", role: "AR", overseas: false }, // 8  (2025: pos 8, bowled all 13)
       { name: "Dominic Drakes", role: "AR", overseas: false }, // 9
       { name: "Usman Tariq", role: "BOWL", overseas: true, note: "AVAILABILITY: PLAYS 9 OF 10 — misses the opening game (8 Aug) per the chart; 8 if Birmingham Phoenix reach the Hundred FINAL. TKR's leading wicket-taker in 2025 (20 in 10)." }, // 10
-      { name: "Nathan Edward", role: "BOWL", overseas: false, note: "⚠️ BREAKOUT-RULE STARTER. CPL requires at least ONE breakout player in every XI, and Trinbago's other two breakouts are Joshua Da Silva (2 games, 10.5 FP) and Abdul-Raheem Toppin (no senior record) — so the 21-year-old left-arm seamer is the one who plays. He is also simply the best of the three: 4 games in 2025, 6 wickets at average 19, 71.0 avg FP, and the franchise preview names him their young prospect. I originally had him at 16 = 1 expected game; under the rule he plays ~10." }, // 11
+      { name: "Terrance Hinds", role: "BOWL", overseas: false, note: "CONFIRMED XI — batted 7 and took 3/33 in the 8 Aug match. I had demoted him to 16 for Nathan Edward on the breakout rule; that was wrong, Trinbago used Da Silva as their breakout instead." }, // 11
+      { name: "Nathan Edward", role: "BOWL", overseas: false, note: "DID NOT play the 8 Aug match — Trinbago satisfied the breakout rule with Joshua Da Silva (kept wicket, batted 3) instead. I had promoted him to 11 on that rule; the selectors chose differently, so he is back in the depth. Original case: ⚠️ BREAKOUT-RULE candidate. CPL requires at least ONE breakout player in every XI, and Trinbago's other two breakouts are Joshua Da Silva (2 games, 10.5 FP) and Abdul-Raheem Toppin (no senior record) — so the 21-year-old left-arm seamer is the one who plays. He is also simply the best of the three: 4 games in 2025, 6 wickets at average 19, 71.0 avg FP, and the franchise preview names him their young prospect. I originally had him at 16 = 1 expected game; under the rule he plays ~10." }, // 11
       // Depth
-      { name: "Joshua Da Silva", role: "WK", overseas: false, note: "Breakout pick." }, // 12
+      { name: "Joshua Da Silva", role: "WK", overseas: false, note: "CONFIRMED XI and KEPT WICKET, batting 3 in the 8 Aug match — Trinbago's breakout-rule pick. Note Nicholas Pooran did NOT play that game (Hundred duty), so Da Silva keeps in his absence." }, // 12
+      { name: "Matthew Tromp", role: "BAT", overseas: false, note: "⚠️ WAS MISSING FROM MY SQUAD ENTIRELY — batted 6 in the 8 Aug XI. Not in Wikipedia, Wisden, T20Tracker or the franchise release. Added on match evidence." }, // 13
       { name: "Jyd Goolie", role: "BAT", overseas: false }, // 13
       { name: "Amshi de Silva", role: "BOWL", overseas: true, note: "Sri Lankan leg-spinner — NOT Joshua Da Silva (TKR)." }, // 14
       { name: "Dexter Sween", role: "BAT", overseas: false }, // 15
-      { name: "Terrance Hinds", role: "BOWL", overseas: false, note: "Dropped out of the XI for Nathan Edward, who both satisfies the breakout-player rule and outperformed him in 2025 (71.0 avg FP to 33.7)." }, // 16
+
       { name: "Abdul-Raheem Toppin", role: "AR", overseas: false, note: "Breakout pick." }, // 17
     ],
   },
