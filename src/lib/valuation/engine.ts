@@ -11,6 +11,10 @@ import {
   bilateralExpectedMatches,
 } from "@/lib/squads/ind-vs-eng-t20-2026";
 import {
+  ENG_VS_PAK_TEST_2026_NAME,
+  testExpectedMatches,
+} from "../squads/eng-vs-pak-test-2026";
+import {
   IRE_VS_WI_W_ODI_2026_NAME,
   odiExpectedMatches,
 } from "@/lib/squads/ire-wi-w-odi-2026";
@@ -151,6 +155,56 @@ function computeScore1(
   return score;
 }
 
+// Red-ball shrinkage prior: the expected mean Test FP of a player in each role.
+//
+// This MUST be measured on Test data and cannot reuse the white-ball prior of 40. Test FP run 2-3x
+// the T20 scale (two innings, +20 a wicket, no rate bonuses), so shrinking a Test average toward 40
+// is not a regression to the mean — 40 sits near the 5th percentile, and it would penalise every
+// player short of caps rather than stabilise them.
+//
+// Measured as the mean of PLAYER MEANS, not of all performances: the quantity being shrunk is one
+// player's average, so the prior should describe how player averages are distributed. Pooling raw
+// rows instead would weight the prior by games played (a 60-Test regular vs a debutant) and gives a
+// materially different number. Players need >= TEST_PRIOR_MIN_TESTS in the window to contribute, so
+// the prior is not itself built out of the small samples it exists to correct.
+//
+// ⚠️ players.role is inferred largely from white-ball data and files most red-ball spinners under
+// AR (Sajid Khan, Jadeja, Santner, Harmer), which lifts the AR prior. Bounded in practice — the
+// prior only carries real weight for thin samples, and none of the thin players here are ARs.
+const TEST_PRIOR_MONTHS = 60;
+const TEST_PRIOR_MIN_TESTS = 5;   // per player, to contribute to the prior
+const TEST_PRIOR_MIN_PLAYERS = 10; // per role, else fall back to the pooled all-role prior
+const TEST_PRIOR_FALLBACK: Record<string, number> = {
+  BAT: 99.2, WK: 112.0, AR: 124.6, BOWL: 102.4,
+};
+
+async function computeTestRolePrior(): Promise<Record<string, number>> {
+  const rows = (await sqlite
+    .prepare(
+      `SELECT role, AVG(pm) AS prior, COUNT(*) AS players FROM (
+         SELECT p.role AS role, AVG(mp.fantasy_points) AS pm
+           FROM match_performances mp
+           JOIN players p ON p.id = mp.player_id
+          WHERE mp.format = 'TEST'
+            AND (p.gender = 'male' OR p.gender IS NULL)
+            AND mp.match_date >= date('now', '-${TEST_PRIOR_MONTHS} months')
+          GROUP BY p.id
+         HAVING COUNT(*) >= ${TEST_PRIOR_MIN_TESTS}
+       )
+       GROUP BY role`
+    )
+    .all()) as Array<{ role: string | null; prior: number; players: number }>;
+
+  const out: Record<string, number> = { ...TEST_PRIOR_FALLBACK };
+  const pooled = rows.reduce((a, r) => a + r.prior * r.players, 0) /
+    Math.max(1, rows.reduce((a, r) => a + r.players, 0));
+  for (const r of rows) {
+    if (!r.role) continue;
+    out[r.role] = r.players >= TEST_PRIOR_MIN_PLAYERS ? r.prior : pooled;
+  }
+  return out;
+}
+
 function trimmedMean(xs: number[], p = 0.1): number {
   if (xs.length === 0) return NaN;
   const s = [...xs].sort((a, b) => a - b);
@@ -269,6 +323,13 @@ export async function recalculateValuations(
   // small-sample shrinkage ON (franchise league, same reasoning as LPL). Venue ON — the Caribbean
   // is a bowler's league: 4 of the 8 grounds read bowl_friendly and none read bat_road.
   const isCpl = tournamentRow?.name === CPL_2026_NAME;
+  // ENG v PAK 2026: the first RED-BALL tour. Scored purely on Test form ('TEST'), which is a
+  // different points scale entirely (2 innings, +20 a wicket, no rate bonuses) — so nothing
+  // white-ball may leak into it, in either direction. No league season, so the bilateral
+  // recency weights apply. First-class ('FC') is ingested but deliberately absent from the
+  // quality clause: it is display-only form, because Pakistan's domestic red-ball competition
+  // is not published by cricsheet and counting FC would tilt the pool toward England's fringe.
+  const isTest = tournamentRow?.name === ENG_VS_PAK_TEST_2026_NAME;
   // For MLC, the "primary league season" buckets are MLC (not IPL), and the quality pool is
   // MLC + IPL + T20I (vs WPL for the women's path). A bilateral T20I series has NO league
   // season: Score 1 drops the season buckets, weights Last-10 60% + all-quality-30mo 40%.
@@ -307,7 +368,7 @@ export async function recalculateValuations(
   // LPL: no 2025 edition, and its last real seasons (2024/2023) are ~1–2 yrs old, so lean recency —
   // 45% last-15 form, 20% most-recent LPL season (2024), 10% prior season (2023), 25% all-quality.
   const score1Weights =
-    isBilateral || isWomensOdi || isMensOdi
+    isBilateral || isWomensOdi || isMensOdi || isTest
       ? [0.60, 0, 0, 0.40]
       : isLpl
       ? [0.45, 0.20, 0.10, 0.25]
@@ -357,15 +418,28 @@ export async function recalculateValuations(
   // (no opposition gate, no T20 supplement) and the windows widen (women's ODIs are infrequent):
   // last-10 over 48mo (effectively "10 most recent"), all-form over 36mo. Non-ODI tours keep the
   // exact prior behaviour (T20 quality list + top-8 T20I supplement; 24mo / 30mo) — byte-identical.
-  const qualityClause = isWomensOdi
+  const qualityClause = isTest
+    // Red ball only, and NO opposition gate: Test cricket is already a 9-team sample, so gating it
+    // would mostly discard real evidence. 'FC' is excluded on purpose — see the isTest note above.
+    ? `format = 'TEST'`
+    : isWomensOdi
     ? `format = 'ODI'`
     : isMensOdi
     ? `format = 'ODI' AND opposition IN (${top8Placeholders})`
     : `format IN (${qualityList}) OR (format = 'T20' AND opposition IN (${top8Placeholders}))`;
   // women's ODI binds no extra params; men's ODI + T20 both bind the top-8 nation list.
-  const qualityParams = isWomensOdi ? [] : TOP_8_NATIONS;
-  const last15Window = isWomensOdi ? "-48 months" : isMensOdi ? "-36 months" : "-24 months";
-  const allWindow = isWomensOdi || isMensOdi ? "-36 months" : "-30 months";
+  const qualityParams = isWomensOdi || isTest ? [] : TOP_8_NATIONS;
+  // Test windows are much wider than the white-ball ones. England play ~12 Tests a year and
+  // Pakistan fewer, so a 24-month window would leave half this squad on 3-6 matches and turn the
+  // recency bucket into noise. 60 months of Tests is roughly 24 months of T20I density.
+  const last15Window = isTest
+    ? "-60 months"
+    : isWomensOdi
+    ? "-48 months"
+    : isMensOdi
+    ? "-36 months"
+    : "-24 months";
+  const allWindow = isTest ? "-60 months" : isWomensOdi || isMensOdi ? "-36 months" : "-30 months";
 
   // --- Batch Query: Score 1 sources ---
 
@@ -445,6 +519,32 @@ export async function recalculateValuations(
   // scaled by HUNDRED_ROLE_NORM). Empty for non-Hundred tours.
   const hunFracMap = new Map<number, number>();
   const qualNMap = new Map<number, number>(); // player -> total quality games (30mo), for shrinkage
+  // Test: sample size is counted in INNINGS, not matches. A Test is up to two innings per player,
+  // and it is innings that generate the milestone/haul events the average is built from, so innings
+  // is the honest unit — counting matches would roughly halve n and double the shrinkage.
+  const testInnsMap = new Map<number, number>();
+  const testRolePrior = isTest ? await computeTestRolePrior() : null;
+  if (isTest) {
+    const innRows = (await sqlite
+      .prepare(
+        `SELECT player_id, innings_detail FROM match_performances
+          WHERE player_id IN (${placeholders}) AND format = 'TEST'
+            AND match_date >= date('now', '${allWindow}')`
+      )
+      .all(...playerIds)) as Array<{ player_id: number; innings_detail: string | null }>;
+    for (const r of innRows) {
+      let n = 1; // pre-innings_detail rows (or a no-event appearance) count as a single innings
+      if (r.innings_detail) {
+        try {
+          const parsed = JSON.parse(r.innings_detail);
+          if (Array.isArray(parsed)) n = parsed.length;
+        } catch {
+          /* malformed JSON — fall back to 1 rather than dropping the appearance */
+        }
+      }
+      testInnsMap.set(r.player_id, (testInnsMap.get(r.player_id) ?? 0) + n);
+    }
+  }
   if (isHundred) {
     const hunFracRows = await sqlite
       .prepare(
@@ -569,7 +669,22 @@ export async function recalculateValuations(
     const shrinkAvg = (avg: number, cnt: number) =>
       cnt > 0 ? (cnt * avg + SHRINK_K * SHRINK_PRIOR) / (cnt + SHRINK_K) : avg;
     let score1: number;
-    if (isHundred) {
+    if (isTest) {
+      // Empirical-Bayes toward the role prior, k=3 pseudo-innings, n in innings.
+      // Plus a hard floor: under TEST_MIN_INNINGS the player gets NO credit for their own number
+      // and sits on the prior outright. One or two innings is not evidence — Awais Zafar's single
+      // 13-point Test would otherwise drag him below a player with no record at all, which says
+      // more about one dismissal than about him.
+      const TEST_SHRINK_K = 3;
+      const TEST_MIN_INNINGS = 3;
+      const prior =
+        testRolePrior?.[p.role] ?? TEST_PRIOR_FALLBACK[p.role] ?? TEST_PRIOR_FALLBACK.BAT;
+      const n = testInnsMap.get(p.player_id) ?? 0;
+      score1 =
+        n < TEST_MIN_INNINGS
+          ? prior
+          : (n * rawScore1 + TEST_SHRINK_K * prior) / (n + TEST_SHRINK_K);
+    } else if (isHundred) {
       const n = qualNMap.get(p.player_id) ?? 0;
       score1 = (n * rawScore1 + SHRINK_K * SHRINK_PRIOR) / (n + SHRINK_K);
     } else if (isLpl || isCpl) {
@@ -609,6 +724,8 @@ export async function recalculateValuations(
     const finalEfppm = normScore1;
     const expectedMatches = isHundred
       ? hundredExpectedMatches(p.ipl_team, p.squad_number, isHundredWomen)
+      : isTest
+      ? testExpectedMatches(p.squad_number)
       : isBilateral
       ? bilateralExpectedMatches(p.squad_number)
       : isWomensOdi

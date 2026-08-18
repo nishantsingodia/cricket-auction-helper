@@ -24,7 +24,17 @@ FOLDER_FORMAT = {
     "wbbl": "WBBL",  # Women's Big Bash League (women-only 20-over; T20 scorer)
     "wblast": "BLAST",  # Vitality Blast Women (women's English domestic T20 — reuse BLAST code so it's
     #                     T20-scored + already excluded from EFPPM; women's rows gendered by player)
+    # First-class domestic, RED BALL. cricsheet tags these match_type="MDM", which detect_format
+    # cannot map, so they MUST be pinned here or they silently fall through to the T20 default and
+    # get T20-scored. 'FC' is red-ball-scored (score_perf) but sits in NO quality list, so it is
+    # display-only form and never reaches EFPPM — see download_cricsheet.py for why.
+    "cch": "FC",        # County Championship
+    "ssh": "FC",        # Sheffield Shield
 }
+
+# Red-ball formats: two innings per side, so milestone/haul bonuses are evaluated PER INNINGS and
+# summed, not computed off the match aggregate. See score_red_ball_match / parse_match.
+RED_BALL_FORMATS = ("TEST", "FC")
 
 # ==================== DREAM11 T20 FANTASY POINTS ====================
 
@@ -324,12 +334,138 @@ def compute_fantasy_points_odi(perf: dict, role: str) -> float:
     return pts
 
 
+# ==================== DREAM11 TEST / RED-BALL FANTASY POINTS ====================
+#
+# Dream11's Test FPS is a pure per-EVENT scorer: unlike T20 and ODI it awards NO strike-rate points,
+# NO economy points, NO maiden bonus and NO dot-ball points. That is what makes a 5-day, 2-innings
+# match tractable — nothing depends on a rate computed over the wrong denominator.
+#
+# ⚠️ THE FLAGS BELOW ARE PENDING CONFIRMATION against the live Dream11 Test page. The user's FPS
+# extract covered batting / bowling / fielding / multipliers but did not explicitly state the
+# ABSENCE of the five rate-based awards, nor the duck role gate. Each is isolated as a constant so
+# confirming or contradicting any of them is a one-line change with no restructuring. Do not report
+# prices built on these until they are confirmed.
+TEST_SR_POINTS = False          # T20/ODI have strike-rate bands; Test has none
+TEST_ECON_POINTS = False        # T20/ODI have economy bands; Test has none
+TEST_MAIDEN_PTS = 0             # T20 +12, ODI +4; Test 0
+TEST_DOT_POINTS = False         # T20 +1/dot, ODI +1 per 3 dots; Test none
+TEST_THREE_CATCH_BONUS = 0      # T20/ODI +4 at 3 catches; not listed for Test
+TEST_DUCK_PTS = -4              # T20 -2, ODI -3
+TEST_DUCK_ROLES = ("BAT", "WK", "AR")   # as in T20/ODI, pure bowlers are exempt
+TEST_XI_BONUS = 4               # "In Announced Lineups" — awarded ONCE per match, not per innings
+
+
+def compute_fantasy_points_test(perf: dict, role: str) -> float:
+    """Dream11 Test FPS for a SINGLE INNINGS. Excludes the +4 announced-XI bonus.
+
+    Call this once per innings and sum; the match-level total comes from score_red_ball_match,
+    which adds the XI bonus once. Scoring per innings is not a stylistic choice — the milestone
+    and wicket-haul tiers are evaluated within an innings, so a 40 and 40 is two 25-bonuses
+    (+8) rather than a 75-bonus (+12), and 3-for + 3-for earns no haul bonus rather than the
+    6-wicket +12. Computing either off the match aggregate is simply a different, wrong number.
+
+    perf keys: as compute_fantasy_points, but scoped to one innings.
+    """
+    pts = 0.0
+
+    # === BATTING ===
+    bat_runs = perf.get("bat_runs", 0) or 0
+    bat_balls = perf.get("bat_balls", 0) or 0
+    bat_4s = perf.get("bat_4s", 0) or 0
+    bat_6s = perf.get("bat_6s", 0) or 0
+    bat_dismissed = perf.get("bat_dismissed", False)
+
+    if bat_balls > 0 or bat_runs > 0:
+        pts += bat_runs * 1 + bat_4s * 4 + bat_6s * 6
+
+        # Milestone — HIGHEST SLAB ONLY. The FPS is explicit: "Any player scoring 150 Runs will
+        # only get points for that. No points will be awarded as their 25/50/75/100/125 Run Bonus."
+        # Test runs deeper than the other formats (125 and 150 tiers exist here and nowhere else).
+        if bat_runs >= 150:
+            pts += 24
+        elif bat_runs >= 125:
+            pts += 20
+        elif bat_runs >= 100:
+            pts += 16
+        elif bat_runs >= 75:
+            pts += 12
+        elif bat_runs >= 50:
+            pts += 8
+        elif bat_runs >= 25:
+            pts += 4
+
+        if TEST_SR_POINTS and bat_balls >= 20 and role != "BOWL":
+            pass  # no Test strike-rate bands defined; guarded so enabling this is deliberate
+
+    # Duck — OUTSIDE the runs/balls gate so a 0-off-0 run-out still counts (as in the ODI scorer).
+    if bat_dismissed and bat_runs == 0 and role in TEST_DUCK_ROLES:
+        pts += TEST_DUCK_PTS
+
+    # === BOWLING ===
+    bowl_balls = perf.get("bowl_balls", 0) or 0
+    bowl_wickets = perf.get("bowl_wickets", 0) or 0
+    bowl_maidens = perf.get("bowl_maidens", 0) or 0
+    bowl_dots = perf.get("bowl_dots", 0) or 0
+    bowl_lbw_bowled = perf.get("bowl_lbw_bowled", 0) or 0
+
+    if bowl_balls > 0:
+        # +20 a wicket — LOWER than T20 (+25) and ODI (+30), because a Test yields ~20 wickets.
+        pts += bowl_wickets * 20 + bowl_lbw_bowled * 8
+
+        if TEST_DOT_POINTS:
+            pts += bowl_dots
+        if TEST_MAIDEN_PTS:
+            pts += bowl_maidens * TEST_MAIDEN_PTS
+
+        # Wicket-haul tiers, PER INNINGS: 4w/5w/6w = +4/+8/+12 (same tiers as ODI, unlike T20's 3/4/5).
+        if bowl_wickets >= 6:
+            pts += 12
+        elif bowl_wickets >= 5:
+            pts += 8
+        elif bowl_wickets >= 4:
+            pts += 4
+
+        if TEST_ECON_POINTS:
+            pass  # no Test economy bands defined; guarded so enabling this is deliberate
+
+    # === FIELDING ===
+    catches = perf.get("catches", 0) or 0
+    stumpings = perf.get("stumpings", 0) or 0
+    run_outs = perf.get("run_outs", 0) or 0
+    direct_run_outs = perf.get("direct_run_outs", 0) or 0
+
+    pts += catches * 8
+    if TEST_THREE_CATCH_BONUS and catches >= 3:
+        pts += TEST_THREE_CATCH_BONUS
+    pts += stumpings * 12
+    pts += direct_run_outs * 12 + (run_outs - direct_run_outs) * 6
+
+    return pts
+
+
+def score_red_ball_match(innings_perfs: list, role: str) -> float:
+    """Total Test/first-class points for one player across a whole match.
+
+    innings_perfs = that player's per-innings counter dicts, in innings order. Events accumulate
+    across the match; the milestone and haul TIERS are evaluated inside each innings. The
+    announced-XI bonus is a match-level award, so it lands exactly once however many innings
+    the player appeared in.
+    """
+    return sum(compute_fantasy_points_test(p, role) for p in innings_perfs) + TEST_XI_BONUS
+
+
 def score_perf(perf: dict, role: str, fmt: str) -> float:
     """Dispatch to the correct fantasy scorer for the format."""
     if fmt == "HUN":
         return compute_fantasy_points_hundred(perf, role)
     if fmt == "ODI":
         return compute_fantasy_points_odi(perf, role)
+    if fmt in RED_BALL_FORMATS:
+        # Aggregate-only fallback: one "innings" covering the whole match. Correct ONLY for a
+        # single-innings appearance. The ingest path and the role-rescore pass both go through
+        # score_red_ball_match with the real per-innings split (innings_detail); this branch
+        # exists so no caller can silently land on the T20 scorer for a red-ball row.
+        return score_red_ball_match([perf], role)
     return compute_fantasy_points(perf, role)
 
 
@@ -365,10 +501,35 @@ def detect_format(match_info: dict) -> str:
     return "T20"
 
 
-def parse_match(filepath: str) -> dict:
+def _new_perf() -> dict:
+    """A zeroed performance counter set (one match, or one innings for red ball)."""
+    return {
+        "bat_runs": 0, "bat_balls": 0, "bat_4s": 0, "bat_6s": 0,
+        "bat_dismissed": False, "dismissal_type": None,
+        "bowl_balls": 0, "bowl_runs": 0, "bowl_wickets": 0,
+        "bowl_maidens": 0, "bowl_dots": 0, "bowl_lbw_bowled": 0,
+        "catches": 0, "stumpings": 0, "run_outs": 0, "direct_run_outs": 0,
+        "team": None,
+    }
+
+
+# Counter keys that simply add up when merging a red-ball match's innings into match totals.
+_PERF_SUM_KEYS = (
+    "bat_runs", "bat_balls", "bat_4s", "bat_6s",
+    "bowl_balls", "bowl_runs", "bowl_wickets", "bowl_maidens", "bowl_dots", "bowl_lbw_bowled",
+    "catches", "stumpings", "run_outs", "direct_run_outs",
+)
+
+
+def parse_match(filepath: str, format_override: str = None) -> dict:
     """
     Parse a single Cricsheet JSON match file.
     Returns match metadata + per-player performance stats.
+
+    format_override pins the format for folder-driven buckets (FOLDER_FORMAT). It MUST be applied
+    here rather than patched onto the result afterwards: cricsheet tags first-class matches
+    match_type="MDM", which detect_format cannot map, so without the override parse_match would
+    treat a 2-innings FC match as a single-innings one and never build the per-innings split.
     """
     with open(filepath, "r") as f:
         data = json.load(f)
@@ -383,18 +544,19 @@ def parse_match(filepath: str) -> dict:
     city = info.get("city", "")
     teams = info.get("teams", [])
     registry = info.get("registry", {}).get("people", {})
-    match_format = detect_format(info)
+    match_format = format_override or detect_format(info)
     gender = info.get("gender", None)  # "male" or "female"
 
     # Player performances
-    perfs = defaultdict(lambda: {
-        "bat_runs": 0, "bat_balls": 0, "bat_4s": 0, "bat_6s": 0,
-        "bat_dismissed": False, "dismissal_type": None,
-        "bowl_balls": 0, "bowl_runs": 0, "bowl_wickets": 0,
-        "bowl_maidens": 0, "bowl_dots": 0, "bowl_lbw_bowled": 0,
-        "catches": 0, "stumpings": 0, "run_outs": 0, "direct_run_outs": 0,
-        "team": None,
-    })
+    perfs = defaultdict(_new_perf)
+
+    # Red ball (Test / first-class): ALSO accumulate a separate counter set per innings, because the
+    # milestone and wicket-haul tiers are evaluated within an innings (see compute_fantasy_points_test).
+    # `perfs` still receives the merged match totals, so storage, career stats, "Recent Matches" and
+    # every other downstream reader are unchanged. For all other formats `cur is perfs`, so those
+    # formats take byte-identical code paths to before and no existing valuation shifts.
+    is_red_ball = match_format in RED_BALL_FORMATS
+    inns_perfs = []
 
     # Track which team each player belongs to
     players_per_team = info.get("players", {})
@@ -405,6 +567,14 @@ def parse_match(filepath: str) -> dict:
     for innings in innings_data:
         if innings.get("super_over"):
             continue  # super-over deliveries score no fantasy points
+
+        # Red ball: a fresh counter set per innings (tiers are per-innings). Otherwise accumulate
+        # straight into the match dict exactly as before.
+        if is_red_ball:
+            cur = defaultdict(_new_perf)
+            inns_perfs.append(cur)
+        else:
+            cur = perfs
         team_batting = innings.get("team", "")
         team_bowling = [t for t in teams if t != team_batting]
         team_bowling = team_bowling[0] if team_bowling else ""
@@ -437,25 +607,25 @@ def parse_match(filepath: str) -> dict:
 
                 # Batting stats (count all deliveries faced except wides)
                 if not is_wide:
-                    perfs[batter]["bat_balls"] += 1
+                    cur[batter]["bat_balls"] += 1
 
-                perfs[batter]["bat_runs"] += runs_batter
+                cur[batter]["bat_runs"] += runs_batter
                 if runs_batter == 4:
-                    perfs[batter]["bat_4s"] += 1
+                    cur[batter]["bat_4s"] += 1
                 elif runs_batter == 6:
-                    perfs[batter]["bat_6s"] += 1
+                    cur[batter]["bat_6s"] += 1
 
                 # Bowling stats — runs CHARGED TO THE BOWLER exclude byes/leg-byes (keeper's
                 # leak, not the bowler's). Drives economy, maidens and dots. Wides/no-balls count.
                 bcharged = runs_total - (extras.get("byes", 0) or 0) - (extras.get("legbyes", 0) or 0)
-                perfs[bowler]["bowl_runs"] += bcharged
+                cur[bowler]["bowl_runs"] += bcharged
                 if is_legal:
-                    perfs[bowler]["bowl_balls"] += 1
+                    cur[bowler]["bowl_balls"] += 1
                     over_legal_balls += 1
 
                 # Dot ball: legal delivery with 0 runs charged to the bowler
                 if is_legal and bcharged == 0:
-                    perfs[bowler]["bowl_dots"] += 1
+                    cur[bowler]["bowl_dots"] += 1
 
                 # For maiden tracking (byes/leg-byes don't break a maiden)
                 if is_legal:
@@ -469,49 +639,62 @@ def parse_match(filepath: str) -> dict:
                     fielders = w.get("fielders", [])
 
                     # Mark batter dismissed
-                    perfs[player_out]["bat_dismissed"] = True
-                    perfs[player_out]["dismissal_type"] = kind
+                    cur[player_out]["bat_dismissed"] = True
+                    cur[player_out]["dismissal_type"] = kind
 
                     # Bowler gets wicket (except run out, retired, obstructing)
                     if kind not in ("run out", "retired hurt", "retired not out",
                                      "retired out", "obstructing the field", "hit wicket"):
-                        perfs[bowler]["bowl_wickets"] += 1
+                        cur[bowler]["bowl_wickets"] += 1
                         if kind in ("bowled", "lbw"):
-                            perfs[bowler]["bowl_lbw_bowled"] += 1
+                            cur[bowler]["bowl_lbw_bowled"] += 1
 
                     # Hit wicket counts as bowler wicket but not lbw/bowled bonus
                     if kind == "hit wicket":
-                        perfs[bowler]["bowl_wickets"] += 1
+                        cur[bowler]["bowl_wickets"] += 1
 
                     # Fielding: catches
                     if kind == "caught":
                         for fielder_info in fielders:
                             fname = fielder_info.get("name", "")
                             if fname and fname != bowler:
-                                perfs[fname]["catches"] += 1
+                                cur[fname]["catches"] += 1
                     if kind == "caught and bowled":   # the bowler caught it — credit the catch
-                        perfs[bowler]["catches"] += 1
+                        cur[bowler]["catches"] += 1
 
                     # Fielding: stumped
                     if kind == "stumped":
                         for fielder_info in fielders:
                             fname = fielder_info.get("name", "")
                             if fname:
-                                perfs[fname]["stumpings"] += 1
+                                cur[fname]["stumpings"] += 1
 
                     # Fielding: run out
                     if kind == "run out":
                         for i, fielder_info in enumerate(fielders):
                             fname = fielder_info.get("name", "")
                             if fname:
-                                perfs[fname]["run_outs"] += 1
+                                cur[fname]["run_outs"] += 1
                                 # First fielder in list with single fielder = direct hit
                                 if len(fielders) == 1:
-                                    perfs[fname]["direct_run_outs"] += 1
+                                    cur[fname]["direct_run_outs"] += 1
 
             # Check for maiden over (6 legal balls, 0 runs)
             if over_legal_balls == 6 and over_runs_for_maiden == 0 and over_bowler:
-                perfs[over_bowler]["bowl_maidens"] += 1
+                cur[over_bowler]["bowl_maidens"] += 1
+
+    # Red ball: fold the per-innings counter sets into match totals. `perfs` then looks exactly as
+    # it would have under the old single-dict accumulation, so storage and every downstream reader
+    # are unaffected — but the per-innings split survives in `innings_detail` for scoring.
+    if is_red_ball:
+        for inns in inns_perfs:
+            for pname, ip in inns.items():
+                tgt = perfs[pname]
+                for k in _PERF_SUM_KEYS:
+                    tgt[k] += ip[k]
+                if ip["bat_dismissed"]:
+                    tgt["bat_dismissed"] = True
+                    tgt["dismissal_type"] = ip["dismissal_type"]  # latest innings they were out in
 
     # Build result
     result = {
@@ -543,10 +726,21 @@ def parse_match(filepath: str) -> dict:
             elif isinstance(ids, str):
                 cricsheet_id = ids
 
+        # Red ball: carry this player's per-innings counters so the scorer can evaluate tiers
+        # inside each innings. Only innings they actually appeared in are kept.
+        detail = None
+        if is_red_ball:
+            detail = [
+                {k: inns[pname][k] for k in (*_PERF_SUM_KEYS, "bat_dismissed", "dismissal_type")}
+                for inns in inns_perfs
+                if pname in inns
+            ]
+
         result["performances"][pname] = {
             **perf,
             "opposition": opposition,
             "cricsheet_id": cricsheet_id,
+            "innings_detail": detail,
         }
 
     return result
@@ -565,6 +759,15 @@ def init_db(conn: sqlite3.Connection):
         print(f"ERROR: Missing tables: {missing}")
         print("Run `npx drizzle-kit push` first to create the schema.")
         sys.exit(1)
+
+    # innings_detail: per-innings counter split for red-ball rows (see compute_fantasy_points_test).
+    # Added idempotently rather than via a Drizzle migration so a Turso-restored copy or a fresh
+    # clone self-heals instead of failing the whole ingest on a missing column.
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(match_performances)")}
+    if "innings_detail" not in cols:
+        print("  + adding match_performances.innings_detail")
+        conn.execute("ALTER TABLE match_performances ADD COLUMN innings_detail TEXT")
+        conn.commit()
 
 
 def get_or_create_player(conn: sqlite3.Connection, name: str, cricsheet_id: str,
@@ -683,7 +886,9 @@ def process_all_matches(conn: sqlite3.Connection):
 
     # Gather all JSON files
     json_files = []
-    for folder in ["ipl", "t20i", "wpl", "mlc", "hundred", "odi", "lpl", "bbl", "blast", "psl", "sa20", "ilt20", "cpl", "wbbl", "wblast"]:
+    for folder in ["ipl", "t20i", "wpl", "mlc", "hundred", "odi", "lpl", "bbl", "blast", "psl", "sa20", "ilt20", "cpl", "wbbl", "wblast",
+                   # red ball: 'tests' is format-detected as TEST; cch/ssh are pinned to FC by FOLDER_FORMAT
+                   "tests", "cch", "ssh"]:
         folder_path = os.path.join(RAW_DIR, folder)
         if os.path.isdir(folder_path):
             files = glob.glob(os.path.join(folder_path, "*.json"))
@@ -716,10 +921,9 @@ def process_all_matches(conn: sqlite3.Connection):
             continue
 
         try:
-            match = parse_match(filepath)
             _folder = os.path.basename(os.path.dirname(filepath))
-            if _folder in FOLDER_FORMAT:
-                match["format"] = FOLDER_FORMAT[_folder]  # franchise league: folder-driven format
+            # franchise league / first-class: folder-driven format, resolved BEFORE parsing
+            match = parse_match(filepath, FOLDER_FORMAT.get(_folder))
         except Exception as e:
             errors += 1
             if errors <= 5:
@@ -754,7 +958,14 @@ def process_all_matches(conn: sqlite3.Connection):
 
             # Compute fantasy points
             # Need role — use "BAT" for now, will recompute after role inference
-            fantasy_pts = score_perf(perf, "BAT", match["format"])
+            detail = perf.get("innings_detail")
+            if detail:
+                fantasy_pts = score_red_ball_match(detail, "BAT")
+            else:
+                fantasy_pts = score_perf(perf, "BAT", match["format"])
+            # Persisted so recompute_fantasy_points_with_roles can redo the per-innings scoring once
+            # roles are known — the aggregate columns alone cannot reproduce per-innings tiers.
+            detail_json = json.dumps(detail, separators=(",", ":")) if detail else None
 
             # Insert match performance
             conn.execute("""
@@ -762,8 +973,9 @@ def process_all_matches(conn: sqlite3.Connection):
                     player_id, match_id, match_date, format, venue_id, venue_name, opposition,
                     bat_runs, bat_balls, bat_4s, bat_6s, bat_dismissed, dismissal_type,
                     bowl_balls, bowl_runs, bowl_wickets, bowl_maidens, bowl_dots, bowl_lbw_bowled,
-                    catches, stumpings, run_outs, direct_run_outs, fantasy_points, series
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    catches, stumpings, run_outs, direct_run_outs, fantasy_points, series,
+                    innings_detail
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 player_id, match["match_id"], match["match_date"], match["format"],
                 venue_id, match["venue"], perf["opposition"],
@@ -773,6 +985,7 @@ def process_all_matches(conn: sqlite3.Connection):
                 perf["bowl_maidens"], perf["bowl_dots"], perf["bowl_lbw_bowled"],
                 perf["catches"], perf["stumpings"], perf["run_outs"],
                 perf["direct_run_outs"], fantasy_pts, match.get("series"),
+                detail_json,
             ))
 
             # Track for role inference
@@ -845,7 +1058,7 @@ def recompute_fantasy_points_with_roles(conn: sqlite3.Connection):
                mp.bowl_balls, mp.bowl_runs, mp.bowl_wickets, mp.bowl_maidens,
                mp.bowl_dots, mp.bowl_lbw_bowled,
                mp.catches, mp.stumpings, mp.run_outs, mp.direct_run_outs,
-               p.role, mp.format
+               p.role, mp.format, mp.innings_detail
         FROM match_performances mp
         JOIN players p ON mp.player_id = p.id
     """)
@@ -863,7 +1076,14 @@ def recompute_fantasy_points_with_roles(conn: sqlite3.Connection):
         }
         role = row[17] or "BAT"
         fmt = row[18] or "T20"
-        fps = score_perf(perf, role, fmt)
+        # Red-ball rows carry their per-innings split; re-score from that so the milestone and haul
+        # tiers stay per-innings. Falling back to score_perf here would silently re-derive them off
+        # the match aggregate and quietly overwrite every Test score with a wrong number.
+        detail = row[19]
+        if detail:
+            fps = score_red_ball_match(json.loads(detail), role)
+        else:
+            fps = score_perf(perf, role, fmt)
         batch.append((fps, row[0]))
         count += 1
 

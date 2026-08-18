@@ -30,6 +30,15 @@ ARCHIVES = {
     "sa20": "https://cricsheet.org/downloads/sat_json.zip",   # SA20
     "ilt20": "https://cricsheet.org/downloads/ilt_json.zip",  # International League T20 (UAE)
     "cpl": "https://cricsheet.org/downloads/cpl_json.zip",    # Caribbean Premier League
+    # --- RED BALL (added Aug 2026 for the ENG v PAK Test series) ---
+    "tests": "https://cricsheet.org/downloads/tests_json.zip", # All Tests (men's + women's); match_type="Test"
+    # First-class domestic. cricsheet tags these match_type="MDM" (multi-day match), NOT "Test", so
+    # detect_format cannot recognise them — they are pinned to 'FC' via FOLDER_FORMAT instead.
+    # DISPLAY-ONLY: 'FC' is deliberately in NO quality list, so it never reaches EFPPM. Pakistan's
+    # Quaid-e-Azam Trophy is not published by cricsheet, so counting FC form would systematically
+    # favour the England fringe over Pakistan's — hence form you can read, but not price.
+    "cch": "https://cricsheet.org/downloads/cch_json.zip",     # County Championship (2014+)
+    "ssh": "https://cricsheet.org/downloads/ssh_json.zip",     # Sheffield Shield (2017+)
 }
 
 def download_file(url: str, dest: str):

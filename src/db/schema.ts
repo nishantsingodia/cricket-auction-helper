@@ -97,6 +97,10 @@ export const matchPerformances = sqliteTable("match_performances", {
   stumpings: integer("stumpings").default(0),
   runOuts: integer("run_outs").default(0),
   directRunOuts: integer("direct_run_outs").default(0),
+  // Red ball only (TEST/FC): JSON array of this player's per-innings counter sets. Dream11's Test
+  // milestone and wicket-haul tiers are evaluated INSIDE an innings, so the aggregate columns above
+  // cannot reproduce fantasyPoints for these rows — the ETL re-scores from this. Null elsewhere.
+  inningsDetail: text("innings_detail"),
   // Fantasy Points (computed from Dream11 rules)
   fantasyPoints: real("fantasy_points").default(0),
 });

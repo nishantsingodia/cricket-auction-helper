@@ -40,6 +40,11 @@ import { buildHundredPool } from "@/lib/squads/build-hundred-pool";
 import { LPL_2026, LPL_2026_NAME } from "@/lib/squads/lpl-2026";
 import { buildLPLPool } from "@/lib/squads/build-lpl-pool";
 import { CPL_2026, CPL_2026_NAME } from "@/lib/squads/cpl-2026";
+import {
+  ENG_VS_PAK_TEST_2026,
+  ENG_VS_PAK_TEST_2026_NAME,
+} from "@/lib/squads/eng-vs-pak-test-2026";
+import { buildTestPool } from "@/lib/squads/build-test-pool";
 import { buildCPLPool } from "@/lib/squads/build-cpl-pool";
 import { eq } from "drizzle-orm";
 
@@ -198,6 +203,48 @@ export async function POST(request: NextRequest) {
         players: built.players,
         matched: built.matched,
         created: built.created,
+        unmatched: built.unmatched,
+        teamBreakdown: built.teamBreakdown,
+      });
+    }
+
+    // ---- England vs Pakistan Men's Test 2026 (RED-BALL bilateral, 3 Tests) ----
+    if (auctionRow.tournament_name === ENG_VS_PAK_TEST_2026_NAME) {
+      let tournamentId = auctionRow.tournament_id;
+      if (!tournamentId) {
+        // match_format 'TEST' is what scopes the engine's form queries and the player modal to
+        // red ball; max_squad_size 17 = Pakistan's squad, the larger of the two.
+        const t = await sqlite
+          .prepare(
+            `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size)
+             VALUES (?, 'BILATERAL', 'TEST', 100, 17)`
+          )
+          .run(ENG_VS_PAK_TEST_2026_NAME);
+        tournamentId = Number(t.lastInsertRowid);
+        await sqlite
+          .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
+          .run(tournamentId, auctionId);
+      }
+
+      const teams = Array.isArray(teamsFilter) && teamsFilter.length
+        ? ENG_VS_PAK_TEST_2026.filter((t) => teamsFilter.includes(t.short))
+        : undefined;
+
+      const built = await buildTestPool(sqlite, { auctionId, tournamentId, teams });
+      if (isFirstBuild)
+        await carryOverPreviousLineups({
+          tournamentName: auctionRow.tournament_name,
+          tournamentId,
+          auctionId,
+        });
+      await initializeValuations(tournamentId);
+
+      return NextResponse.json({
+        success: true,
+        teams: built.teams,
+        players: built.players,
+        matched: built.matched,
+        created: 0, // csid-anchored: the builder throws rather than inventing a statless player
         unmatched: built.unmatched,
         teamBreakdown: built.teamBreakdown,
       });
