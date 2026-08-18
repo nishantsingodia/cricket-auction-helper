@@ -25,7 +25,12 @@ import {
   describeBatIndex,
   venueTypeFromBatIndex,
   type BatIndexEntry,
+  type BatIndexBasis,
 } from "./bat-index";
+import {
+  ENG_VS_PAK_TEST_2026_NAME,
+  ENG_PAK_TEST_VENUES,
+} from "@/lib/squads/eng-vs-pak-test-2026";
 import { canonicalVenue } from "@/lib/registry/venues";
 import {
   CPL_2026_NAME,
@@ -166,13 +171,16 @@ export interface TourVenueContext {
 // Decorates each venue with its Bat Index (reporting only — it never affects a price).
 async function withBatIndex(
   venues: TourVenue[],
-  gender: "male" | "female"
+  gender: "male" | "female",
+  // Red-ball tours MUST pass "red". A Test tour reading the white-ball index would report a T20
+  // Lord's as if it were a Test Lord's, which is worse than showing nothing at all.
+  basis: BatIndexBasis = "white"
 ): Promise<{
   venues: TourVenue[];
   batIndexMedian: number;
   batIndexByGround: Map<string, BatIndexEntry>;
 }> {
-  const { byGround, median } = await computeBatIndex(gender);
+  const { byGround, median } = await computeBatIndex(gender, basis);
   return {
     median,
     batIndexMedian: median,
@@ -210,6 +218,7 @@ export async function getTourVenueContext(tournamentName: string): Promise<TourV
   const isHundredWomen = tournamentName === THE_HUNDRED_WOMEN_2026_NAME;
   const isLpl = tournamentName === LPL_2026_NAME;
   const isCpl = tournamentName === CPL_2026_NAME;
+  const isEngPakTest = tournamentName === ENG_VS_PAK_TEST_2026_NAME;
 
   if (isHundredMen || isHundredWomen) {
     const teams = isHundredMen ? HUNDRED_MEN_2026 : HUNDRED_WOMEN_2026;
@@ -279,6 +288,42 @@ export async function getTourVenueContext(tournamentName: string): Promise<TourV
       homeOf: CPL_VENUE_BASIS === "tournament"
         ? Object.fromEntries(Object.keys(CPL_TEAM_SCHEDULE).map((t) => [t, null]))
         : homeOf,
+    };
+  }
+
+  if (isEngPakTest) {
+    // Every ground is an England ground, so `neutral` is false — but no ONE ground is a "home" for
+    // either side across a 3-Test series, so homeOf is null for both and the header shows the
+    // schedule rather than a single home venue. Each ground hosts exactly one Test.
+    const schedule = ENG_PAK_TEST_VENUES.map((v) => ({ venue: v.canonical, games: 1 }));
+    return {
+      tour: tournamentName,
+      neutral: false,
+      gender: "male",
+      // TEST only — see BAT_INDEX_RED_FORMATS. FC is ingested but deliberately not read here.
+      venueFormats: ["TEST"],
+      // Matches the red basis' fallback window; a Test ground needs years, not months, for a sample.
+      venueWindowMonths: 144,
+      ...(await (async () => {
+        const d = await withBatIndex(
+          // `type` is a required field but is DERIVED inside withBatIndex from the measured index —
+          // the seed value here is only the fallback for a ground with no usable Test sample.
+          ENG_PAK_TEST_VENUES.map((v) => ({
+            canonical: v.canonical,
+            variants: v.variants,
+            type: "balanced" as VenueType,
+          })),
+          "male",
+          "red"
+        );
+        return {
+          venues: d.venues,
+          batIndexMedian: d.batIndexMedian,
+          batIndexByGround: d.batIndexByGround,
+        };
+      })()),
+      teamSchedule: { ENG: schedule, PAK: schedule },
+      homeOf: { ENG: null, PAK: null },
     };
   }
 

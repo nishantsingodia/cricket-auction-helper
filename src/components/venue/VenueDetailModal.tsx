@@ -42,7 +42,9 @@ interface Venue {
   batIndex: number | null;
   batIndexMedian: number;
   batIndexMatches: number | null;
-  batIndexWindow: "2yr" | "4yr" | "neutral" | null;
+  // Window the index was measured over. Red-ball tours use much wider windows (5yr/12yr) because a
+  // Test ground only hosts one or two Tests a year — see BASIS in lib/venues/bat-index.ts.
+  batIndexWindow: "2yr" | "4yr" | "5yr" | "12yr" | "neutral" | null;
   whoEarnsMore: "batters" | "bowlers" | null;
   earnsMorePct: number | null;
   vsAverageLabel: string | null;
@@ -269,7 +271,9 @@ export function VenueDetailModal({
                     {venue.batIndexMatches != null && (
                       <span className="text-xs text-muted-foreground">
                         · {venue.batIndexMatches} matches
-                        {venue.batIndexWindow === "2yr" ? " (last 2yr)" : venue.batIndexWindow === "4yr" ? " (last 4yr)" : ""}
+                        {venue.batIndexWindow && venue.batIndexWindow !== "neutral"
+                          ? ` (last ${venue.batIndexWindow.replace("yr", "yr")})`
+                          : ""}
                       </span>
                     )}
                   </div>

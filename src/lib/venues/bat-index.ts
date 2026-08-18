@@ -36,12 +36,44 @@ export const BAT_INDEX_FORMATS = [
   "CPL", "IPL", "BBL", "PSL", "LPL", "SA20", "ILT20", "MLC", "HUN", "T20",
 ] as const;
 
-const RECENT_MONTHS = 24;
-const RECENT_MIN_MATCHES = 15;
-const WIDE_MONTHS = 48;
-const WIDE_MIN_MATCHES = 5;
+// Red ball reads TEST ONLY. First-class ('FC') is excluded for the same reason Vitality Blast is
+// excluded from the white-ball list: it is a tier below international cricket, and at 36k rows it
+// would swamp the 20k Test rows and measure county cricket rather than Test cricket. The cost is a
+// thinner sample, which the wider windows below absorb.
+export const BAT_INDEX_RED_FORMATS = ["TEST"] as const;
 
-export type BatIndexSource = "2yr" | "4yr" | "neutral";
+/**
+ * Which cricket the index is measured on. A ground's red-ball character is a different physical
+ * question from its white-ball character — a September Lord's Test pitch behaves nothing like a
+ * T20 there — so the two cannot share one number.
+ */
+export type BatIndexBasis = "white" | "red";
+
+export type BatIndexSource = "2yr" | "4yr" | "5yr" | "12yr" | "neutral";
+
+interface BasisConfig {
+  formats: readonly string[];
+  recentMonths: number; recentMin: number; recentLabel: BatIndexSource;
+  wideMonths: number; wideMin: number; wideLabel: BatIndexSource;
+}
+
+// Red-ball windows are far wider BECAUSE OF FIXTURE DENSITY, not preference. An English Test ground
+// hosts one or two Tests a year, so the white-ball rule ("last 24 months if >=15 matches") can never
+// be satisfied by any ground on earth — every one would fall through to neutral 1.0 and the whole
+// model would silently report "we don't know". 5 years gets the busy grounds (Lord's) a real read;
+// 12 years is the fallback and is what produces the ~9-22 Test samples at the ENG v PAK grounds.
+const BASIS: Record<BatIndexBasis, BasisConfig> = {
+  white: {
+    formats: BAT_INDEX_FORMATS,
+    recentMonths: 24, recentMin: 15, recentLabel: "2yr",
+    wideMonths: 48, wideMin: 5, wideLabel: "4yr",
+  },
+  red: {
+    formats: BAT_INDEX_RED_FORMATS,
+    recentMonths: 60, recentMin: 8, recentLabel: "5yr",
+    wideMonths: 144, wideMin: 5, wideLabel: "12yr",
+  },
+};
 
 export interface BatIndexEntry {
   ground: string; // canonical ground name
@@ -68,9 +100,13 @@ interface Row {
 // bit-identical to the two separate queries this replaces. A raw spelling with no rows inside the
 // 24-month window is skipped for `recent`, so that map has exactly the same keys it had before.
 async function readWindows(
-  gender: "male" | "female"
+  gender: "male" | "female",
+  basis: BatIndexBasis
 ): Promise<{ recent: Map<string, Row>; wide: Map<string, Row> }> {
-  const fmt = BAT_INDEX_FORMATS.map((f) => `'${f}'`).join(",");
+  const cfg = BASIS[basis];
+  const RECENT_MONTHS = cfg.recentMonths;
+  const WIDE_MONTHS = cfg.wideMonths;
+  const fmt = cfg.formats.map((f) => `'${f}'`).join(",");
   const inWindow = (months: number) => `mp.match_date >= date('now', '-${months} months')`;
   // NOTE the inner CASE keeps the original `WHEN p.role = 'BOWL' THEN … ELSE …` shape rather than
   // `p.role != 'BOWL'`: role can be NULL, and a NULL role must keep landing on the BATTING side.
@@ -195,25 +231,39 @@ async function writePersisted(gender: string, res: BatIndexResult): Promise<void
   }
 }
 
-export async function computeBatIndex(gender: "male" | "female" = "male"): Promise<BatIndexResult> {
-  const memo = batIndexCache.get(gender);
+// Cache key for both tiers. The white basis keeps the bare gender string so every row already in
+// bat_index_cache stays valid — the table's PK is (gender, ground) and the column is TEXT, so
+// namespacing the red basis into the same column needs no migration for what is only a derived cache.
+const cacheKeyFor = (gender: "male" | "female", basis: BatIndexBasis) =>
+  basis === "white" ? gender : `${gender}:${basis}`;
+
+export async function computeBatIndex(
+  gender: "male" | "female" = "male",
+  basis: BatIndexBasis = "white"
+): Promise<BatIndexResult> {
+  const key = cacheKeyFor(gender, basis);
+  const memo = batIndexCache.get(key);
   if (memo && Date.now() - memo.at < BAT_INDEX_TTL_MS) return memo.value;
 
-  const persisted = await readPersisted(gender);
+  const persisted = await readPersisted(key);
   if (persisted) {
-    batIndexCache.set(gender, { at: Date.now(), value: persisted });
+    batIndexCache.set(key, { at: Date.now(), value: persisted });
     return persisted;
   }
 
-  const fresh = await computeBatIndexUncached(gender);
-  batIndexCache.set(gender, { at: Date.now(), value: fresh });
-  await writePersisted(gender, fresh);
+  const fresh = await computeBatIndexUncached(gender, basis);
+  batIndexCache.set(key, { at: Date.now(), value: fresh });
+  await writePersisted(key, fresh);
   return fresh;
 }
 
-async function computeBatIndexUncached(gender: "male" | "female"): Promise<BatIndexResult> {
+async function computeBatIndexUncached(
+  gender: "male" | "female",
+  basis: BatIndexBasis
+): Promise<BatIndexResult> {
+  const cfg = BASIS[basis];
   // Both windows come back from a single query — see readWindows().
-  const { recent, wide } = await readWindows(gender);
+  const { recent, wide } = await readWindows(gender, basis);
 
   const byGround = new Map<string, BatIndexEntry>();
   for (const ground of new Set([...recent.keys(), ...wide.keys()])) {
@@ -222,10 +272,10 @@ async function computeBatIndexUncached(gender: "male" | "female"): Promise<BatIn
     const rr = ratioOf(r);
     const wr = ratioOf(w);
 
-    if (r && rr && r.matches >= RECENT_MIN_MATCHES) {
-      byGround.set(ground, { ground, batIndex: rr.idx, matches: r.matches, source: "2yr", batFp: rr.bat, bowlFp: rr.bowl });
-    } else if (w && wr && w.matches >= WIDE_MIN_MATCHES) {
-      byGround.set(ground, { ground, batIndex: wr.idx, matches: w.matches, source: "4yr", batFp: wr.bat, bowlFp: wr.bowl });
+    if (r && rr && r.matches >= cfg.recentMin) {
+      byGround.set(ground, { ground, batIndex: rr.idx, matches: r.matches, source: cfg.recentLabel, batFp: rr.bat, bowlFp: rr.bowl });
+    } else if (w && wr && w.matches >= cfg.wideMin) {
+      byGround.set(ground, { ground, batIndex: wr.idx, matches: w.matches, source: cfg.wideLabel, batFp: wr.bat, bowlFp: wr.bowl });
     } else {
       byGround.set(ground, {
         ground, batIndex: 1.0, matches: w?.matches ?? r?.matches ?? 0,
