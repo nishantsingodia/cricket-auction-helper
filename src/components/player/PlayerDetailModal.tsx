@@ -182,6 +182,11 @@ function MiniStat({
 export function PlayerDetailModal({ playerId, onClose, tour, riskNote, poolId, playerStatus, isWatched, onRiskToggle, onSell, onUndo, onWatchlist }: PlayerDetailProps) {
   const [data, setData] = useState<PlayerDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  // Without this the modal is indistinguishable from a slow network when the fetch fails: `catch`
+  // cleared `loading` but left `data` null, and the render shows the loading copy whenever `!data`,
+  // so a 500 looked like an eternal "Loading player details…" with the real error only in the
+  // console. That is exactly how the tour-venue 500 presented.
+  const [error, setError] = useState<string | null>(null);
   const [seasonData, setSeasonData] = useState<{ leagueSeasons: SeasonStat[]; tours: SeasonStat[] } | null>(null);
   const [recentFmt, setRecentFmt] = useState<"ALL" | "T20" | "ODI">("ALL");
   const [seasonFmt, setSeasonFmt] = useState<"ALL" | "T20" | "ODI">("ALL");
@@ -189,6 +194,7 @@ export function PlayerDetailModal({ playerId, onClose, tour, riskNote, poolId, p
   useEffect(() => {
     async function fetchDetail() {
       setLoading(true);
+      setError(null);
       setRecentFmt("ALL");
       setSeasonFmt("ALL");
       try {
@@ -196,12 +202,15 @@ export function PlayerDetailModal({ playerId, onClose, tour, riskNote, poolId, p
           fetch(`/api/players/${playerId}${tour ? `?tour=${encodeURIComponent(tour)}` : ""}`),
           fetch(`/api/players/${playerId}/seasons`),
         ]);
-        const json = await res.json();
-        setData(json);
-        const seasonsJson = await seasonsRes.json();
-        setSeasonData(seasonsJson);
+        // fetch only rejects on a network failure, so an HTTP 500 arrives here looking like success
+        // and only blows up on res.json(). Check status explicitly.
+        if (!res.ok) throw new Error(`player detail failed: HTTP ${res.status}`);
+        setData(await res.json());
+        // Seasons are supplementary — a failure there should not cost you the whole modal.
+        if (seasonsRes.ok) setSeasonData(await seasonsRes.json());
       } catch (err) {
         console.error("Failed to fetch player detail:", err);
+        setError(err instanceof Error ? err.message : "Failed to load player details");
       } finally {
         setLoading(false);
       }
@@ -212,9 +221,14 @@ export function PlayerDetailModal({ playerId, onClose, tour, riskNote, poolId, p
   return (
     <Dialog open onOpenChange={() => onClose()}>
       <DialogContent className="w-[95vw] max-w-[95vw] max-h-[90vh] overflow-y-auto p-3 sm:p-4">
-        {loading || !data ? (
+        {loading ? (
           <div className="py-12 text-center text-muted-foreground">
             Loading player details...
+          </div>
+        ) : !data ? (
+          <div className="py-12 text-center space-y-2">
+            <p className="text-destructive font-medium">Couldn&apos;t load this player</p>
+            <p className="text-xs text-muted-foreground">{error ?? "Unknown error"}</p>
           </div>
         ) : (
           <>

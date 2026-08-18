@@ -90,19 +90,27 @@ export async function GET(
       args: [playerId],
     },
   ];
-  if (!tour) {
-    mainStmts.push({
-      sql: `
-          SELECT pvs.*, v.name as venue_name, v.city, v.country, v.pitch_type
-          FROM player_venue_stats pvs
-          JOIN venues v ON pvs.venue_id = v.id
-          WHERE pvs.player_id = ?
-          ORDER BY pvs.matches DESC
-          LIMIT 10
-        `,
-      args: [playerId],
-    });
-  }
+  // The career top-10 venue fallback is ALWAYS fetched, even when a tour is supplied.
+  //
+  // It used to be gated on `if (!tour)`, which conflated "a tour was named" with "that tour has a
+  // venue model". Only the Hundred, LPL and CPL have one, so for every other tour —
+  // ENG v PAK Test, IND v ENG T20I, both ODI bilaterals — getTourVenueContext() returns null, the
+  // code fell to the `else` branch below, and read mainRows[7] which had never been queued. Reading
+  // `.rows` of undefined threw, so the endpoint 500'd and the player modal hung on
+  // "Loading player details..." forever. One extra LIMIT 10 read on an indexed table is a much better
+  // trade than a whole tour class having no working player modal.
+  const FALLBACK_VENUE_IDX = mainStmts.length;
+  mainStmts.push({
+    sql: `
+        SELECT pvs.*, v.name as venue_name, v.city, v.country, v.pitch_type
+        FROM player_venue_stats pvs
+        JOIN venues v ON pvs.venue_id = v.id
+        WHERE pvs.player_id = ?
+        ORDER BY pvs.matches DESC
+        LIMIT 10
+      `,
+    args: [playerId],
+  });
 
   const [mainRows, tourVenues] = await Promise.all([
     client.batch(mainStmts, "read"),
@@ -171,7 +179,9 @@ export async function GET(
       .filter((r) => (r.matches as number) > 0)
       .sort((a, b) => (b.matches as number) - (a.matches as number));
   } else {
-    venueStats = mainRows[7].rows as unknown as Record<string, unknown>[];
+    // No venue model for this tour (or no tour at all) — fall back to the player's career grounds.
+    venueStats = (mainRows[FALLBACK_VENUE_IDX]?.rows ??
+      []) as unknown as Record<string, unknown>[];
   }
 
   let fantasyBreakdown = null;
