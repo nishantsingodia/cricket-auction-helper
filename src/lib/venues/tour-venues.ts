@@ -26,6 +26,7 @@ import {
   venueTypeFromBatIndex,
   type BatIndexEntry,
   type BatIndexBasis,
+  type BatIndexSource,
 } from "./bat-index";
 import {
   ENG_VS_PAK_TEST_2026_NAME,
@@ -136,7 +137,10 @@ export interface TourVenue {
   // batting, <median favours bowling. `batIndexMatches` is the sample; a 5-match read is weak.
   batIndex?: number;
   batIndexMatches?: number;
-  batIndexSource?: "2yr" | "4yr" | "neutral";
+  // Reuse the source type rather than re-listing the window labels: this was a hardcoded
+  // "2yr" | "4yr" | "neutral" that had silently gone stale when the red basis added its own windows,
+  // and the mismatch was masked by the `as` cast at the end of withBatIndex().
+  batIndexSource?: BatIndexSource;
   batIndexLabel?: string;
 }
 
@@ -303,7 +307,7 @@ export async function getTourVenueContext(tournamentName: string): Promise<TourV
       // TEST only — see BAT_INDEX_RED_FORMATS. FC is ingested but deliberately not read here.
       venueFormats: ["TEST"],
       // Matches the red basis' fallback window; a Test ground needs years, not months, for a sample.
-      venueWindowMonths: 144,
+      venueWindowMonths: 60,
       ...(await (async () => {
         const d = await withBatIndex(
           // `type` is a required field but is DERIVED inside withBatIndex from the measured index —

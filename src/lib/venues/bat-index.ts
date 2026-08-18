@@ -49,7 +49,7 @@ export const BAT_INDEX_RED_FORMATS = ["TEST"] as const;
  */
 export type BatIndexBasis = "white" | "red";
 
-export type BatIndexSource = "2yr" | "4yr" | "5yr" | "12yr" | "neutral";
+export type BatIndexSource = "2yr" | "3yr" | "4yr" | "5yr" | "neutral";
 
 interface BasisConfig {
   formats: readonly string[];
@@ -57,11 +57,18 @@ interface BasisConfig {
   wideMonths: number; wideMin: number; wideLabel: BatIndexSource;
 }
 
-// Red-ball windows are far wider BECAUSE OF FIXTURE DENSITY, not preference. An English Test ground
-// hosts one or two Tests a year, so the white-ball rule ("last 24 months if >=15 matches") can never
-// be satisfied by any ground on earth — every one would fall through to neutral 1.0 and the whole
-// model would silently report "we don't know". 5 years gets the busy grounds (Lord's) a real read;
-// 12 years is the fallback and is what produces the ~9-22 Test samples at the ENG v PAK grounds.
+// Prefer RECENT over large-sample: read a ground on the last 3 years when it has enough Tests, and
+// widen to 5 years only when it does not. This is the same adaptive-recency shape already used for
+// the Hundred's women's venue read — a pitch's character drifts (grounds get re-laid, drainage and
+// groundsman change), so a 12-year average describes a ground that no longer exists.
+//
+// Red-ball windows still can't be as tight as white-ball ones, because of fixture density: an
+// English ground hosts one or two Tests a year, so the white-ball rule ("24 months if >=15 matches")
+// can never be satisfied by any ground and every one would fall through to neutral 1.0.
+//
+// The minimums are the honest part. At 3 years Headingley has ONE Test and Edgbaston two — a single
+// match is not a read of anything, so recentMin=5 keeps them out of the 3-year window. The 5-year
+// floor is 3, below which we return neutral rather than pretend.
 const BASIS: Record<BatIndexBasis, BasisConfig> = {
   white: {
     formats: BAT_INDEX_FORMATS,
@@ -70,8 +77,8 @@ const BASIS: Record<BatIndexBasis, BasisConfig> = {
   },
   red: {
     formats: BAT_INDEX_RED_FORMATS,
-    recentMonths: 60, recentMin: 8, recentLabel: "5yr",
-    wideMonths: 144, wideMin: 5, wideLabel: "12yr",
+    recentMonths: 36, recentMin: 5, recentLabel: "3yr",
+    wideMonths: 60, wideMin: 3, wideLabel: "5yr",
   },
 };
 
@@ -231,11 +238,21 @@ async function writePersisted(gender: string, res: BatIndexResult): Promise<void
   }
 }
 
-// Cache key for both tiers. The white basis keeps the bare gender string so every row already in
-// bat_index_cache stays valid — the table's PK is (gender, ground) and the column is TEXT, so
-// namespacing the red basis into the same column needs no migration for what is only a derived cache.
-const cacheKeyFor = (gender: "male" | "female", basis: BatIndexBasis) =>
-  basis === "white" ? gender : `${gender}:${basis}`;
+// Cache key for both tiers, and it deliberately encodes the WINDOW CONFIG, not just gender+basis.
+//
+// The persisted tier survives a code deploy — it is only cleared by turso:sync. So without the config
+// in the key, editing a window (say red-ball 5yr/12yr -> 3yr/5yr) would deploy new code that keeps
+// serving numbers computed under the OLD rule, indefinitely and invisibly. Encoding the config means
+// any change to a window or minimum is self-invalidating: it simply asks for a key nothing has
+// written yet. Superseded rows linger until the next sync clears the table, which is harmless for a
+// derived cache.
+//
+// The table's PK is (gender, ground) and the column is TEXT, so namespacing into it needs no
+// migration.
+const cacheKeyFor = (gender: "male" | "female", basis: BatIndexBasis) => {
+  const c = BASIS[basis];
+  return `${gender}:${basis}:${c.recentMonths}-${c.recentMin}-${c.wideMonths}-${c.wideMin}`;
+};
 
 export async function computeBatIndex(
   gender: "male" | "female" = "male",
