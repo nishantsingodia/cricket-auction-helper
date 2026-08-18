@@ -130,6 +130,19 @@ interface PlayerDetail {
     bowlBalls: number;
     catches: number;
     fantasyPoints: number;
+    // Red ball only. Present so a Test row can show "1 & 60" instead of the match aggregate "61" —
+    // every other field here is a match total, while fantasyPoints is scored per innings and summed.
+    innings?: Array<{
+      batRuns: number;
+      batBalls: number;
+      bat4s: number;
+      bat6s: number;
+      batDismissed: boolean;
+      bowlWickets: number;
+      bowlRuns: number;
+      bowlBalls: number;
+      catches: number;
+    }> | null;
   }>;
   venueStats: Array<{
     venueName: string;
@@ -180,6 +193,31 @@ function MiniStat({
 }
 
 type FmtFilter = "ALL" | "T20" | "ODI" | "TEST" | "FC";
+
+type InningsSplit = {
+  batRuns: number; batBalls: number; bat4s: number; bat6s: number; batDismissed: boolean;
+  bowlWickets: number; bowlRuns: number; bowlBalls: number; catches: number;
+};
+
+// "1 & 60*" — the knocks that make up a red-ball match total, with * for not out. Only innings the
+// player actually batted in are listed, so a keeper who batted once in a four-innings match shows one
+// score, not two blanks. Returns null when there is nothing worth adding (white ball, or a single
+// innings that already equals the match total).
+function inningsBat(innings?: InningsSplit[] | null): string | null {
+  if (!innings?.length) return null;
+  const batted = innings.filter((i) => i.batBalls > 0 || i.batRuns > 0);
+  if (batted.length < 2) return null;
+  return batted.map((i) => `${i.batRuns}${i.batDismissed ? "" : "*"}`).join(" & ");
+}
+
+// "3/48 & 3/52" — same idea for bowling, where it matters more: the haul tiers are per innings, so
+// two 3-fors earn nothing while a 6-for earns +12 and the match aggregate looks identical.
+function inningsBowl(innings?: InningsSplit[] | null): string | null {
+  if (!innings?.length) return null;
+  const bowled = innings.filter((i) => i.bowlBalls > 0);
+  if (bowled.length < 2) return null;
+  return bowled.map((i) => `${i.bowlWickets}/${i.bowlRuns}`).join(" & ");
+}
 
 // Format-family predicates, shared by Recent Matches and Season Stats so the two panels can never
 // disagree about what counts as what. T20 is the catch-all for every 20-over/100-ball league bucket
@@ -726,14 +764,20 @@ export function PlayerDetailModal({ playerId, onClose, tour, riskNote, poolId, p
                             </div>
                             <div className="mt-2 grid grid-cols-4 gap-1.5 text-center">
                               <MiniStat
-                                label="Runs"
-                                value={`${m.batRuns ?? "—"}${m.batBalls != null ? ` (${m.batBalls})` : ""}`}
+                                label={inningsBat(m.innings) ? "Runs (inns)" : "Runs"}
+                                value={
+                                  inningsBat(m.innings) ??
+                                  `${m.batRuns ?? "—"}${m.batBalls != null ? ` (${m.batBalls})` : ""}`
+                                }
                               />
                               <MiniStat label="4s/6s" value={`${m.bat4s ?? 0}/${m.bat6s ?? 0}`} />
                               {m.bowlBalls != null && m.bowlBalls > 0 && (
                                 <MiniStat label="Ov" value={ballsToOvers(m.bowlBalls)} />
                               )}
-                              <MiniStat label="Wkts" value={m.bowlWickets ?? 0} />
+                              <MiniStat
+                                label={inningsBowl(m.innings) ? "Wkts (inns)" : "Wkts"}
+                                value={inningsBowl(m.innings) ?? (m.bowlWickets ?? 0)}
+                              />
                               <MiniStat label="Ct" value={m.catches ?? 0} />
                             </div>
                           </div>
@@ -787,6 +831,14 @@ export function PlayerDetailModal({ playerId, onClose, tour, riskNote, poolId, p
                         </TableCell>
                         <TableCell className="text-right">
                           {m.batRuns ?? "—"}
+                          {/* Red ball: the per-innings knocks under the match total, because "61"
+                              hides whether it was 61 in one go or 1 and 60 — and the milestone
+                              bonus, which is evaluated per innings, turns on exactly that. */}
+                          {inningsBat(m.innings) && (
+                            <div className="text-[10px] font-normal text-muted-foreground leading-tight">
+                              {inningsBat(m.innings)}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           {m.batBalls ?? "—"}
@@ -802,6 +854,13 @@ export function PlayerDetailModal({ playerId, onClose, tour, riskNote, poolId, p
                         </TableCell>
                         <TableCell className="text-right">
                           {m.bowlWickets ?? 0}
+                          {/* Matters more here than for batting: "6" could be a 6-for (+12 haul
+                              bonus) or 3-for + 3-for (no bonus at all). */}
+                          {inningsBowl(m.innings) && (
+                            <div className="text-[10px] font-normal text-muted-foreground leading-tight">
+                              {inningsBowl(m.innings)}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           {m.catches ?? 0}

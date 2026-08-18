@@ -4,6 +4,42 @@ import { calculateFantasyPoints } from "@/lib/fantasy-points/calculator";
 import type { MatchPerformance, PlayerRole } from "@/lib/fantasy-points/types";
 import { getTourVenueContext } from "@/lib/venues/tour-venues";
 
+/** One innings of a red-ball match, as persisted by the ETL in match_performances.innings_detail. */
+interface InningsSplit {
+  batRuns: number;
+  batBalls: number;
+  bat4s: number;
+  bat6s: number;
+  batDismissed: boolean;
+  bowlWickets: number;
+  bowlRuns: number;
+  bowlBalls: number;
+  catches: number;
+}
+
+// Null for every non-red-ball row. Malformed JSON degrades to null rather than failing the request —
+// the split is a display nicety, the aggregate columns are still correct without it.
+function parseInningsDetail(raw: unknown): InningsSplit[] | null {
+  if (typeof raw !== "string" || !raw) return null;
+  try {
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return null;
+    return arr.map((x: Record<string, unknown>) => ({
+      batRuns: Number(x.bat_runs ?? 0),
+      batBalls: Number(x.bat_balls ?? 0),
+      bat4s: Number(x.bat_4s ?? 0),
+      bat6s: Number(x.bat_6s ?? 0),
+      batDismissed: Boolean(x.bat_dismissed),
+      bowlWickets: Number(x.bowl_wickets ?? 0),
+      bowlRuns: Number(x.bowl_runs ?? 0),
+      bowlBalls: Number(x.bowl_balls ?? 0),
+      catches: Number(x.catches ?? 0),
+    }));
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -34,15 +70,51 @@ export async function GET(
     { sql: "SELECT * FROM players WHERE id = ?", args: [playerId] },
     // Career stats (all formats)
     { sql: "SELECT * FROM career_stats WHERE player_id = ? ORDER BY format", args: [playerId] },
-    // Recent match performances (last 20)
+    // Recent match performances.
+    //
+    // A flat "last 40 by date" is wrong for red ball. These players are white-ball regulars — a
+    // Blast/Hundred season alone is 20+ games — so the 40 most recent matches can cover barely six
+    // months and leave a Test specialist with three or four Tests visible. A Test is also played
+    // roughly monthly at best, so judging red-ball form needs YEARS of it, not a match count.
+    //
+    // So: the last 40 of anything (white-ball behaviour unchanged) UNION the last 25 TESTS UNION the
+    // last 20 first-class.
+    //
+    // TEST and FC get SEPARATE budgets rather than a shared red-ball one. Sharing 30 slots between
+    // them fails for exactly the players who need it most: Dan Lawrence is out of the Test side, so
+    // his recent red-ball matches are all County Championship, and a shared budget left him 3 Tests
+    // and 27 county games. 25 Tests reaches back 3+ years for everyone in this squad, and past a
+    // full career for the fringe players.
     {
       sql: `
       SELECT * FROM match_performances
-      WHERE player_id = ?
+      WHERE player_id = ? AND id IN (
+        SELECT id FROM (
+          SELECT id FROM match_performances WHERE player_id = ?
+          ORDER BY match_date DESC LIMIT 40
+        )
+        UNION
+        SELECT id FROM (
+          SELECT id FROM match_performances WHERE player_id = ? AND format = 'TEST'
+          ORDER BY match_date DESC LIMIT 25
+        )
+        UNION
+        -- A match COUNT cannot guarantee a time span, and for red ball the span is the point. Root
+        -- plays so much Test cricket that his last 25 Tests cover only 1.9 years, while Lawrence's
+        -- 14 cover 3.6. So take EVERY Test in the last 3 years as well, and let whichever rule is
+        -- more generous win.
+        SELECT id FROM match_performances
+        WHERE player_id = ? AND format = 'TEST'
+          AND match_date >= date('now', '-36 months')
+        UNION
+        SELECT id FROM (
+          SELECT id FROM match_performances WHERE player_id = ? AND format = 'FC'
+          ORDER BY match_date DESC LIMIT 20
+        )
+      )
       ORDER BY match_date DESC
-      LIMIT 40
     `,
-      args: [playerId],
+      args: [playerId, playerId, playerId, playerId, playerId],
     },
     // Opposition stats (top 10 by matches)
     {
@@ -292,6 +364,10 @@ export async function GET(
       bowlBalls: m.bowl_balls,
       catches: m.catches,
       fantasyPoints: m.fantasy_points,
+      // Red-ball only: the per-innings split, so the UI can show "1 & 60" rather than a match
+      // aggregate of "61". Every other column here is a MATCH total while fantasyPoints is scored
+      // per innings and summed, so without this the row cannot be reconciled with its own FP.
+      innings: parseInningsDetail(m.innings_detail),
     })),
     venueStats: venueStats.map((vs) => ({
       venueId: vs.venue_id,
