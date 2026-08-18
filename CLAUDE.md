@@ -37,23 +37,46 @@ Live at **https://cricket-auction-helper.vercel.app** — the board is run from 
 in both places: `src/db/index.ts` opens `file:db/cricket-auction.db` locally, or **Turso** when
 `TURSO_DATABASE_URL` (+ `TURSO_AUTH_TOKEN`) is set. Local dev needs neither — see `.env.example`.
 
-**Which copy is master depends on the table. Get this backwards and you lose data.**
-- **Local is master for reference data** — `players`, `match_performances`, `career_stats`, `venues`,
-  the registry. The ETL and the valuation pipeline only ever run on the laptop.
-- **The cloud is master for auction state while you're running an auction from your phone** —
-  `auctions`, `auction_participants`, `auction_pool`, `watchlist`.
+**Each table has ONE master, and the sync enforces it — there is no longer a direction to remember.**
+- **Local is master for REFERENCE data** — `players`, `match_performances`, `career_stats`, `venues`,
+  `player_venue_stats`, `player_opposition_stats`, the registry. This half is *derived*: the ETL
+  rebuilds it from cricsheet JSON that only exists on the laptop (~1.4GB of files → ~642k rows).
+- **Turso is master for AUCTION state, always** — `auctions`, `auction_participants`, `auction_pool`,
+  `watchlist`, `tournaments`, `tournament_teams`, `team_captains`, `match_results`,
+  `match_fantasy_scores`, `leaderboard`, `retained_players`. This half is *authoritative* and not
+  reproducible: it is the record of what people actually bid, typed on a phone, one row at a time.
+  (List derived from a writer audit — every one of these is written by `src/` and by no ETL script.)
 
-So:
-- **`npm run turso:push`** (`scripts/turso-push.sh`) — snapshot local → **REPLACE** the Turso DB.
-  Run after any local ETL / re-valuation / squad work. It **refuses** to run when the cloud has more
-  SOLD rows than local (i.e. a phone auction you haven't pulled back yet).
-- **`npm run turso:pull`** (`scripts/turso-pull.sh`) — bring back **ONLY those four mutable auction
-  tables**; reference data is left alone. Run after every auction run from the phone, before doing
-  anything locally. Backs up to `db/cricket-auction.db.bak-preTursoPull-<stamp>` first, and aborts
-  rather than wiping local if nothing comes back.
-- **`npm run go-live`** (`scripts/go-live.sh`) — push the DB → mint a Turso token → set
+⚠️ **Therefore: CREATE AUCTIONS AGAINST TURSO**, not against the local file — the deployed site, or
+local dev with `TURSO_DATABASE_URL` set. An auction created in the local file is discarded by the next
+sync. That is deliberate: it means auction ids are minted in exactly one place. On 2026-08-18 a
+locally-created auction collided with a cloud auction on **id 40** precisely because both copies were
+handing out ids.
+
+- **`npm run turso:sync`** (`scripts/turso-sync.sh`) — **the only command you need.** Ships local
+  reference data up while carrying the cloud's auction state through untouched:
+  read cloud auction tables → snapshot local → swap the local auction tables for the cloud's →
+  verify → upload. **Order-independent**, so "pull before push" is no longer a rule you can get wrong.
+  It aborts if any FK dangles after the merge, and re-reads a fingerprint of cloud auction state
+  (pool/sold/spend/auctions/purses) immediately before uploading — if it moved, somebody is bidding
+  and it refuses rather than swallowing their sales. `DRY_RUN=1` does everything except the upload.
+- **`npm run turso:push`** — **RETIRED.** It replaced the whole cloud DB from local, making auction
+  state collateral damage of a data refresh, and its guard compared *total* SOLD rows so it could pass
+  while silently wiping one live auction. It now just prints a pointer to `turso:sync`.
+- **`npm run turso:pull`** (`scripts/turso-pull.sh`) — now a **debugging** tool only: copy cloud
+  auction state into the local file to poke at it with `sqlite3`. Not part of the normal flow, since
+  `turso:sync` folds the read into the upload. Backs up first.
+- **`npm run go-live`** (`scripts/go-live.sh`) — sync → mint a Turso token → set
   `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` on Vercel (production + preview) → `vercel deploy --prod`.
   One-time interactive prereq: `turso auth login` (and `vercel login`).
+
+**⚠️ `turso db shell "$DB" ".dump <table>"` DOES NOT WORK** (turso CLI v1.0.32: *"unknown command or
+invalid arguments"*). It fails **silently into zero rows**, which is why `turso-pull.sh` had been
+aborting on its own "nothing came back" guard. The shell's only other output mode is a human table
+that pads every column to the widest value, mangling long text (`auction_pool.risk_note` holds
+paragraphs). All cloud reads therefore go through **`scripts/turso_auction_state.py`**, which uses the
+libsql **HTTP API** (`/v2/pipeline`) and returns typed JSON. Add new cloud-owned tables to
+`AUCTION_TABLES` there — it is the canonical list.
 
 Deploy gotchas, both already paid for:
 - **`.vercelignore` paths MUST stay root-anchored** — `/db/`, `/data/`, `/docs/`, `/scripts/`. A bare
@@ -103,17 +126,20 @@ The LPL 2026 saga (18 Jul) burned a full day on this. Rules, in order:
    anchoring: two "Wanindu Hasaranga" rows → the matcher's tie-breaker rejects both → star left unanchored).
 
 ## ⛔ CRITICAL — never break a live auction
-- **⚠️ `turso:push` / `turso:pull` DIRECTION — now the easiest way to destroy an auction.**
-  `push` **REPLACES the cloud DB**: run it while an auction is being run from the phone and every
-  sale made there is gone, while the purses stay debited — the same silent over-charge as a pool
-  rebuild, in one command. `pull` **REPLACES local auction state** from the cloud: run it when the
-  cloud is stale and you throw away the laptop's sales instead.
-  **Rule: pull after the phone, push after the laptop.** The push script blocks the obvious case
-  (cloud SOLD > local SOLD) — treat that as a backstop, not as your guard.
+- **⚠️ The push/pull direction footgun is FIXED — use `npm run turso:sync`.** The old rule ("pull after
+  the phone, push after the laptop") put correctness in the operator's memory, and `turso:push` would
+  replace the cloud wholesale: run it during a phone auction and every sale is gone while the purses
+  stay debited — the same silent over-charge as a pool rebuild, in one command. `turso:sync` cannot do
+  that: auction state is always taken FROM the cloud, never sent TO it. `turso:push` is retired.
 - **The live auction may not be in the copy you're looking at.** If it's being run from the phone,
-  local SOLD counts are stale, so the gate check below passes on a laptop DB that knows nothing about
-  it. Check the copy that's actually live (`turso db shell cricket-auction "SELECT COUNT(*) FROM
-  auction_pool WHERE status='SOLD';"`) or `turso:pull` first.
+  local SOLD counts are stale, so any laptop-side gate check passes on a DB that knows nothing about
+  it. `turso:sync` handles this for you, but when checking by hand, query the copy that is actually
+  live. Note `turso db shell` output is padded/formatted — for anything you intend to parse, use
+  `scripts/turso_auction_state.py` (libsql HTTP API), and see the sync section for why `.dump` lies.
+- **Comparing TOTAL sold rows is not a safety check.** Local can hold more sales in aggregate while
+  the cloud holds a whole live auction the laptop has never seen — that is exactly the 2026-08-18
+  state (local 1269 vs cloud 1396, with cloud auction 40 entirely absent locally). Diff **per
+  auction**, not in total.
 - **NEVER `DELETE`/rebuild `auction_pool` or run the ETL on an auction that has
   sales.** Purses live on `auction_participants` and are NOT reset by a pool
   rebuild → wiping sold rows leaves money debited with no matching sale (silent

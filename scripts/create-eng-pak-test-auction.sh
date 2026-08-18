@@ -1,20 +1,31 @@
 #!/usr/bin/env bash
-# Recreate the ENG v PAK Test auction (pool + valuation) from the squad file.
+# Create the ENG v PAK Test auction (pool + valuation) from the squad file.
 #
-# WHY THIS EXISTS: scripts/turso-pull.sh replaces ALL local auction state, so a pull deletes this
-# auction along with everything else and it has to be rebuilt. That is cheap and safe — the pool is
-# rebuilt from src/lib/squads/eng-vs-pak-test-2026.ts and the valuation is deterministic, so you get
-# byte-identical prices. It also means the auction gets a FRESH id, which is the point: the first
-# attempt collided with a cloud auction already using id 40.
+# POINT THIS AT TURSO, NOT AT THE LOCAL FILE. Turso is the master for auction state, so an auction
+# created in the local sqlite file is discarded by the next `npm run turso:sync`. Creating it against
+# the cloud also means the id is minted in exactly one place, which is what makes the id collision
+# that bit us on 2026-08-18 (local auction 40 vs cloud "Pushap CPL Auction" 40) impossible.
 #
-# ORDER MATTERS:  turso:pull  ->  this script  ->  turso:push / go-live
-# Run it the other way round and the push is refused (cloud ahead on sold rows), or worse, accepted
-# and it wipes sales made on the phone.
+# Rebuilding is cheap and lossless: the pool comes from src/lib/squads/eng-vs-pak-test-2026.ts and
+# the valuation is deterministic, so prices come back identical.
 #
-# Usage: bash scripts/create-eng-pak-test-auction.sh
+# ORDER:  npm run turso:sync   (get the red-ball data up there first, or the pool build finds no
+#                               TEST rows and buildTestPool throws)
+#         then this script against the deployed URL.
+#
+# Usage:
+#   BASE=https://cricket-auction-helper.vercel.app bash scripts/create-eng-pak-test-auction.sh
+#   bash scripts/create-eng-pak-test-auction.sh          # local dev — only if TURSO_* is set in .env.local
 set -euo pipefail
 
 BASE="${BASE:-http://localhost:3000}"
+PROD="https://cricket-auction-helper.vercel.app"
+if [ "$BASE" = "http://localhost:3000" ]; then
+  echo "⚠️  BASE is localhost. That only reaches Turso if TURSO_DATABASE_URL is set in .env.local;"
+  echo "    otherwise this creates the auction in the local file and the next sync discards it."
+  echo "    For the cloud:  BASE=$PROD bash $0"
+  echo
+fi
 NAME="${NAME:-ENG v PAK Test P<>N}"
 TOURNAMENT="England vs Pakistan Men's Test 2026"
 
@@ -60,7 +71,9 @@ curl -s -X POST "$BASE/api/pool/fetch" \
 
 echo
 echo "✅ Board: $BASE/auction/$AUCTION_ID"
-echo "   Sanity check — the top (friends x players-each) prices should sum to friends x purse (800):"
-sqlite3 -header -column "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/db/cricket-auction.db" \
-  "SELECT COUNT(*) AS pool, ROUND(SUM(val_expected),0) AS price_sum
-     FROM auction_pool WHERE auction_id = $AUCTION_ID;"
+echo "   Sanity check — the whole 32-player pool should price to friends x purse (= 800):"
+# Read this back THROUGH THE API, not from the local sqlite file: when BASE is the deployed app the
+# rows live in Turso and the local file knows nothing about them.
+curl -s "$BASE/api/auction/$AUCTION_ID" \
+  | jq '{pool: ([.pool[]?] | length), price_sum: ([.pool[]?.val_expected // 0] | add | round)}' \
+  2>/dev/null || echo "   (could not read back — open the board URL above)"

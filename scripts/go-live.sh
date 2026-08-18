@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One command to put the auction board online.
 #
-#   1. create/replace the Turso database from the local SQLite file
+#   1. sync locally-churned reference data up to Turso, carrying cloud auction state through
 #   2. mint a DB token
 #   3. set TURSO_DATABASE_URL + TURSO_AUTH_TOKEN on the Vercel project
 #   4. deploy to production
@@ -26,8 +26,8 @@ if ! turso auth whoami >/dev/null 2>&1; then
 fi
 vercel whoami >/dev/null 2>&1 || { echo "⛔ Not logged in to Vercel. Run: vercel login"; exit 1; }
 
-echo "──────────── 1/4  push the database ────────────"
-bash "$ROOT/scripts/turso-push.sh" "$DB_NAME"
+echo "──────────── 1/4  sync reference data (auction state preserved) ────────────"
+bash "$ROOT/scripts/turso-sync.sh" "$DB_NAME"
 
 echo
 echo "──────────── 2/4  mint a token ────────────"
