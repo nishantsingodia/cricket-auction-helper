@@ -96,6 +96,13 @@ export default function HomePage() {
       format: "ODI",
       note: "5-match men's ODI bilateral · ODI form vs top-8 (36mo) · bowl-leaning Caribbean venues",
     },
+    {
+      // The id MUST equal ENG_VS_PAK_TEST_2026_NAME — /api/pool/fetch branches on tournament_name.
+      id: "England vs Pakistan Men's Test 2026",
+      label: "England vs Pakistan Men's Test 2026",
+      format: "TEST",
+      note: "3-Test bilateral · D11 Test FPS scored per innings · red-ball form only (60mo), FC display-only",
+    },
   ];
 
   // Create form state
