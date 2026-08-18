@@ -1,5 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sqlite, withTransaction } from "@/db";
+import { sqlite, withTransaction, isRemote } from "@/db";
+
+// Auctions may only be created against TURSO, never against the local SQLite file.
+//
+// Turso is the sole master for auction state (see CLAUDE.md "Deploy & the local ⇄ cloud split"), so
+// an auction created locally is discarded by the next `npm run turso:sync` — you would build a pool,
+// value it, maybe start bidding, and silently lose the lot. Worse, ids are local autoincrement: on
+// 2026-08-18 a locally-created auction and a phone-created one both took id 40, and reconciling them
+// meant a forced pull and a rebuild. Minting ids in exactly one place makes that impossible.
+//
+// Escape hatch for deliberate offline work (tests, schema poking) — it does NOT make the auction
+// survivable, it just stops the guard getting in your way:
+//   ALLOW_LOCAL_AUCTION_CREATE=1 npm run dev
+const ALLOW_LOCAL_CREATE = process.env.ALLOW_LOCAL_AUCTION_CREATE === "1";
 
 const DEFAULT_COLORS = [
   "#3B82F6", // blue
@@ -59,6 +72,23 @@ interface CreateAuctionBody {
 
 export async function POST(request: NextRequest) {
   try {
+    if (!isRemote && !ALLOW_LOCAL_CREATE) {
+      return NextResponse.json(
+        {
+          error:
+            "Auctions can only be created against Turso, not the local SQLite file. " +
+            "Turso is the master for auction state, so an auction created here is discarded by the " +
+            "next `npm run turso:sync` — and local ids collide with cloud-minted ones.",
+          how: [
+            "Use the deployed board: https://cricket-auction-helper.vercel.app",
+            "Or point local dev at Turso: set TURSO_DATABASE_URL + TURSO_AUTH_TOKEN in .env.local",
+            "Deliberate offline work only: ALLOW_LOCAL_AUCTION_CREATE=1 npm run dev",
+          ],
+        },
+        { status: 409 }
+      );
+    }
+
     const body = (await request.json()) as CreateAuctionBody;
     const {
       name,

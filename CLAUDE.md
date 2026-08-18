@@ -53,6 +53,12 @@ sync. That is deliberate: it means auction ids are minted in exactly one place. 
 locally-created auction collided with a cloud auction on **id 40** precisely because both copies were
 handing out ids.
 
+**This is now ENFORCED, not just documented.** `POST /api/auctions` returns **409** when `isRemote` is
+false, so localhost physically cannot mint an auction id. For deliberate offline work (tests, schema
+poking) set `ALLOW_LOCAL_AUCTION_CREATE=1` — it only silences the guard, it does not make the auction
+survive a sync. Note the escape hatch is read at module load, so the dev server must be restarted for
+it to take effect.
+
 - **`npm run turso:sync`** (`scripts/turso-sync.sh`) — **the only command you need.** Ships local
   reference data up while carrying the cloud's auction state through untouched:
   read cloud auction tables → snapshot local → swap the local auction tables for the cloud's →
