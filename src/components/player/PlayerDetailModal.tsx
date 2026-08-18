@@ -179,6 +179,27 @@ function MiniStat({
   );
 }
 
+type FmtFilter = "ALL" | "T20" | "ODI" | "TEST" | "FC";
+
+// Format-family predicates, shared by Recent Matches and Season Stats so the two panels can never
+// disagree about what counts as what. T20 is the catch-all for every 20-over/100-ball league bucket
+// (IPL, HUN, BLAST, WBBL…), so it is defined by exclusion — which means every NEW format code has to
+// be excluded here explicitly or it lands in T20 by default, exactly how FC did.
+const FMT = {
+  isOdi: (f?: string) => f === "ODI",
+  isTest: (f?: string) => f === "TEST",
+  isFc: (f?: string) => f === "FC",
+  isT20: (f?: string) => f !== "ODI" && f !== "TEST" && f !== "FC",
+};
+
+function matchesFmt(filter: FmtFilter, f?: string): boolean {
+  if (filter === "ALL") return true;
+  if (filter === "ODI") return FMT.isOdi(f);
+  if (filter === "TEST") return FMT.isTest(f);
+  if (filter === "FC") return FMT.isFc(f);
+  return FMT.isT20(f);
+}
+
 export function PlayerDetailModal({ playerId, onClose, tour, riskNote, poolId, playerStatus, isWatched, onRiskToggle, onSell, onUndo, onWatchlist }: PlayerDetailProps) {
   const [data, setData] = useState<PlayerDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -188,8 +209,11 @@ export function PlayerDetailModal({ playerId, onClose, tour, riskNote, poolId, p
   // console. That is exactly how the tour-venue 500 presented.
   const [error, setError] = useState<string | null>(null);
   const [seasonData, setSeasonData] = useState<{ leagueSeasons: SeasonStat[]; tours: SeasonStat[] } | null>(null);
-  const [recentFmt, setRecentFmt] = useState<"ALL" | "T20" | "ODI">("ALL");
-  const [seasonFmt, setSeasonFmt] = useState<"ALL" | "T20" | "ODI">("ALL");
+  // TEST and FC are their own buckets. They used to have none: the T20 predicate was
+  // `f !== "ODI" && f !== "TEST"`, so first-class (County Championship / Sheffield Shield) rows were
+  // silently counted as T20, and actual Tests were only visible under "All".
+  const [recentFmt, setRecentFmt] = useState<FmtFilter>("ALL");
+  const [seasonFmt, setSeasonFmt] = useState<FmtFilter>("ALL");
 
   useEffect(() => {
     async function fetchDetail() {
@@ -508,21 +532,13 @@ export function PlayerDetailModal({ playerId, onClose, tour, riskNote, poolId, p
               <TabsContent value="seasons">
                 {seasonData && seasonData.tours.length > 0 ? (
                   (() => {
-                    const isOdi = (f?: string) => f === "ODI";
-                    const isT20 = (f?: string) => f !== "ODI" && f !== "TEST";
-                    const hasOdi = seasonData.tours.some((s) => isOdi(s.format));
-                    const hasT20 = seasonData.tours.some((s) => isT20(s.format));
-                    const filtered = seasonData.tours.filter((s) =>
-                      seasonFmt === "ALL"
-                        ? true
-                        : seasonFmt === "ODI"
-                        ? isOdi(s.format)
-                        : isT20(s.format)
-                    );
+                    const filtered = seasonData.tours.filter((s) => matchesFmt(seasonFmt, s.format));
                     const chips = ([
                       { key: "ALL", label: "All", show: true },
-                      { key: "T20", label: "T20", show: hasT20 },
-                      { key: "ODI", label: "ODI", show: hasOdi },
+                      { key: "T20", label: "T20", show: seasonData.tours.some((s) => FMT.isT20(s.format)) },
+                      { key: "ODI", label: "ODI", show: seasonData.tours.some((s) => FMT.isOdi(s.format)) },
+                      { key: "TEST", label: "Test", show: seasonData.tours.some((s) => FMT.isTest(s.format)) },
+                      { key: "FC", label: "First-class", show: seasonData.tours.some((s) => FMT.isFc(s.format)) },
                     ] as const).filter((c) => c.show);
                     return (
                       <div>
@@ -647,21 +663,13 @@ export function PlayerDetailModal({ playerId, onClose, tour, riskNote, poolId, p
               {/* Recent Matches */}
               <TabsContent value="recent">
                 {(() => {
-                  const isOdi = (f: string) => f === "ODI";
-                  const isT20 = (f: string) => f !== "ODI" && f !== "TEST";
-                  const hasOdi = data.recentMatches.some((m) => isOdi(m.format));
-                  const hasT20 = data.recentMatches.some((m) => isT20(m.format));
-                  const filtered = data.recentMatches.filter((m) =>
-                    recentFmt === "ALL"
-                      ? true
-                      : recentFmt === "ODI"
-                      ? isOdi(m.format)
-                      : isT20(m.format)
-                  );
+                  const filtered = data.recentMatches.filter((m) => matchesFmt(recentFmt, m.format));
                   const chips = ([
                     { key: "ALL", label: "All", show: true },
-                    { key: "T20", label: "T20", show: hasT20 },
-                    { key: "ODI", label: "ODI", show: hasOdi },
+                    { key: "T20", label: "T20", show: data.recentMatches.some((m) => FMT.isT20(m.format)) },
+                    { key: "ODI", label: "ODI", show: data.recentMatches.some((m) => FMT.isOdi(m.format)) },
+                    { key: "TEST", label: "Test", show: data.recentMatches.some((m) => FMT.isTest(m.format)) },
+                    { key: "FC", label: "First-class", show: data.recentMatches.some((m) => FMT.isFc(m.format)) },
                   ] as const).filter((c) => c.show);
                   return (
                     <>
