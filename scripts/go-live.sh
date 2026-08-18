@@ -26,8 +26,22 @@ if ! turso auth whoami >/dev/null 2>&1; then
 fi
 vercel whoami >/dev/null 2>&1 || { echo "⛔ Not logged in to Vercel. Run: vercel login"; exit 1; }
 
-echo "──────────── 1/4  sync reference data (auction state preserved) ────────────"
-bash "$ROOT/scripts/turso-sync.sh" "$DB_NAME"
+# SKIP_SYNC=1 goes straight to token + Vercel + deploy. Use it when the cloud DB is already correct
+# and you only need to re-point Vercel at it — in particular after a manual
+# `turso db create ... --from-file`, because destroying a DB invalidates every token issued for it, so
+# whatever Vercel is holding will no longer authenticate.
+if [ "${SKIP_SYNC:-0}" = "1" ]; then
+  echo "──────────── 1/4  sync SKIPPED (SKIP_SYNC=1) ────────────"
+  turso db list 2>/dev/null | awk '{print $1}' | grep -qx "$DB_NAME" || {
+    echo "⛔ No cloud DB named '$DB_NAME' — there is nothing to point Vercel at."
+    echo "   Create it first (from a snapshot, or drop SKIP_SYNC to run a full sync)."
+    exit 1
+  }
+  echo "  using the existing '$DB_NAME' as-is"
+else
+  echo "──────────── 1/4  sync reference data (auction state preserved) ────────────"
+  bash "$ROOT/scripts/turso-sync.sh" "$DB_NAME"
+fi
 
 echo
 echo "──────────── 2/4  mint a token ────────────"

@@ -46,7 +46,28 @@ DUMP="$ROOT/db/.turso-sync-$STAMP.sql"
 # stops. Worth doing before a real sync when an auction has been touched on the phone.
 DRY_RUN="${DRY_RUN:-0}"
 
-cleanup() { rm -f "$STAGE" "$STAGE-wal" "$STAGE-shm" "$DUMP" "$DUMP.rows" "$DUMP.log"; }
+# ⚠️ Only clean up on SUCCESS. The upload is destroy-then-create, so between those two calls the
+# merged snapshot is the ONLY copy of cloud auction state in existence. On 2026-08-18 the destroy
+# succeeded and the create failed with a Turso-side 404 ("Namespace ... doesn't exist"), and an
+# unconditional cleanup trap then deleted that snapshot — briefly making 127 sold rows that existed
+# nowhere else unrecoverable. They were only recovered because a rehearsal copy happened to survive
+# in a scratch directory. Never again: on any failure the artifacts are KEPT and their paths printed.
+KEEP_ARTIFACTS=1
+cleanup() {
+  if [ "$KEEP_ARTIFACTS" = "0" ]; then
+    rm -f "$STAGE" "$STAGE-wal" "$STAGE-shm" "$DUMP" "$DUMP.rows" "$DUMP.log"
+  else
+    echo
+    echo "⚠️  Artifacts KEPT for recovery (delete them yourself once you are satisfied):"
+    [ -f "$STAGE" ]      && echo "     merged snapshot : $STAGE"
+    [ -f "$DUMP.rows" ]  && echo "     cloud auction   : $DUMP.rows"
+    if [ -f "$STAGE" ]; then
+      echo
+      echo "   If the cloud DB is missing or wrong, restore it with:"
+      echo "     turso db create $DB_NAME --from-file $STAGE"
+    fi
+  fi
+}
 trap cleanup EXIT
 
 command -v turso   >/dev/null || { echo "turso CLI not found. brew install tursodatabase/tap/turso"; exit 1; }
@@ -160,15 +181,52 @@ if [ "$DRY_RUN" = "1" ]; then
       (SELECT COUNT(*) FROM auction_pool WHERE status='SOLD') AS sold,
       (SELECT COUNT(*) FROM auctions)           AS auctions;"
   echo "  Re-run without DRY_RUN=1 to upload."
+  # A dry run destroys nothing, so there is nothing to recover from — bin the 154MB snapshot rather
+  # than leaving one in db/ after every rehearsal.
+  KEEP_ARTIFACTS=0
   exit 0
 fi
 
 echo "──────── 5/5  upload ────────"
 echo "  (destroy + recreate from the merged snapshot — this is the fast file path)"
+# Keep a durable copy BEFORE destroying anything. `turso db create --from-file` is not atomic with
+# the destroy, so this window is the one place the whole auction history can go missing.
+SAFETY="$ROOT/db/PRE-SYNC-SNAPSHOT-$STAMP.db"
+cp "$STAGE" "$SAFETY"
+echo "  safety copy: $(basename "$SAFETY")  ($(du -h "$SAFETY" | cut -f1))"
+
 if [ "$DB_EXISTS" = "1" ]; then
   turso db destroy "$DB_NAME" --yes
 fi
-turso db create "$DB_NAME" --from-file "$STAGE"
+
+# Retry once: the 2026-08-18 failure was a transient platform 404 immediately after a destroy, and the
+# identical create succeeded a minute later.
+if ! turso db create "$DB_NAME" --from-file "$STAGE"; then
+  echo
+  echo "  ⚠️  create failed — waiting 20s and retrying once (this has been transient before)…"
+  sleep 20
+  if ! turso db create "$DB_NAME" --from-file "$STAGE"; then
+    echo
+    echo "⛔ UPLOAD FAILED AND THE CLOUD DB IS GONE. Nothing is lost — recover with:"
+    echo
+    echo "     turso db create $DB_NAME --from-file $SAFETY"
+    echo
+    echo "   Then re-point Vercel at it (the old auth token died with the old DB):"
+    echo "     SKIP_SYNC=1 npm run go-live"
+    exit 1
+  fi
+fi
+
+# Verify what actually landed before declaring success.
+UP_SOLD="$(turso db shell "$DB_NAME" "SELECT COUNT(*) FROM auction_pool WHERE status='SOLD';" 2>/dev/null | tr -dc '0-9' || echo "")"
+EXP_SOLD="$(sqlite3 "$STAGE" "SELECT COUNT(*) FROM auction_pool WHERE status='SOLD';")"
+if [ -n "$UP_SOLD" ] && [ "$UP_SOLD" != "$EXP_SOLD" ]; then
+  echo "⛔ Uploaded DB has $UP_SOLD sold rows, expected $EXP_SOLD. Snapshot kept — investigate."
+  exit 1
+fi
+echo "  verified in cloud: $EXP_SOLD sold rows ✓"
+KEEP_ARTIFACTS=0
+rm -f "$SAFETY"
 
 echo
 echo "✅ Synced reference data to Turso '$DB_NAME'; auction state preserved from the cloud."
