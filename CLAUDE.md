@@ -291,6 +291,50 @@ Three things that are easy to get wrong (all bit us on the India-England setup):
 
 ---
 
+## Valuation model (TEST bilateral) — quick reference
+First RED-BALL archetype (England vs Pakistan Men's Test 2026, 3 Tests). Test was previously absent
+end to end — no archive, no scorer, no engine branch, zero rows.
+
+- **Scoring is PER INNINGS.** `compute_fantasy_points_test` scores one innings;
+  `score_red_ball_match` sums them and adds the announced-XI +4 once. Dream11 evaluates the
+  milestone and haul TIERS inside an innings, so a match aggregate is a different number
+  (3-for + 3-for = 124, not the 136 an aggregate 6-for gives; a 10-wicket match would cap at the
+  6w tier). The aggregate columns cannot reproduce this, so the split lives in
+  `match_performances.innings_detail` and `recompute_fantasy_points_with_roles` re-scores from it.
+- **`FOLDER_FORMAT` pinning is mandatory for first-class.** cricsheet tags County Championship and
+  Sheffield Shield `match_type="MDM"`, which `detect_format` cannot map — unpinned they fall through
+  to the **T20 default** and get T20-scored. And the pin must reach `parse_match` as
+  `format_override`, not be patched onto the result, or the per-innings split is never built.
+- **`FC` is display-only** — in no quality list, so it never reaches EFPPM. Pakistan's Quaid-e-Azam
+  Trophy is not on cricsheet, so pricing FC form would favour England's fringe over Pakistan's.
+- **Form: red ball ONLY** (`format = 'TEST'`), **no opposition gate** (Test cricket is already a
+  9-team sample). No white-ball blend in either direction — a T20 gun who cannot bat 90 overs is not
+  a Test asset, and Test FP run 2–3x the T20 scale so mixing them is meaningless.
+- **Windows are 60 months**, not 24/30. England play ~12 Tests a year and Pakistan fewer; a 24-month
+  window leaves half a squad on 3–6 matches and turns the recency bucket into noise.
+- **Score 1:** 60% last-10 Tests + 40% all Tests in the window (the bilateral weight set).
+- **Expected matches:** XI (1–11) = **3**, bench = **1**. NOT the T20 bench of 2 — Test XIs have no
+  dead rubbers to experiment in, so a bench Test is injury or pace rotation. This split does most of
+  the pricing work (3x vs 1x), so the XI seed deserves a manual pass before bidding.
+- **Shrinkage: k=3, n in INNINGS**, toward a **role prior measured at valuation time**
+  (`computeTestRolePrior` — mean of player mean Test FP, ≥5 Tests, 60mo: BAT ~99 / WK ~112 /
+  AR ~125 / BOWL ~102). **Do NOT reuse the white-ball prior of 40** — on the Test scale that is
+  about the 5th percentile, so it penalises everyone short of caps instead of stabilising them.
+  Under 3 innings the player sits on the prior outright.
+  ⚠️ `players.role` files most red-ball spinners under AR (Sajid Khan, Jadeja, Santner), lifting the
+  AR prior. Bounded, because the prior only carries weight for thin samples.
+  ⚠️ KNOWN GAP: 0 innings and 1–2 innings both land on the prior, so a player who has NEVER played a
+  Test rates as an average one (Ghazi Ghori 111 EFPPM > Shoaib Bashir 86.5 off 21 Tests). If this
+  bites, split it: 0 innings → floor, 1–2 → prior.
+- **Identity: anchor on cricsheet id, no fuzzy fallback.** `build-test-pool.ts` resolves by
+  `csid` only and THROWS on a miss. This squad is hostile to name matching: "Khurram Shahzad" is two
+  different men and the one NOT in the squad has 3x the appearances, so every most-matches tie-break
+  picks wrong; "Emilio Gay" reaches for CH Gayle (548 appearances); "Awais Zafar" sits beside Ayesha
+  Zafar, a woman.
+- **Venue:** informational only (removed from pricing 5 Aug 2026). Headingley / Lord's / Edgbaston.
+
+---
+
 ## Valuation model (women's ODI bilateral) — quick reference
 First ODI-format archetype (e.g. Ireland vs West Indies Women's ODI 2026, 3 matches). Like the
 bilateral T20I set there's no league season to anchor Score 1 on, and — as with every women's tour —
