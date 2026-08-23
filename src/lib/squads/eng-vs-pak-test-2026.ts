@@ -82,7 +82,7 @@ export const ENG_VS_PAK_TEST_2026: TestTeam[] = [
       { name: "Dan Lawrence", csid: "4b685e2d", role: "BAT" },       // 12 last Test Sep 2024; 123 FC innings
       { name: "Jordan Cox", csid: "ff154ecd", role: "WK" },          // 13 backup keeper, 1 Test
       { name: "Ollie Robinson", csid: "0f3ee070", role: "BOWL" },    // 14 OE Robinson — NOT OG Robinson (Kent WK)
-      { name: "Matthew Fisher", csid: "8f2dfebf", role: "BOWL" },    // 15 2 Tests — thin sample
+      { name: "Matthew David Fisher", csid: "8f2dfebf", role: "BOWL" },    // 15 2 Tests — thin sample
     ],
   },
   {

@@ -169,7 +169,7 @@ export const HUNDRED_MEN_2026: HundredTeam[] = [
       { name: "Tymal Mills", role: "BOWL", overseas: false },
       { name: "James Rew", role: "WK", overseas: false },
       { name: "Mason Crane", role: "BOWL", overseas: false },
-      { name: "Matthew Fisher", role: "BOWL", overseas: false },
+      { name: "Matthew David Fisher", role: "BOWL", overseas: false },
     ],
   },
   {

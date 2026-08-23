@@ -49,7 +49,7 @@ export const NZ_VS_WI_MEN_ODI_2026: MensOdiTeam[] = [
       { name: "Mitch Hay", role: "WK" },             // 12  (bench)
       { name: "Dean Foxcroft", role: "AR" },         // 13  (bench)
       { name: "Kristian Clarke", role: "AR" },       // 14  (bench)
-      { name: "Matthew Fisher", role: "BOWL" },      // 15  (bench; maiden call-up)
+      { name: "Matthew John Fisher", role: "BOWL" }, // 15  (bench; maiden call-up) — NOT MD Fisher (England); two different men share "Matthew Fisher"
       { name: "Jayden Lennox", role: "BOWL" },       // 16  (bench)
     ],
   },
