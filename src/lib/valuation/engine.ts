@@ -38,6 +38,10 @@ import {
   CPL_2026_NAME,
   cplExpectedMatchesFor,
 } from "@/lib/squads/cpl-2026";
+import {
+  ETPL_2026_NAME,
+  etplExpectedMatchesFor,
+} from "@/lib/squads/etpl-2026";
 
 /**
  * IPL Auction Valuation Engine — 2-Score Model
@@ -205,6 +209,57 @@ async function computeTestRolePrior(): Promise<Record<string, number>> {
   return out;
 }
 
+// ETPL shrinkage prior: the expected mean T20 FP of a player in each role, MEASURED on the same
+// widened quality set the tour is scored on. A flat prior of 40 (what the franchise leagues use) is
+// wrong here in both directions: 40 is roughly the median of an IPL/CPL pool, whereas an ETPL squad
+// is half uncapped associate cricketers, and a bowler's FP distribution sits well below a batter's
+// once you stop filtering out associate fixtures. Shrinking every role toward one number would
+// quietly transfer value from bowlers to batters.
+//
+// Measured as the mean of PLAYER MEANS (not of raw rows), for the same reason as the Test prior:
+// the quantity being shrunk is one player's average, so the prior must describe how player averages
+// are distributed rather than being weighted by games played. Players need >= ETPL_PRIOR_MIN_GAMES
+// in the window to contribute, so the prior is not itself built from the small samples it exists to
+// correct. The weak-opposition discount is applied here too, so prior and estimate share a scale.
+const ETPL_PRIOR_MONTHS = 30;
+const ETPL_PRIOR_MIN_GAMES = 10;  // per player, to contribute to the prior
+const ETPL_PRIOR_MIN_PLAYERS = 10; // per role, else fall back to the pooled all-role prior
+const ETPL_PRIOR_FALLBACK: Record<string, number> = {
+  BAT: 40, WK: 40, AR: 42, BOWL: 38,
+};
+
+async function computeEtplRolePrior(
+  qualityList: string,
+  fpExpr: string,
+  fpParams: string[]
+): Promise<Record<string, number>> {
+  const rows = (await sqlite
+    .prepare(
+      `SELECT role, AVG(pm) AS prior, COUNT(*) AS players FROM (
+         SELECT p.role AS role, AVG(${fpExpr}) AS pm
+           FROM match_performances mp
+           JOIN players p ON p.id = mp.player_id
+          WHERE mp.format IN (${qualityList})
+            AND (p.gender = 'male' OR p.gender IS NULL)
+            AND mp.match_date >= date('now', '-${ETPL_PRIOR_MONTHS} months')
+          GROUP BY p.id
+         HAVING COUNT(*) >= ${ETPL_PRIOR_MIN_GAMES}
+       )
+       GROUP BY role`
+    )
+    .all(...fpParams)) as Array<{ role: string | null; prior: number; players: number }>;
+
+  const out: Record<string, number> = { ...ETPL_PRIOR_FALLBACK };
+  const pooled =
+    rows.reduce((a, r) => a + r.prior * r.players, 0) /
+    Math.max(1, rows.reduce((a, r) => a + r.players, 0));
+  for (const r of rows) {
+    if (!r.role) continue;
+    out[r.role] = r.players >= ETPL_PRIOR_MIN_PLAYERS ? r.prior : pooled;
+  }
+  return out;
+}
+
 function trimmedMean(xs: number[], p = 0.1): number {
   if (xs.length === 0) return NaN;
   const s = [...xs].sort((a, b) => a - b);
@@ -323,6 +378,30 @@ export async function recalculateValuations(
   // small-sample shrinkage ON (franchise league, same reasoning as LPL). Venue ON — the Caribbean
   // is a bowler's league: 4 of the 8 grounds read bowl_friendly and none read bat_road.
   const isCpl = tournamentRow?.name === CPL_2026_NAME;
+  // ETPL 2026: the INAUGURAL European T20 Premier League. Modelled as a franchise T20 league, but
+  // with two deliberate departures forced by it being a first season:
+  //   (1) NO league-season buckets. leagueFmt is set to a format that does not exist in the DB, so
+  //       buckets B/C come back empty and computeScore1 redistributes their 40% onto A (last-10
+  //       form) and D (all quality form) — effectively 67/33. This is honest: there is no ETPL
+  //       history, and no other league is a fair proxy. Using BLAST+HUN as a stand-in "primary
+  //       league" was considered and rejected — only the county-based ENG/SCO/IRE half of the pool
+  //       has that data, so it would systematically outbid the Dutch contingent for no real reason.
+  //   (2) The WIDEST quality set of any tour here, and the ONLY one that counts the Vitality Blast
+  //       ('BLAST') and unrestricted T20Is. Every other league excludes BLAST as "a tier below that
+  //       would swamp the sample" — but for ETPL the Blast and the Hundred ARE where this pool's
+  //       form lives, and its associate players' records are almost entirely T20Is against
+  //       non-top-8 opposition. Measured on the actual 99-man pool: the standard gate (IPL/WPL +
+  //       top-8 T20Is) leaves 47 of 99 players with under 5 qualifying matches, i.e. sitting at
+  //       baseline 20 — including James Vince, Jason Roy, Chris Jordan, Steve Smith, Laurie Evans
+  //       and Tom Curran. Widening it drops that to 12, and those 12 are genuinely dataless
+  //       uncapped draft picks, which is the correct answer for them.
+  //       The cost of widening is that a T20I against Nepal would otherwise price like one against
+  //       South Africa, so ETPL_ASSOCIATE_FP_MULT discounts non-top-8-opposition T20Is (see below).
+  // Shrinkage is ON and stronger in effect than elsewhere: k=5 toward a MEASURED per-role prior
+  // (not the flat 40), because a third of this pool has under 10 recorded T20s.
+  // Venue is OFF: only two grounds, and all six teams play the same 15/15 split, so a conditions
+  // factor carries no relative signal whatsoever.
+  const isEtpl = tournamentRow?.name === ETPL_2026_NAME;
   // ENG v PAK 2026: the first RED-BALL tour. Scored purely on Test form ('TEST'), which is a
   // different points scale entirely (2 innings, +20 a wicket, no rate bonuses) — so nothing
   // white-ball may leak into it, in either direction. No league season, so the bilateral
@@ -338,7 +417,10 @@ export async function recalculateValuations(
   // non-Hundred proxy form is normalized to the Hundred scale per role (normMult below).
   // LPL: venue ON — all 2026 grounds read bowl_friendly on LPL+SL-T20I history (subcontinent);
   // venueClassification + per-team schedule overridden in the isLpl block below.
-  const leagueFmt = isHundred ? "HUN" : isMLC ? "MLC" : isLpl ? "LPL" : isCpl ? "CPL" : "IPL";
+  // NOTE ETPL -> "ETPL", a format string that appears NOWHERE in match_performances. That is
+  // intentional, not a bug: it makes the two league-season buckets provably empty so their weight
+  // redistributes onto the form buckets. See the isEtpl note above.
+  const leagueFmt = isHundred ? "HUN" : isMLC ? "MLC" : isLpl ? "LPL" : isCpl ? "CPL" : isEtpl ? "ETPL" : "IPL";
   const qualityList = isHundredMen
     // Marquee franchise leagues only — Vitality Blast ('BLAST') is EXCLUDED: it's domestic
     // county T20 (a tier below), and at 1,557 matches it's the largest bucket, so counting it
@@ -361,9 +443,71 @@ export async function recalculateValuations(
     // PSL, de Kock in SA20/ILT20, Gurbaz/Nabi in everything). Counting only CPL+IPL would park most
     // of the marquee overseas talent at baseline. BLAST stays excluded (county tier, would swamp).
     ? "'CPL','IPL','BBL','PSL','LPL','SA20','ILT20','MLC','HUN'"
+    : isEtpl
+    // The widest set here, and the ONLY one that includes BLAST and unrestricted 'T20'. Listing
+    // 'T20' inside the format list means the top-8-opposition gate no longer binds — every T20I
+    // counts, associate fixtures included, because for half this pool that IS the entire record.
+    // BLAST is in for the same reason: the Blast and the Hundred are where the Irish, Scottish and
+    // England-county players actually play. The quality trade-off is handled by discounting weak
+    // opposition (ETPL_ASSOCIATE_FP_MULT), not by excluding it.
+    ? "'T20','BLAST','HUN','IPL','BBL','PSL','SA20','ILT20','CPL','LPL','MLC'"
     : isMLC || isBilateral
     ? "'MLC','IPL'"
     : "'IPL','WPL'";
+
+  // Opposition-strength discount, ETPL only. Widening the gate to all T20Is lets a hundred against
+  // Nepal count the same as one against South Africa, which it plainly is not. Rather than throw
+  // the associate record away (that is what breaks the model — see isEtpl), each T20I against
+  // NON-top-8 opposition is scaled to 85% of its face fantasy points. Franchise-league and
+  // domestic rows (BLAST, HUN, IPL, BBL, ...) are NOT discounted: those are full professional
+  // competitions, and discounting them would re-create the very bias being fixed.
+  // 0.85 is a judgement call, not a measured constant. It is deliberately mild: strong enough to
+  // stop associate-only records outbidding franchise regulars, small enough that it cannot flip
+  // the order of two players who are genuinely far apart. Expect a few % on most prices.
+  const ETPL_ASSOCIATE_FP_MULT = 0.85;
+
+  // Second ETPL-only correction, and it pulls the OTHER way. The quality set includes 'HUN', but
+  // The Hundred is a 100-BALL competition — five fewer balls an innings than a T20 — so its fantasy
+  // points are on a systematically lower scale. Measured over the last 30 months (mean FP per game,
+  // HUN vs all 20-over formats, by role):
+  //     BAT  38.1 vs 42.8  -> 1.122      WK   44.6 vs 48.8  -> 1.095
+  //     AR   51.0 vs 62.4  -> 1.225      BOWL 51.3 vs 52.8  -> 1.029
+  // Left uncorrected this silently penalises exactly the players with the FRESHEST evidence: the
+  // Hundred ran to 16 Aug 2026, so for Klaasen, Maxwell, Miller, Vince, Livingstone, Santner, Boult,
+  // Tim David, Evans, Jordan and Curran those games dominate the recency bucket — which carries 67%
+  // of Score1 here, since ETPL has no league-season buckets. In the first pass it dropped Klaasen,
+  // Maxwell and Miller BELOW pure-20-over associate records (Aneurin Donald, Logan van Beek), which
+  // is not a defensible ranking. So HUN rows are scaled UP to the 20-over scale, per role.
+  //
+  // This is the mirror image of what the Hundred build does: HUNDRED_ROLE_NORM scales non-Hundred
+  // form DOWN onto the Hundred scale (0.85/0.93/0.92/0.99). Same correction, opposite direction,
+  // because here the target scale is the 20-over one.
+  const ETPL_HUNDRED_UPLIFT: Record<string, number> = {
+    BAT: 1.122, WK: 1.095, AR: 1.225, BOWL: 1.029,
+  };
+  const ETPL_HUNDRED_UPLIFT_FALLBACK = 1.12; // role unset in `players`
+
+  // Composed FP expression: face points x weak-opposition discount x Hundred scale uplift.
+  // roleExpr is passed in because the callers reference `players.role` differently — the bucket
+  // queries do not join players at all (so they need a correlated subquery), while the role-prior
+  // query already has it joined as `p`.
+  const etplFpExpr = (roleExpr: string) =>
+    `fantasy_points` +
+    ` * (CASE WHEN format = 'T20' AND opposition NOT IN (${TOP_8_NATIONS.map(() => "?").join(
+      ","
+    )}) THEN ${ETPL_ASSOCIATE_FP_MULT} ELSE 1 END)` +
+    ` * (CASE WHEN format = 'HUN' THEN (CASE ${roleExpr}` +
+    ` WHEN 'BAT' THEN ${ETPL_HUNDRED_UPLIFT.BAT}` +
+    ` WHEN 'WK' THEN ${ETPL_HUNDRED_UPLIFT.WK}` +
+    ` WHEN 'AR' THEN ${ETPL_HUNDRED_UPLIFT.AR}` +
+    ` WHEN 'BOWL' THEN ${ETPL_HUNDRED_UPLIFT.BOWL}` +
+    ` ELSE ${ETPL_HUNDRED_UPLIFT_FALLBACK} END) ELSE 1 END)`;
+
+  const fpExpr = isEtpl
+    ? etplFpExpr("(SELECT role FROM players WHERE id = match_performances.player_id)")
+    : "fantasy_points";
+  // The discount CASE binds its own copy of the nation list, ahead of the quality clause's copy.
+  const fpParams = isEtpl ? TOP_8_NATIONS : [];
   // Bilateral (T20I) AND both ODI archetypes have no league season → recent-form-heavy.
   // LPL: no 2025 edition, and its last real seasons (2024/2023) are ~1–2 yrs old, so lean recency —
   // 45% last-15 form, 20% most-recent LPL season (2024), 10% prior season (2023), 25% all-quality.
@@ -444,11 +588,14 @@ export async function recalculateValuations(
   // --- Batch Query: Score 1 sources ---
 
   // A: Last 15 quality T20 matches per player
+  // fpExpr is plain `fantasy_points` for every tour except ETPL, which discounts weak-opposition
+  // T20Is (see ETPL_ASSOCIATE_FP_MULT). Its placeholders sit in the SELECT list, i.e. AHEAD of the
+  // WHERE clause in SQL text order, so fpParams must be bound BEFORE playerIds.
   const last15Rows = await sqlite
     .prepare(
       `SELECT player_id, AVG(fantasy_points) as avg_fp, COUNT(*) as cnt
        FROM (
-         SELECT player_id, fantasy_points,
+         SELECT player_id, ${fpExpr} AS fantasy_points,
            ROW_NUMBER() OVER (PARTITION BY player_id ORDER BY match_date DESC) as rn
          FROM match_performances
          WHERE player_id IN (${placeholders})
@@ -458,7 +605,7 @@ export async function recalculateValuations(
        WHERE rn <= 15
        GROUP BY player_id`
     )
-    .all(...playerIds, ...qualityParams) as Array<{
+    .all(...fpParams, ...playerIds, ...qualityParams) as Array<{
     player_id: number;
     avg_fp: number;
     cnt: number;
@@ -500,14 +647,14 @@ export async function recalculateValuations(
   // D: All quality T20 last 2.5yr
   const t20AllRows = await sqlite
     .prepare(
-      `SELECT player_id, AVG(fantasy_points) as avg_fp, COUNT(*) as cnt
+      `SELECT player_id, AVG(${fpExpr}) as avg_fp, COUNT(*) as cnt
        FROM match_performances
        WHERE player_id IN (${placeholders})
          AND (${qualityClause})
          AND match_date >= date('now', '${allWindow}')
        GROUP BY player_id`
     )
-    .all(...playerIds, ...qualityParams) as Array<{
+    .all(...fpParams, ...playerIds, ...qualityParams) as Array<{
     player_id: number;
     avg_fp: number;
     cnt: number;
@@ -524,6 +671,11 @@ export async function recalculateValuations(
   // is the honest unit — counting matches would roughly halve n and double the shrinkage.
   const testInnsMap = new Map<number, number>();
   const testRolePrior = isTest ? await computeTestRolePrior() : null;
+  // The prior is measured on the SAME corrected scale as the estimates it shrinks toward — using
+  // the joined `p.role` rather than the correlated subquery the bucket queries need.
+  const etplRolePrior = isEtpl
+    ? await computeEtplRolePrior(qualityList, etplFpExpr("p.role"), fpParams)
+    : null;
   if (isTest) {
     const innRows = (await sqlite
       .prepare(
@@ -544,6 +696,19 @@ export async function recalculateValuations(
       }
       testInnsMap.set(r.player_id, (testInnsMap.get(r.player_id) ?? 0) + n);
     }
+  }
+  if (isEtpl) {
+    // Total quality games in the 30-month window, the n for ETPL's total-N shrinkage.
+    const nRows = (await sqlite
+      .prepare(
+        `SELECT player_id, COUNT(*) AS n FROM match_performances
+          WHERE player_id IN (${placeholders})
+            AND (${qualityClause})
+            AND match_date >= date('now', '${allWindow}')
+          GROUP BY player_id`
+      )
+      .all(...playerIds, ...qualityParams)) as Array<{ player_id: number; n: number }>;
+    for (const r of nRows) qualNMap.set(r.player_id, r.n);
   }
   if (isHundred) {
     const hunFracRows = await sqlite
@@ -601,7 +766,7 @@ export async function recalculateValuations(
         SELECT player_id, fantasy_points, cnt,
           NTILE(10) OVER (PARTITION BY player_id ORDER BY fantasy_points DESC) as tile
         FROM (
-          SELECT player_id, fantasy_points,
+          SELECT player_id, ${fpExpr} AS fantasy_points,
             COUNT(*) OVER (PARTITION BY player_id) as cnt
           FROM match_performances
           WHERE player_id IN (${placeholders})
@@ -612,7 +777,7 @@ export async function recalculateValuations(
       WHERE tile = 1
       GROUP BY player_id`
     )
-    .all(...playerIds, ...qualityParams) as Array<{
+    .all(...fpParams, ...playerIds, ...qualityParams) as Array<{
     player_id: number;
     ceiling_avg: number;
     cnt: number;
@@ -687,6 +852,16 @@ export async function recalculateValuations(
     } else if (isHundred) {
       const n = qualNMap.get(p.player_id) ?? 0;
       score1 = (n * rawScore1 + SHRINK_K * SHRINK_PRIOR) / (n + SHRINK_K);
+    } else if (isEtpl) {
+      // Total-N shrinkage toward the MEASURED per-role prior, k=5 pseudo-games. Total-N rather than
+      // per-bucket (the LPL/CPL choice) because ETPL has no season buckets at all — the distortion
+      // to fix is simply "this player has 2 recorded T20s", not "one bucket is carrying 30% weight
+      // on a single game". A statless player has n=0 and lands exactly on his role prior, which is
+      // a better answer for an uncapped draft pick than computeScore1's flat baseline of 20.
+      const prior =
+        etplRolePrior?.[p.role] ?? ETPL_PRIOR_FALLBACK[p.role] ?? ETPL_PRIOR_FALLBACK.BAT;
+      const n = qualNMap.get(p.player_id) ?? 0;
+      score1 = (n * rawScore1 + SHRINK_K * prior) / (n + SHRINK_K);
     } else if (isLpl || isCpl) {
       // CPL uses the same PER-BUCKET shrinkage as LPL. The trigger differs slightly: CPL's season
       // buckets are populated, but a squad of 122 is full of players with a 1–3 game CPL season
@@ -736,6 +911,9 @@ export async function recalculateValuations(
       ? mlcExpectedMatches(p.ipl_team, p.squad_number)
       : isLpl
       ? lplExpectedMatchesFor(p.name, p.squad_number)
+      : isEtpl
+      // Name-keyed so the two CPL-clash availability overrides can bypass squad_number.
+      ? etplExpectedMatchesFor(p.name, p.squad_number)
       : isCpl
       // Name-keyed, because CPL 2026's phased overseas rotation makes squad_number a bad proxy:
       // a "bench" number can be a first-3-games specialist and an XI number a 7-of-10 player.

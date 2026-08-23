@@ -40,12 +40,14 @@ import { buildHundredPool } from "@/lib/squads/build-hundred-pool";
 import { LPL_2026, LPL_2026_NAME } from "@/lib/squads/lpl-2026";
 import { buildLPLPool } from "@/lib/squads/build-lpl-pool";
 import { CPL_2026, CPL_2026_NAME } from "@/lib/squads/cpl-2026";
+import { ETPL_2026, ETPL_2026_NAME } from "@/lib/squads/etpl-2026";
 import {
   ENG_VS_PAK_TEST_2026,
   ENG_VS_PAK_TEST_2026_NAME,
 } from "@/lib/squads/eng-vs-pak-test-2026";
 import { buildTestPool } from "@/lib/squads/build-test-pool";
 import { buildCPLPool } from "@/lib/squads/build-cpl-pool";
+import { buildETPLPool } from "@/lib/squads/build-etpl-pool";
 import { eq } from "drizzle-orm";
 
 export async function POST(request: NextRequest) {
@@ -442,6 +444,50 @@ export async function POST(request: NextRequest) {
         : undefined;
 
       const built = await buildCPLPool(sqlite, { auctionId, tournamentId, teams });
+      if (isFirstBuild)
+        await carryOverPreviousLineups({
+          tournamentName: auctionRow.tournament_name,
+          tournamentId,
+          auctionId,
+        });
+      await initializeValuations(tournamentId);
+
+      return NextResponse.json({
+        success: true,
+        teams: built.teams,
+        players: built.players,
+        matched: built.matched,
+        created: built.created,
+        unmatched: built.unmatched,
+        teamBreakdown: built.teamBreakdown,
+      });
+    }
+
+    // ---- ETPL 2026 (European T20 Premier League) — INAUGURAL season, franchise T20 ----
+    // 6 franchises across NED/SCO/IRE, squads of 17 (ROT 16 and GLA 15 pending replacements).
+    // max_overseas = 4, and note that ETPL's definition of "overseas" is narrower than any other
+    // league here: it means a Full Member / Test-nation player only. Host-nation (NED/SCO/IRE) AND
+    // associate players all count as LOCAL for XI selection.
+    if (auctionRow.tournament_name === ETPL_2026_NAME) {
+      let tournamentId = auctionRow.tournament_id;
+      if (!tournamentId) {
+        const t = await sqlite
+          .prepare(
+            `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size, max_overseas)
+             VALUES (?, 'CUSTOM', 'T20', 100, 17, 4)`
+          )
+          .run(ETPL_2026_NAME);
+        tournamentId = Number(t.lastInsertRowid);
+        await sqlite
+          .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
+          .run(tournamentId, auctionId);
+      }
+
+      const teams = Array.isArray(teamsFilter) && teamsFilter.length
+        ? ETPL_2026.filter((t) => teamsFilter.includes(t.short))
+        : undefined;
+
+      const built = await buildETPLPool(sqlite, { auctionId, tournamentId, teams });
       if (isFirstBuild)
         await carryOverPreviousLineups({
           tournamentName: auctionRow.tournament_name,

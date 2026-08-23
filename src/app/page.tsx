@@ -67,6 +67,12 @@ export default function HomePage() {
       note: "7 Caribbean franchises · valued on CPL 2025/24 + franchise-T20 form, bowl-leaning venues",
     },
     {
+      id: "ETPL 2026",
+      label: "ETPL 2026",
+      format: "T20",
+      note: "6 NED/SCO/IRE franchises · inaugural season, no league history · valued on Blast/Hundred + all-T20 form, venue-neutral",
+    },
+    {
       id: "India vs England Men's T20 2026",
       label: "India vs England Men's T20 2026",
       format: "T20",

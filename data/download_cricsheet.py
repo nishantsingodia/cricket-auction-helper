@@ -6,6 +6,7 @@ Cricsheet provides free ball-by-ball cricket data in JSON format.
 
 import os
 import sys
+import shutil
 import zipfile
 import requests
 
@@ -68,16 +69,46 @@ def extract_zip(zip_path: str, extract_to: str):
 
 
 def main():
+    """
+    By default an archive that is already extracted is SKIPPED. That makes a first-time download
+    cheap, but it also means a plain `refresh.sh` on an existing checkout re-ingests the same files
+    and reports "0 new" — it looks like a successful refresh while fetching nothing at all. Cricsheet
+    republishes the WHOLE archive each time, so picking up newly-played matches REQUIRES re-download.
+
+    Use --force to re-download everything, or --force <name> [<name> ...] to re-download only some
+    archives (e.g. `--force t20i blast cpl` before an auction). Prefer the targeted form: the full
+    set is ~17k files.
+    """
     os.makedirs(RAW_DIR, exist_ok=True)
+
+    args = sys.argv[1:]
+    force_all = False
+    force_names = set()
+    if "--force" in args:
+        rest = [a for a in args[args.index("--force") + 1:] if not a.startswith("-")]
+        if rest:
+            force_names = set(rest)
+            unknown = force_names - set(ARCHIVES)
+            if unknown:
+                print(f"ERROR: unknown archive name(s): {', '.join(sorted(unknown))}")
+                print(f"  Known: {', '.join(sorted(ARCHIVES))}")
+                return 1
+        else:
+            force_all = True
 
     for name, url in ARCHIVES.items():
         extract_dir = os.path.join(RAW_DIR, name)
         zip_path = os.path.join(RAW_DIR, f"{name}.zip")
 
-        # Skip if already extracted
-        if os.path.isdir(extract_dir) and len(os.listdir(extract_dir)) > 10:
-            print(f"[{name}] Already downloaded and extracted ({len(os.listdir(extract_dir))} files). Skipping.")
+        forced = force_all or name in force_names
+        # Skip if already extracted, unless this archive was explicitly forced.
+        if not forced and os.path.isdir(extract_dir) and len(os.listdir(extract_dir)) > 10:
+            print(f"[{name}] Already downloaded and extracted ({len(os.listdir(extract_dir))} files). "
+                  f"Skipping — pass `--force {name}` to re-fetch newly-played matches.")
             continue
+        if forced and os.path.isdir(extract_dir):
+            print(f"[{name}] FORCED re-download (clearing {len(os.listdir(extract_dir))} existing files).")
+            shutil.rmtree(extract_dir)
 
         print(f"[{name}] Downloading archive...")
         download_file(url, zip_path)
@@ -90,7 +121,8 @@ def main():
         print(f"[{name}] Done.\n")
 
     print("All archives downloaded and extracted.")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main() or 0)
