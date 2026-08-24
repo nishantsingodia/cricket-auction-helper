@@ -3,11 +3,13 @@
 // Double round-robin: 30 league games, each team plays 10. Playoffs: 1st goes straight to the
 // Final, 2nd v 3rd in a Qualifier, Qualifier winner meets 1st. 34 matches in all.
 //
-// Only TWO venues, shared equally by all six teams:
-//   * Sportpark Westvliet, Voorburg (NED)   — rounds 1–2, 15 matches
-//   * The Village, Malahide (IRL)           — remaining 15 matches + playoffs
-// Because every team plays the same 15/15 split, a venue/conditions factor has NO relative
-// signal here — Score2 is deliberately left at 1.0 (see engine.ts). For bidding context only,
+// Only TWO venues. The published fixture list (30 league games) splits them 17 / 13, not 15 / 15:
+//   * Sportpark Westvliet, Voorburg (NED)   — matches 1–17,  26 Aug – 6 Sep
+//   * The Village, Malahide (IRL)           — matches 18–30, 9–17 Sep, + both playoffs
+// Per-team split, counted off the fixture list: AMS 6/4 · ROT 6/4 · EDI 6/4 · GLA 6/4 · BEL 5/5 ·
+// DUB 5/5. Every team plays exactly 10, and the widest venue skew between any two teams is ONE
+// game — so a conditions factor still has essentially no relative signal, and Score2 stays at 1.0
+// (see engine.ts). For bidding context only,
 // measured off our own cricsheet FP (T20, 2021+): Voorburg bat/bowl FP ratio 0.86 (20 matches),
 // Malahide 1.07 (10 matches) vs a global T20 baseline of 0.79 — i.e. BOTH grounds are batting-
 // friendlier than the world norm, Malahide markedly so. Small samples; treat as a tilt, not a law.
@@ -48,6 +50,42 @@
 // picks are best-effort; they price near baseline anyway. Reorder squad_number in the auction panel
 // to correct any XI.
 
+// Published fixture list (double round-robin, 30 league games). Kept here because it is what turns
+// a vague "joins late" into an exact number of games missed — see ETPL_EXPECTED_GAMES.
+// Playoffs: Qualifier 19 Sep (2nd v 3rd), Final 20 Sep (1st v Qualifier winner).
+export const ETPL_FIXTURES: Array<{ n: number; date: string; a: string; b: string; venue: "VOORBURG" | "MALAHIDE" }> = [
+  { n: 1,  date: "2026-08-26", a: "ROT", b: "AMS", venue: "VOORBURG" },
+  { n: 2,  date: "2026-08-27", a: "BEL", b: "DUB", venue: "VOORBURG" },
+  { n: 3,  date: "2026-08-27", a: "EDI", b: "GLA", venue: "VOORBURG" },
+  { n: 4,  date: "2026-08-28", a: "AMS", b: "EDI", venue: "VOORBURG" },
+  { n: 5,  date: "2026-08-29", a: "GLA", b: "DUB", venue: "VOORBURG" },
+  { n: 6,  date: "2026-08-29", a: "ROT", b: "BEL", venue: "VOORBURG" },
+  { n: 7,  date: "2026-08-30", a: "AMS", b: "BEL", venue: "VOORBURG" },
+  { n: 8,  date: "2026-08-30", a: "EDI", b: "DUB", venue: "VOORBURG" },
+  { n: 9,  date: "2026-09-01", a: "GLA", b: "ROT", venue: "VOORBURG" },
+  { n: 10, date: "2026-09-02", a: "DUB", b: "ROT", venue: "VOORBURG" },
+  { n: 11, date: "2026-09-02", a: "BEL", b: "EDI", venue: "VOORBURG" },
+  { n: 12, date: "2026-09-03", a: "AMS", b: "GLA", venue: "VOORBURG" },
+  { n: 13, date: "2026-09-04", a: "GLA", b: "BEL", venue: "VOORBURG" },
+  { n: 14, date: "2026-09-05", a: "ROT", b: "EDI", venue: "VOORBURG" },
+  { n: 15, date: "2026-09-05", a: "DUB", b: "AMS", venue: "VOORBURG" },
+  { n: 16, date: "2026-09-02", a: "GLA", b: "EDI", venue: "VOORBURG" },
+  { n: 17, date: "2026-09-06", a: "AMS", b: "ROT", venue: "VOORBURG" },
+  { n: 18, date: "2026-09-09", a: "DUB", b: "BEL", venue: "MALAHIDE" },
+  { n: 19, date: "2026-09-10", a: "ROT", b: "GLA", venue: "MALAHIDE" },
+  { n: 20, date: "2026-09-10", a: "BEL", b: "AMS", venue: "MALAHIDE" },
+  { n: 21, date: "2026-09-11", a: "DUB", b: "EDI", venue: "MALAHIDE" },
+  { n: 22, date: "2026-09-12", a: "BEL", b: "ROT", venue: "MALAHIDE" },
+  { n: 23, date: "2026-09-12", a: "DUB", b: "GLA", venue: "MALAHIDE" },
+  { n: 24, date: "2026-09-13", a: "EDI", b: "AMS", venue: "MALAHIDE" },
+  { n: 25, date: "2026-09-13", a: "BEL", b: "GLA", venue: "MALAHIDE" },
+  { n: 26, date: "2026-09-15", a: "AMS", b: "DUB", venue: "MALAHIDE" },
+  { n: 27, date: "2026-09-15", a: "EDI", b: "ROT", venue: "MALAHIDE" },
+  { n: 28, date: "2026-09-16", a: "GLA", b: "AMS", venue: "MALAHIDE" },
+  { n: 29, date: "2026-09-17", a: "EDI", b: "BEL", venue: "MALAHIDE" },
+  { n: 30, date: "2026-09-17", a: "ROT", b: "DUB", venue: "MALAHIDE" },
+];
+
 export type Role = "BAT" | "BOWL" | "AR" | "WK";
 
 export interface ETPLSquadPlayer {
@@ -79,7 +117,7 @@ export const ETPL_2026: ETPLTeam[] = [
     name: "Amsterdam Flames", short: "AMS", color: "#F97316", coach: "Ryan Cook",
     players: [
       // XI — 4 Test-nation overseas: Smith, David, Bracewell, Gleeson.
-      { name: "Steve Smith", role: "BAT", overseas: true, nat: "AUS", pick: "S", note: "⚠️ AVAILABILITY: PLAYS ~8.5 OF 10 — MISSES THE OPENING ROUND. Australia's 2nd Test v Bangladesh runs 22-26 Aug at Mackay and ETPL starts 26 Aug; Smith played the 1st Test (Darwin, 13 Aug, 209 FP) so he is in that squad. He cannot cross from Queensland to the Netherlands for round 1. Retired from ODIs in 2025, so the Zimbabwe ODIs (15-20 Sep) do not take him and he should be there for the Malahide half. Amsterdam's marquee — worth paying for, but not for 10 games." },
+      { name: "Steve Smith", role: "BAT", overseas: true, nat: "AUS", pick: "S", note: "⚠️ AVAILABILITY: PLAYS 9 OF 10 — MISSES THE 26 AUG OPENER, JOINS LATE. Australia's 2nd Test v Bangladesh runs 22-26 Aug at Mackay and ETPL starts 26 Aug; Smith played the 1st Test (Darwin, 13 Aug, 209 FP) so he is in that squad. He cannot cross from Queensland to the Netherlands for the 26 Aug opener; Amsterdam's 2nd game is 28 Aug, which is reachable. Retired from ODIs in 2025, so the Zimbabwe ODIs (15-20 Sep) do not take him and he should be there for the Malahide half. Amsterdam's marquee — worth paying for, but not for 10 games." },
       { name: "Max O'Dowd", role: "BAT", overseas: false, nat: "NED", pick: "R6" },
       { name: "Bas de Leede", role: "AR", overseas: false, nat: "NED", pick: "S" },
       { name: "Scott Edwards", role: "WK", overseas: false, nat: "NED", pick: "S" },
@@ -173,7 +211,7 @@ export const ETPL_2026: ETPLTeam[] = [
     ],
   },
   {
-    name: "Edinburgh Castle Rockers", short: "EDI", color: "#1D4ED8", coach: "James Foster",
+    name: "Edinburgh Castle Rockers", short: "EDI", color: "#1D4ED8", coach: "Trevor Bayliss",
     players: [
       // XI — 4 Test-nation overseas: Evans, Santner, Curran, Boult.
       { name: "Ross Adair", role: "BAT", overseas: false, nat: "IRE", pick: "R2", note: "Mark Adair's brother (Mark is at Belfast) — separate DB record, do not conflate." },
@@ -396,12 +434,15 @@ const ETPL_EXPECTED_GAMES: Record<string, number> = {
   // their franchise misses the playoffs; realistically it could be zero.
   "agsgous": 2,          // Andries Gous — 4 CPL games 9-19 Aug, 69.8 avg FP, POTM on 9 Aug (82 off 51)
   "snnetravalkar": 2,    // Saurabh Netravalkar — 3 CPL games 8-18 Aug, 78.0 avg FP
-  // Australia's 2nd Test v Bangladesh runs 22-26 Aug at Mackay, Queensland. ETPL's first game is
-  // 26 Aug. Smith played the 1st Test (Darwin, 13 Aug, 209 FP), so he is in that squad and cannot
-  // be in the Netherlands for the opening round — even a same-day finish leaves a 24h+ flight.
-  // Docked ~2 games at the front. He retired from ODIs in 2025, so Australia's Zimbabwe ODI series
-  // (15-20 Sep) does NOT take him and the back end is left intact.
-  "spdsmith": 8.5,
+  // Australia's 2nd Test v Bangladesh runs 22-26 Aug at Mackay, Queensland; Smith played the 1st
+  // (Darwin, 13 Aug, 209 FP) so he is in that squad. Now computed off the ACTUAL fixture list
+  // rather than estimated: Amsterdam play 26 Aug (match 1), then 28, 30 Aug, 3, 5, 6, 10, 13, 15,
+  // 16 Sep. He certainly misses the 26 Aug opener; the 28th is two days later and Queensland ->
+  // Amsterdam is ~24h, so it is reachable. Hence 9 of 10, which matches the user's own team news
+  // ("misses the opening game, joins late"). Downside risk is 8 if he is held back or rested.
+  // He retired from ODIs in 2025, so Australia's Zimbabwe ODIs (15-20 Sep) do NOT take him and the
+  // back end is intact.
+  "spdsmith": 9,
 };
 
 export function etplExpectedMatchesFor(dbName: string, squadNumber: number): number {
