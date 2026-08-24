@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { sqlite, withTransaction } from "@/db";
 import { CPL_2026_NAME, cplAvailability } from "@/lib/squads/cpl-2026";
 import { resolveCplSquads } from "@/lib/squads/build-cpl-pool";
+import { ETPL_2026_NAME } from "@/lib/squads/etpl-2026";
+import { resolveEtplSquads } from "@/lib/squads/build-etpl-pool";
 
 // POST /api/pool/refresh-meta  { auctionId }
 //
@@ -42,18 +44,27 @@ export async function POST(request: NextRequest) {
       | { id: number; tournament_id: number | null; tournament_name: string }
       | undefined;
     if (!auction) return NextResponse.json({ error: "auction not found" }, { status: 404 });
-    if (auction.tournament_name !== CPL_2026_NAME) {
+    // ETPL 2026 needs this more than CPL did: its source sheet is edited daily right up to the
+    // first ball (on 24 Aug alone it changed a head coach and reinstated Mitch Marsh as captain,
+    // which reshuffled the whole Amsterdam XI). Note this route stays METADATA-ONLY by contract —
+    // it will not move squad_number. Use POST /api/pool/reorder for an XI change, which is the
+    // purpose-built route and re-values on its own.
+    const supported = [CPL_2026_NAME, ETPL_2026_NAME];
+    if (!supported.includes(auction.tournament_name)) {
       return NextResponse.json(
-        { error: `refresh-meta currently supports ${CPL_2026_NAME} only` },
+        { error: `refresh-meta supports ${supported.join(" and ")} only` },
         { status: 400 }
       );
     }
+    const isEtpl = auction.tournament_name === ETPL_2026_NAME;
     if (!auction.tournament_id) {
       return NextResponse.json({ error: "auction has no pool yet — fetch the pool first" }, { status: 400 });
     }
 
-    // squad entry -> player_id, resolved exactly as the builder does
-    const resolved = await resolveCplSquads(sqlite);
+    // squad entry -> player_id, resolved exactly as the matching builder does
+    const resolved = isEtpl
+      ? await resolveEtplSquads(sqlite)
+      : await resolveCplSquads(sqlite);
     const noteByPlayerId = new Map<number, string>();
     for (const r of resolved) {
       if (r.playerId !== null) noteByPlayerId.set(r.playerId, r.sp.note ?? "");
@@ -87,7 +98,9 @@ export async function POST(request: NextRequest) {
       const updAvail = tx.prepare(`UPDATE auction_pool SET availability = ? WHERE id = ?`);
       for (const row of poolRows) {
         const wantNote = noteByPlayerId.get(row.player_id) ?? "";
-        const wantAvail = cplAvailability(row.name);
+        // ETPL encodes availability in the note text and in etplExpectedMatchesFor, not in an
+        // availability tag, so there is nothing to sync for it — leave the column untouched.
+        const wantAvail = isEtpl ? row.availability : cplAvailability(row.name);
 
         // risk_note: the squad file is authoritative. Only hold back if asked to.
         const looksMachine =
@@ -129,7 +142,7 @@ export async function POST(request: NextRequest) {
           r.team.short,
           r.sn,
           r.sp.note ?? "",
-          cplAvailability(r.sp.name)
+          isEtpl ? "FIT" : cplAvailability(r.sp.name)
         );
         added.push(`${r.team.short}/${r.sp.name}`);
       }
