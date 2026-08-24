@@ -116,25 +116,34 @@ export const ETPL_2026: ETPLTeam[] = [
   {
     name: "Amsterdam Flames", short: "AMS", color: "#F97316", coach: "Ryan Cook",
     players: [
-      // XI — 4 Test-nation overseas: Smith, David, Bracewell, Gleeson.
-      { name: "Steve Smith", role: "BAT", overseas: true, nat: "AUS", pick: "S", note: "⚠️ AVAILABILITY: PLAYS 9 OF 10 — MISSES THE 26 AUG OPENER, JOINS LATE. Australia's 2nd Test v Bangladesh runs 22-26 Aug at Mackay and ETPL starts 26 Aug; Smith played the 1st Test (Darwin, 13 Aug, 209 FP) so he is in that squad. He cannot cross from Queensland to the Netherlands for the 26 Aug opener; Amsterdam's 2nd game is 28 Aug, which is reachable. Retired from ODIs in 2025, so the Zimbabwe ODIs (15-20 Sep) do not take him and he should be there for the Malahide half. Amsterdam's marquee — worth paying for, but not for 10 games." },
+      // 18 players (one over the nominal 17) after Mitch Marsh was reinstated on 24 Aug — the sheet's
+      // REPLACEMENTS block still carries a stale "Marsh OUT -> Rahane IN" line, but Marsh is back in
+      // the squad list AS CAPTAIN, so Rahane is an ADDITIONAL marquee, not his replacement. That is
+      // also what Cricinfo/ESPN/cricket.com.au reported all along.
+      //
+      // XI — 4 Test-nation overseas: Smith, Marsh, David, Gleeson. Squad Test-nation overseas = 7
+      // (those four plus Bracewell, Payne, Rahane) = EXACTLY the max-7 squad limit, so Amsterdam is
+      // legal but completely maxed out. Fitting Marsh in cost MICHAEL BRACEWELL his XI place: he has
+      // dropped from position 7 to 16. Kyle Klein also drops out of the XI (9 -> 12).
+      { name: "Steve Smith", role: "BAT", overseas: true, nat: "AUS", pick: "S", note: "⚠️ AVAILABILITY: PLAYS 9 OF 10 — MISSES THE 26 AUG OPENER, JOINS LATE. Australia's 2nd Test v Bangladesh runs 22-26 Aug at Mackay and ETPL starts 26 Aug; Smith played the 1st Test (Darwin, 13 Aug, 209 FP) so he is in that squad. He cannot cross from Queensland to the Netherlands for the 26 Aug opener; Amsterdam's 2nd game is 28 Aug, which is reachable. Retired from ODIs in 2025, so the Zimbabwe ODIs (15-20 Sep) do not take him and he should be there for the Malahide half." },
+      { name: "Mitch Marsh", role: "AR", overseas: true, nat: "AUS", pick: "S", note: "CAPTAIN, and reinstated on 24 Aug after appearing as a withdrawal earlier (the sheet's stale replacement line still says otherwise — ignore it). ⚠️ AVAILABILITY: PLAYS 9 OF 10 — misses the 26 Aug opener and joins late, per team news. Note he has NO tournament clash: he played the entire Hundred for Sunrisers Leeds (9 games to 14 Aug, ~92 avg FP with 158/133/129/100), which finished 16 Aug, so he is already in Europe and in excellent form. RESIDUAL RISK AT THE BACK END, unlike Smith: Marsh is Australia's T20 captain and an ODI regular, and Australia play ODIs v Zimbabwe 15-20 Sep — Amsterdam's last two games are 15 and 16 Sep. If he is picked for that, this becomes 7 of 10. Priced at 9; that risk is what you carry." },
       { name: "Max O'Dowd", role: "BAT", overseas: false, nat: "NED", pick: "R6" },
       { name: "Bas de Leede", role: "AR", overseas: false, nat: "NED", pick: "S" },
       { name: "Scott Edwards", role: "WK", overseas: false, nat: "NED", pick: "S" },
       { name: "Tim David", role: "BAT", overseas: true, nat: "AUS", pick: "S" },
       { name: "Curtis Campher", role: "AR", overseas: false, nat: "IRE", pick: "R1" },
-      { name: "Michael Bracewell", role: "AR", overseas: true, nat: "NZ", pick: "S" },
+      { name: "Aryan Dutt", role: "BOWL", overseas: false, nat: "NED", pick: "R4", note: "Promoted into the XI (12 -> 8) in the 24 Aug reshuffle." },
       { name: "Tim Pringle", role: "AR", overseas: false, nat: "NED", pick: "R3" },
-      { name: "Kyle Klein", role: "BOWL", overseas: false, nat: "NED", pick: "R2" },
       { name: "Richard Gleeson", role: "BOWL", overseas: true, nat: "ENG", pick: "S" },
       { name: "Ali Hasan", role: "AR", overseas: false, nat: "ITA", pick: "S", note: "Italy associate — counts as LOCAL for XI selection. Thin record (10 T20s in our data); role best-effort." },
       // Depth
-      { name: "Aryan Dutt", role: "BOWL", overseas: false, nat: "NED", pick: "R4" },
-      { name: "Jordan Neill", role: "BOWL", overseas: false, nat: "IRE", pick: "R5", note: "No ball-by-ball record in our data — prices at baseline." },
-      { name: "David Rushmere", role: "BAT", overseas: false, nat: "NED", pick: "Rep", note: "Replacement for Dipendra Singh Airee (OUT). No ball-by-ball record in our data — prices at baseline." },
+      { name: "Kyle Klein", role: "BOWL", overseas: false, nat: "NED", pick: "R2", note: "DROPPED OUT OF THE XI (9 -> 12) in the 24 Aug Marsh reshuffle. A local seamer who was a first-choice pick two days ago, so he is a strong reorder candidate if the published XI differs." },
+      { name: "Jordan Neill", role: "BOWL", overseas: false, nat: "IRE", pick: "R5", note: "No ball-by-ball record in our data — prices at his role prior." },
+      { name: "David Rushmere", role: "BAT", overseas: false, nat: "NED", pick: "Rep", note: "Replacement for Dipendra Singh Airee (OUT). No ball-by-ball record in our data — prices at his role prior." },
       { name: "Yuvraj Samra", role: "BAT", overseas: false, nat: "CAN", pick: "S", note: "Canada = Global Associate, counts as LOCAL for XI selection." },
-      { name: "David Payne", role: "BOWL", overseas: true, nat: "ENG", pick: "S", note: "SURPLUS OVERSEAS — 5th Test-nation player, so he can only play if one of Smith/David/Bracewell/Gleeson sits. Priced as depth." },
-      { name: "Ajinkya Rahane", role: "BAT", overseas: true, nat: "IND", pick: "Rep", note: "Replacement for Mitchell Marsh (OUT). SURPLUS OVERSEAS — 6th Test-nation player; needs two of the front four to sit. Priced as depth." },
+      { name: "Michael Bracewell", role: "AR", overseas: true, nat: "NZ", pick: "S", note: "🚨 THE BIGGEST PRICE MOVE OF THE 24 AUG UPDATE — DROPPED FROM XI POSITION 7 TO 16. Marsh's reinstatement gave Amsterdam a 5th Test-nation overseas player, and Bracewell is the one who lost out: Smith, Marsh, David and Gleeson hold the four legal slots. A 100-match international all-rounder who is now depth. He only plays if one of those four sits — which is live for the 26 Aug opener, when BOTH Smith and Marsh are absent. Worth a speculative bid at depth money, not an XI price." },
+      { name: "David Payne", role: "BOWL", overseas: true, nat: "ENG", pick: "S", note: "SURPLUS OVERSEAS — 6th Test-nation player now. Priced as depth." },
+      { name: "Ajinkya Rahane", role: "BAT", overseas: true, nat: "IND", pick: "Rep", note: "Signed as an ADDITIONAL marquee (Steve Waugh is co-owner), NOT as Marsh's replacement — the sheet's replacement line is stale. SURPLUS OVERSEAS — 7th Test-nation player, which is exactly Amsterdam's squad cap. Needs three of the front four to sit, so realistically he plays the 26 Aug opener (Smith and Marsh both out) and little else. Priced as depth." },
     ],
   },
   {
@@ -288,6 +297,8 @@ export const ETPL_NAME_ALIASES: Record<string, string> = {
   "harmeet singh": "Harmeet Singh",       // 2440, 98m  — USA (a second, older row also exists)
   "ali hasan": "Ali Hasan",               // 4666, 10m  — Italy; must not fuzz to Hasan Ali (PAK, 318m)
   "steve smith": "SPD Smith",             // 81, 558m
+  "mitch marsh": "MR Marsh",              // 276, 397m — Mitchell Ross Marsh, NOT SE Marsh (Shaun)
+  "mitchell marsh": "MR Marsh",
   // (a) sheet spelling -> DB spelling
   "micheal bracewell": "MG Bracewell",
   "michael bracewell": "MG Bracewell",
@@ -443,6 +454,11 @@ const ETPL_EXPECTED_GAMES: Record<string, number> = {
   // He retired from ODIs in 2025, so Australia's Zimbabwe ODIs (15-20 Sep) do NOT take him and the
   // back end is intact.
   "spdsmith": 9,
+  // Marsh: same team news as Smith (misses the opener, joins late). He has no tournament clash --
+  // the Hundred ended 16 Aug -- so 9 of 10 is the read. Unlike Smith he carries BACK-END risk:
+  // Australia's ODIs v Zimbabwe are 15-20 Sep and Amsterdam's last two games are 15 and 16 Sep.
+  // Left at 9 rather than pre-docking a call-up that has not happened.
+  "mrmarsh": 9,
 };
 
 export function etplExpectedMatchesFor(dbName: string, squadNumber: number): number {
