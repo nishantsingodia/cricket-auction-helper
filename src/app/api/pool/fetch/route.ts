@@ -40,6 +40,7 @@ import { buildHundredPool } from "@/lib/squads/build-hundred-pool";
 import { LPL_2026, LPL_2026_NAME } from "@/lib/squads/lpl-2026";
 import { buildLPLPool } from "@/lib/squads/build-lpl-pool";
 import { CPL_2026, CPL_2026_NAME } from "@/lib/squads/cpl-2026";
+import { WCPL_2026, WCPL_2026_NAME } from "@/lib/squads/wcpl-2026";
 import { ETPL_2026, ETPL_2026_NAME } from "@/lib/squads/etpl-2026";
 import {
   ENG_VS_PAK_TEST_2026,
@@ -47,6 +48,7 @@ import {
 } from "@/lib/squads/eng-vs-pak-test-2026";
 import { buildTestPool } from "@/lib/squads/build-test-pool";
 import { buildCPLPool } from "@/lib/squads/build-cpl-pool";
+import { buildWCPLPool } from "@/lib/squads/build-wcpl-pool";
 import { buildETPLPool } from "@/lib/squads/build-etpl-pool";
 import { eq } from "drizzle-orm";
 
@@ -444,6 +446,48 @@ export async function POST(request: NextRequest) {
         : undefined;
 
       const built = await buildCPLPool(sqlite, { auctionId, tournamentId, teams });
+      if (isFirstBuild)
+        await carryOverPreviousLineups({
+          tournamentName: auctionRow.tournament_name,
+          tournamentId,
+          auctionId,
+        });
+      await initializeValuations(tournamentId);
+
+      return NextResponse.json({
+        success: true,
+        teams: built.teams,
+        players: built.players,
+        matched: built.matched,
+        created: built.created,
+        unmatched: built.unmatched,
+        teamBreakdown: built.teamBreakdown,
+      });
+    }
+
+    // ---- WCPL 2026 (Women's Caribbean Premier League) — women's franchise T20 ----
+    // 4 franchises, 8 matches, every one at Kensington Oval. Squads of 14–15 and the same
+    // 4-overseas XI cap the men's CPL uses (assumed — see the note in wcpl-2026.ts).
+    if (auctionRow.tournament_name === WCPL_2026_NAME) {
+      let tournamentId = auctionRow.tournament_id;
+      if (!tournamentId) {
+        const t = await sqlite
+          .prepare(
+            `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size, max_overseas)
+             VALUES (?, 'CUSTOM', 'T20', 100, 15, 4)`
+          )
+          .run(WCPL_2026_NAME);
+        tournamentId = Number(t.lastInsertRowid);
+        await sqlite
+          .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
+          .run(tournamentId, auctionId);
+      }
+
+      const teams = Array.isArray(teamsFilter) && teamsFilter.length
+        ? WCPL_2026.filter((t) => teamsFilter.includes(t.short))
+        : undefined;
+
+      const built = await buildWCPLPool(sqlite, { auctionId, tournamentId, teams });
       if (isFirstBuild)
         await carryOverPreviousLineups({
           tournamentName: auctionRow.tournament_name,

@@ -67,6 +67,12 @@ export default function HomePage() {
       note: "7 Caribbean franchises · valued on CPL 2025/24 + franchise-T20 form, bowl-leaning venues",
     },
     {
+      id: "WCPL 2026",
+      label: "WCPL 2026",
+      format: "T20",
+      note: "4 Caribbean franchises · 8 matches, all at Kensington Oval · valued on WCPL 2025/24 + WPL/WBBL/T20I form, venue-neutral",
+    },
+    {
       id: "ETPL 2026",
       label: "ETPL 2026",
       format: "T20",

@@ -42,6 +42,10 @@ import {
   ETPL_2026_NAME,
   etplExpectedMatchesFor,
 } from "@/lib/squads/etpl-2026";
+import {
+  WCPL_2026_NAME,
+  wcplExpectedMatches,
+} from "@/lib/squads/wcpl-2026";
 
 /**
  * IPL Auction Valuation Engine — 2-Score Model
@@ -402,6 +406,18 @@ export async function recalculateValuations(
   // Venue is OFF: only two grounds, and all six teams play the same 15/15 split, so a conditions
   // factor carries no relative signal whatsoever.
   const isEtpl = tournamentRow?.name === ETPL_2026_NAME;
+  // WCPL 2026: the Women's Caribbean Premier League — a women's franchise T20, and a TINY one:
+  // 4 teams, 8 matches, ALL of them at Kensington Oval. Modelled like CPL/LPL (20-over franchise
+  // league) with its OWN 'WCPL' league bucket, and this is the FIRST tour to use that bucket — the
+  // cricsheet archive code is `wcl`, not `wcpl` (25 matches, 2022-2025, ingested 4 Sep 2026).
+  // Quality = the women's marquee set (WCPL/WPL/T20/WBBL, HUN deliberately out — see below); the
+  // DEFAULT 40/30/10/20 weights apply because WCPL ran real 2025 and 2024 seasons, so unlike LPL
+  // there is nothing to slide back to; per-bucket small-sample shrinkage ON, same as CPL/LPL; plus
+  // one thing no men's tour needs, a league SCALE UPLIFT (WCPL_SCALE_UPLIFT, below).
+  // Venue is OFF, deliberately: every one of the 8 matches is at the one ground, so a venue factor
+  // would be the same constant for all 59 players and carries ZERO relative signal. Same call as
+  // ETPL, and it is why isWcpl appears in no venue path anywhere in this file.
+  const isWcpl = tournamentRow?.name === WCPL_2026_NAME;
   // ENG v PAK 2026: the first RED-BALL tour. Scored purely on Test form ('TEST'), which is a
   // different points scale entirely (2 innings, +20 a wicket, no rate bonuses) — so nothing
   // white-ball may leak into it, in either direction. No league season, so the bilateral
@@ -420,7 +436,11 @@ export async function recalculateValuations(
   // NOTE ETPL -> "ETPL", a format string that appears NOWHERE in match_performances. That is
   // intentional, not a bug: it makes the two league-season buckets provably empty so their weight
   // redistributes onto the form buckets. See the isEtpl note above.
-  const leagueFmt = isHundred ? "HUN" : isMLC ? "MLC" : isLpl ? "LPL" : isCpl ? "CPL" : isEtpl ? "ETPL" : "IPL";
+  // WCPL -> "WCPL", which DOES exist in match_performances (25 matches, 2022-2025). It gets the
+  // DEFAULT calendar season buckets and they must NOT slide back the way LPL's do: WCPL ran a real
+  // 2025 season (Sep 2025) and a 2024 one, so buckets B and C are genuinely populated and the
+  // default 40/30/10/20 weights apply — identical reasoning to CPL, hence no score1Weights entry.
+  const leagueFmt = isHundred ? "HUN" : isMLC ? "MLC" : isLpl ? "LPL" : isCpl ? "CPL" : isWcpl ? "WCPL" : isEtpl ? "ETPL" : "IPL";
   const qualityList = isHundredMen
     // Marquee franchise leagues only — Vitality Blast ('BLAST') is EXCLUDED: it's domestic
     // county T20 (a tier below), and at 1,557 matches it's the largest bucket, so counting it
@@ -443,6 +463,20 @@ export async function recalculateValuations(
     // PSL, de Kock in SA20/ILT20, Gurbaz/Nabi in everything). Counting only CPL+IPL would park most
     // of the marquee overseas talent at baseline. BLAST stays excluded (county tier, would swamp).
     ? "'CPL','IPL','BBL','PSL','LPL','SA20','ILT20','MLC','HUN'"
+    : isWcpl
+    // The women's marquee set. Identical to the isHundredWomen list ABOVE except for one
+    // deliberate omission: 'HUN' is EXCLUDED. The Hundred is a 100-ball competition played on a
+    // systematically lower FP scale, and unlike the Hundred build — whose TARGET scale IS the
+    // Hundred, so its own rows are the on-scale ones — the target scale here is the 20-over one.
+    // Counting HUN rows would therefore silently DEFLATE exactly the players with the heaviest
+    // Hundred exposure: Kapp, Lanning, Bates, Matthews, Tryon. Every one of them has ample
+    // WBBL / WPL / women's-T20I history, so excluding the Hundred costs their sample nothing.
+    // (The alternative — keeping HUN and scaling it up per role, as ETPL does — is not worth the
+    // machinery for a 59-player pool where the affected players are all richly sampled elsewhere.)
+    // Note that listing 'T20' means the top-8-opposition gate does NOT bind: ALL women's T20Is
+    // count, the same call as the Hundred Women, because the women's sample is thin and gating it
+    // on opposition would starve it.
+    ? "'WCPL','WPL','T20','WBBL'"
     : isEtpl
     // The widest set here, and the ONLY one that includes BLAST and unrestricted 'T20'. Listing
     // 'T20' inside the format list means the top-8-opposition gate no longer binds — every T20I
@@ -508,6 +542,23 @@ export async function recalculateValuations(
     : "fantasy_points";
   // The discount CASE binds its own copy of the nation list, ahead of the quality clause's copy.
   const fpParams = isEtpl ? TOP_8_NATIONS : [];
+
+  // WCPL SCALE UPLIFT — the one genuinely new piece of modelling this tour needs, and the MIRROR
+  // IMAGE of the Hundred's HUNDRED_ROLE_NORM. The WCPL is a materially WEAKER competition than the
+  // WPL, the WBBL or a women's T20I against a top-8 nation: weaker attacks, weaker fielding, more
+  // cheap wickets. So the SAME player scores MORE fantasy points in it, and proxy form earned
+  // outside the league has to be scaled UP onto the WCPL scale before the two can be compared.
+  //
+  // MEASURED 4 Sep 2026 over the 36 women with >= 5 WCPL games AND >= 8 non-WCPL quality games in
+  // the last 60 months: pooled ratio of mean WCPL FP to mean non-WCPL FP = 1.183.
+  //
+  // POOLED, NOT PER-ROLE — deliberately, and this is the interesting call. The per-role ratios came
+  // out BOWL 1.147 / BAT 1.229 / AR 1.282 / WK 0.817, which looks like a story until you look at
+  // the cells: k = 4-11 players each, and the medians disagree with the means (the WK cell is four
+  // keepers and flips the sign outright). That is sampling noise wearing the costume of a role
+  // effect, and hard-coding it would move real auction money on the strength of four players. One
+  // pooled constant is the honest read of the same data, and it is what the normMult block uses.
+  const WCPL_SCALE_UPLIFT = 1.18;
   // Bilateral (T20I) AND both ODI archetypes have no league season → recent-form-heavy.
   // LPL: no 2025 edition, and its last real seasons (2024/2023) are ~1–2 yrs old, so lean recency —
   // 45% last-15 form, 20% most-recent LPL season (2024), 10% prior season (2023), 25% all-quality.
@@ -661,9 +712,11 @@ export async function recalculateValuations(
   }>;
   const t20AllMap = new Map(t20AllRows.map((r) => [r.player_id, r]));
 
-  // For the Hundred: each player's fraction of recent quality games that ARE Hundred games,
-  // used to blend the per-role scale normalization (Hundred games already on-scale; the rest
-  // scaled by HUNDRED_ROLE_NORM). Empty for non-Hundred tours.
+  // Each player's fraction of recent quality games that were played in the TOUR'S OWN format,
+  // used to blend the format-scale normalization (own-format games are already on-scale; the rest
+  // get scaled). Populated for the Hundred (fraction of HUN games, blended toward
+  // HUNDRED_ROLE_NORM) and for WCPL (fraction of WCPL games, blended toward WCPL_SCALE_UPLIFT in
+  // the opposite direction). Empty for every other tour, where normMult stays 1.
   const hunFracMap = new Map<number, number>();
   const qualNMap = new Map<number, number>(); // player -> total quality games (30mo), for shrinkage
   // Test: sample size is counted in INNINGS, not matches. A Test is up to two innings per player,
@@ -710,11 +763,16 @@ export async function recalculateValuations(
       .all(...playerIds, ...qualityParams)) as Array<{ player_id: number; n: number }>;
     for (const r of nRows) qualNMap.set(r.player_id, r.n);
   }
-  if (isHundred) {
+  if (isHundred || isWcpl) {
+    // Same query, same map, two tours — the only difference is WHICH format counts as "own".
+    // For WCPL this also fills qualNMap, which the WCPL path never reads (WCPL shrinks PER BUCKET,
+    // not on total N — see the shrinkage block), so it is harmless dead data rather than a branch
+    // worth splitting the query over.
+    const ownFmt = isWcpl ? "WCPL" : "HUN";
     const hunFracRows = await sqlite
       .prepare(
         `SELECT player_id,
-           SUM(CASE WHEN format='HUN' THEN 1 ELSE 0 END) AS hun, COUNT(*) AS tot
+           SUM(CASE WHEN format='${ownFmt}' THEN 1 ELSE 0 END) AS hun, COUNT(*) AS tot
          FROM match_performances
          WHERE player_id IN (${placeholders})
            AND format IN (${qualityList})
@@ -862,11 +920,20 @@ export async function recalculateValuations(
         etplRolePrior?.[p.role] ?? ETPL_PRIOR_FALLBACK[p.role] ?? ETPL_PRIOR_FALLBACK.BAT;
       const n = qualNMap.get(p.player_id) ?? 0;
       score1 = (n * rawScore1 + SHRINK_K * prior) / (n + SHRINK_K);
-    } else if (isLpl || isCpl) {
+    } else if (isLpl || isCpl || isWcpl) {
       // CPL uses the same PER-BUCKET shrinkage as LPL. The trigger differs slightly: CPL's season
       // buckets are populated, but a squad of 122 is full of players with a 1–3 game CPL season
       // (uncapped domestics, breakout picks, overseas cameos), and a single big score in a 1-game
       // bucket carrying 30% weight is exactly the artifact that sent S Samarawickrama to 68 EFPPM.
+      // WCPL needs it HARDEST of the three. 12 of its 59 players are uncapped local draft picks
+      // with no record at all, and a good many of the rest have a 1–3 game WCPL season on top of
+      // a thin outside record — in a 25-match league history, a 1-game season bucket carrying 30%
+      // of Score 1 is precisely the artifact this removes.
+      // The existing SHRINK_PRIOR of 40 was VERIFIED against this pool and is correct on the WCPL
+      // scale — do NOT special-case it here. Measured 4 Sep 2026: WCPL per-player mean FP 46.3,
+      // median 39.2 across the 63 players with >= 3 games, so 40 really is this league's average
+      // player, exactly as it is the LPL/CPL median. (Contrast the Test and ETPL paths, where 40
+      // was measurably the WRONG anchor and had to be replaced by a measured per-role prior.)
       score1 = computeScore1({
         last15Avg: shrinkAvg(last15?.avg_fp ?? 0, last15?.cnt ?? 0),
         last15Count: last15?.cnt ?? 0,
@@ -881,8 +948,10 @@ export async function recalculateValuations(
       score1 = rawScore1;
     }
 
-    // Hundred: convert the (mostly non-Hundred) proxy form to the D11 Hundred scale, weighted
-    // by how much of the player's recent quality history is actually Hundred. normMult=1 else.
+    // Format-scale normalization, blended by how much of the player's recent quality history is
+    // already in the tour's own format. Hundred: convert the (mostly non-Hundred) proxy form DOWN
+    // to the D11 Hundred scale. WCPL: convert non-WCPL proxy form UP to the WCPL scale. normMult=1
+    // for every other tour.
     let normMult = 1.0;
     if (isHundred) {
       const hf = hunFracMap.get(p.player_id) ?? 0;
@@ -891,6 +960,17 @@ export async function recalculateValuations(
         HUNDRED_ROLE_NORM[p.role as HundredRole] ??
         1.0;
       normMult = hf + (1 - hf) * rf;
+    } else if (isWcpl) {
+      // Exactly the same correction as HUNDRED_ROLE_NORM, pointed the other way. A player whose
+      // recent quality history is ALL WCPL is already on-scale (multiplier 1.0); a player with no
+      // WCPL history at all has her outside form scaled up by the full WCPL_SCALE_UPLIFT; anyone
+      // in between is blended by her WCPL fraction. Pooled, not per-role — see the constant.
+      // WITHOUT this the West Indian locals are systematically OVERPRICED: they are scored largely
+      // on WCPL rows that the weak league has already inflated, while the marquee overseas signings
+      // who have never played the competition — Lanning, Brits, de Klerk, Bhatia, Mlaba — are
+      // scored entirely on the tougher WPL / WBBL / T20I scale and would be marked down for it.
+      const wcplFrac = hunFracMap.get(p.player_id) ?? 0;
+      normMult = wcplFrac * 1.0 + (1 - wcplFrac) * WCPL_SCALE_UPLIFT;
     }
     const normScore1 = score1 * normMult;
 
@@ -918,6 +998,11 @@ export async function recalculateValuations(
       // Name-keyed, because CPL 2026's phased overseas rotation makes squad_number a bad proxy:
       // a "bench" number can be a first-3-games specialist and an XI number a 7-of-10 player.
       ? cplExpectedMatchesFor(p.name, p.squad_number)
+      : isWcpl
+      // Squad-number-keyed, NOT name-keyed: unlike CPL there is no phased overseas rotation to
+      // model here — everyone is available for the whole 13-day window, and the ceiling is 3
+      // league games plus at most 2 knockouts. See wcplExpectedMatches (XI 4.0 / 12th 1.2 / 0.6).
+      ? wcplExpectedMatches(p.squad_number)
       : isWomensWC
       ? getWomensExpectedMatches(p.squad_number, WC_TEAM_TIERS[p.ipl_team] ?? "C")
       : getExpectedMatches(p.squad_number);
@@ -925,7 +1010,7 @@ export async function recalculateValuations(
     // Ceiling premium: explosive players (high top-10% avg) get a boost
     const ceilData = ceilingMap.get(p.player_id);
     let ceilingBonus = 1.0;
-    const ceilAvg = ceilData ? ceilData.ceilingAvg * normMult : 0; // same Hundred-scale normalization
+    const ceilAvg = ceilData ? ceilData.ceilingAvg * normMult : 0; // same format-scale normalization
     if (ceilData && ceilAvg > finalEfppm) {
       const ceilingRatio = (ceilAvg - finalEfppm) / finalEfppm;
       const effectiveAlpha = 0.15 * Math.min(ceilData.cnt / 25, 1.0);

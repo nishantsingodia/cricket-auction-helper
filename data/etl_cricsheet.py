@@ -22,6 +22,9 @@ FOLDER_FORMAT = {
     "bbl": "BBL", "blast": "BLAST", "psl": "PSL",
     "sa20": "SA20", "ilt20": "ILT20", "cpl": "CPL",
     "wbbl": "WBBL",  # Women's Big Bash League (women-only 20-over; T20 scorer)
+    "wcpl": "WCPL",  # Women's Caribbean Premier League (women-only 20-over; T20 scorer). Own bucket
+    #                  so the WCPL 2026 auction can use it as its league-season anchor, the way
+    #                  CPL/LPL/HUN do — 25 matches, 2022-25, all Caribbean.
     "wblast": "BLAST",  # Vitality Blast Women (women's English domestic T20 — reuse BLAST code so it's
     #                     T20-scored + already excluded from EFPPM; women's rows gendered by player)
     # First-class domestic, RED BALL. cricsheet tags these match_type="MDM", which detect_format
@@ -886,7 +889,7 @@ def process_all_matches(conn: sqlite3.Connection):
 
     # Gather all JSON files
     json_files = []
-    for folder in ["ipl", "t20i", "wpl", "mlc", "hundred", "odi", "lpl", "bbl", "blast", "psl", "sa20", "ilt20", "cpl", "wbbl", "wblast",
+    for folder in ["ipl", "t20i", "wpl", "mlc", "hundred", "odi", "lpl", "bbl", "blast", "psl", "sa20", "ilt20", "cpl", "wbbl", "wblast", "wcpl",
                    # red ball: 'tests' is format-detected as TEST; cch/ssh are pinned to FC by FOLDER_FORMAT
                    "tests", "cch", "ssh"]:
         folder_path = os.path.join(RAW_DIR, folder)

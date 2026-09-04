@@ -31,6 +31,8 @@ ARCHIVES = {
     "sa20": "https://cricsheet.org/downloads/sat_json.zip",   # SA20
     "ilt20": "https://cricsheet.org/downloads/ilt_json.zip",  # International League T20 (UAE)
     "cpl": "https://cricsheet.org/downloads/cpl_json.zip",    # Caribbean Premier League
+    "wcpl": "https://cricsheet.org/downloads/wcl_json.zip",   # Women's Caribbean Premier League
+    #        NOTE the archive code is `wcl`, NOT `wcpl` (that URL 404s).
     # --- RED BALL (added Aug 2026 for the ENG v PAK Test series) ---
     "tests": "https://cricsheet.org/downloads/tests_json.zip", # All Tests (men's + women's); match_type="Test"
     # First-class domestic. cricsheet tags these match_type="MDM" (multi-day match), NOT "Test", so
