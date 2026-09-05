@@ -24,11 +24,26 @@
 
 export type Role = "BAT" | "BOWL" | "AR" | "WK";
 
+// Availability. In a 3-league-game tournament this matters MORE than anywhere else in the app: an
+// XI player is worth 4.0 games, so missing ONE fixture is a 25% haircut — bigger than most form
+// differences. International duty is the live threat, because the ICC Women's Championship runs
+// straight through the WCPL window.
+//   OUT    — will not play at all
+//   LATE1  — misses her team's FIRST league game (3.0)
+//   LATE2  — misses the first two (2.0)
+//   EARLY  — leaves before the knockouts (3.0)
+//   DOUBT  — fitness monitor; assume she misses one (3.0)
+export type Avail = "OUT" | "LATE1" | "LATE2" | "EARLY" | "DOUBT";
+export const AVAIL_MATCHES: Record<Avail, number> = {
+  OUT: 0, LATE1: 3.0, LATE2: 2.0, EARLY: 3.0, DOUBT: 3.0,
+};
+
 export interface WcplSquadPlayer {
   name: string;
   role: Role;
   overseas: boolean;
   captain?: boolean;
+  avail?: Avail;
   note?: string;
 }
 
@@ -54,10 +69,33 @@ export const WCPL_MAX_OVERSEAS_XI = 4;
 // The bench is worth very little in a 3-game league phase — there are no dead rubbers to
 // experiment in, and a squad player only plays on an injury. 12th = 1.2, 13+ = 0.6 (a small
 // positive, not 0, so a fringe player prices near the floor instead of free).
-export function wcplExpectedMatches(squadNumber: number): number {
-  if (squadNumber >= 1 && squadNumber <= WCPL_XI_SIZE) return 4.0;
-  if (squadNumber === 12) return 1.2;
-  return 0.6;
+// An `avail` flag CAPS the positional value rather than replacing it (the Hundred replaces it).
+// Replacing would be wrong here: a 14th-choice squad player who is also on international duty
+// would be PROMOTED from 0.6 to 3.0. A player is worth the lesser of "how high is she in the
+// order" and "how many games can she physically attend".
+export function wcplExpectedMatches(teamShort: string, squadNumber: number): number {
+  const positional =
+    squadNumber >= 1 && squadNumber <= WCPL_XI_SIZE ? 4.0 : squadNumber === 12 ? 1.2 : 0.6;
+  const player = WCPL_2026.find((t) => t.short === teamShort)?.players[squadNumber - 1];
+  if (player?.avail) return Math.min(positional, AVAIL_MATCHES[player.avail]);
+  return positional;
+}
+
+// Maps the seed flag onto the coarse DB availability enum the board's Availability Panel reads.
+// Consumed by build-wcpl-pool.ts at insert time AND by /api/pool/refresh-meta, which is how an
+// availability correction reaches an auction that has already been built (a pool rebuild is never
+// safe once anything is sold). Name-keyed because that is what refresh-meta has to work with.
+const AVAIL_TO_DB: Record<Avail, string> = {
+  OUT: "UNAVAILABLE", LATE1: "DOUBTFUL", LATE2: "DOUBTFUL", EARLY: "DOUBTFUL", DOUBT: "DOUBTFUL",
+};
+
+export function wcplAvailability(name: string): string {
+  for (const t of WCPL_2026) {
+    for (const p of t.players) {
+      if (p.name === name) return p.avail ? AVAIL_TO_DB[p.avail] : "FIT";
+    }
+  }
+  return "FIT";
 }
 
 // ── BARBADOS TRIDENTS ───────────────────────────────────────────────────────
@@ -105,7 +143,7 @@ export const WCPL_2026: WcplTeam[] = [
   {
     name: "Jamaica Empress", short: "JAM", color: "#FFB81C",
     players: [
-      { name: "Amy Hunter", role: "WK", overseas: true },
+      { name: "Amy Hunter", role: "WK", overseas: true, avail: "LATE1", note: "🚨 IRELAND DUTY: the 3rd ODI v England is at Worcester on 6 Sep — the same day as Jamaica's opener v Guyana. She cannot be in Barbados for it, so she misses match 1 of 3 and joins for 10 + 12 Sep. Rashada Williams keeps in the opener." },
       { name: "Meg Lanning", role: "BAT", overseas: true },
       { name: "Stafanie Taylor", role: "AR", overseas: false },
       { name: "Rashada Williams", role: "BAT", overseas: false, note: "Keeper by trade but Hunter has the gloves here; only 2 quality games in 24 months." },
@@ -125,8 +163,8 @@ export const WCPL_2026: WcplTeam[] = [
   {
     name: "Trinbago Knight Riders", short: "TKR", color: "#552583",
     players: [
-      { name: "Deandra Dottin", role: "AR", overseas: false },
-      { name: "Yastika Bhatia", role: "WK", overseas: true },
+      { name: "Deandra Dottin", role: "AR", overseas: false, note: "Medical watch item, not an availability flag: a near-collapse during the anthems at the T20 WC semi-final in early July 2026 (carried off, then batted at No.8). CWI called it a \"little medical issue\" and there has been no follow-up report since. Sources also disagree on whether she or Ramharack captains TKR — the armband is informational here, it does not touch pricing." },
+      { name: "Yastika Bhatia", role: "WK", overseas: true, note: "⚠️ KNOCKOUT-ONLY RISK, unconfirmed: named India A captain for the one-dayers v Australia A, 1st OD 20 Sep at Mohali. All three TKR league games (5, 10, 12 Sep) are clear — but Barbados→Mohali is 24-30h, so leaving after a 17 Sep final lands her the day before she captains. No NOC or partial-availability note has been published either way, so this is NOT priced in." },
       { name: "Laura Harris", role: "BAT", overseas: true, note: "52.9 avg FP over 15 WCPL games on top of 120 WBBL games — the best-sampled overseas bat here." },
       { name: "Marizanne Kapp", role: "AR", overseas: true, note: "74.4 avg FP over 55 quality games in 24 months — the most reliable non-Matthews floor in the auction." },
       { name: "Jannillea Glasgow", role: "BAT", overseas: false },

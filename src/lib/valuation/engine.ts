@@ -1002,7 +1002,7 @@ export async function recalculateValuations(
       // Squad-number-keyed, NOT name-keyed: unlike CPL there is no phased overseas rotation to
       // model here — everyone is available for the whole 13-day window, and the ceiling is 3
       // league games plus at most 2 knockouts. See wcplExpectedMatches (XI 4.0 / 12th 1.2 / 0.6).
-      ? wcplExpectedMatches(p.squad_number)
+      ? wcplExpectedMatches(p.ipl_team, p.squad_number)
       : isWomensWC
       ? getWomensExpectedMatches(p.squad_number, WC_TEAM_TIERS[p.ipl_team] ?? "C")
       : getExpectedMatches(p.squad_number);

@@ -2,6 +2,7 @@ import { withTransaction, type DbHandle } from "@/db";
 import {
   WCPL_2026,
   WCPL_NAME_ALIASES,
+  wcplAvailability,
   type WcplTeam,
 } from "./wcpl-2026";
 import { fuzzyMatchName, normName } from "@/lib/fuzzy-name-match";
@@ -37,6 +38,20 @@ interface BuildResult {
   teamBreakdown: { team: string; name: string; playerCount: number }[];
 }
 
+// Matching pool: FEMALE players with data in a WCPL-relevant format. WCPL is the league itself;
+// WPL/WBBL carry the overseas signings (Lanning, Harris, Kapp, Penna) and T20 carries the
+// internationals — women's T20Is share `format='T20'` with the men's and are separated only by
+// players.gender, which is exactly what the WHERE clause below is for.
+async function wcplCandidatePool(sqlite: DbHandle): Promise<DbPlayer[]> {
+  return (await sqlite
+    .prepare(
+      `SELECT DISTINCT p.id, p.name, p.cricsheet_id AS cricsheetId FROM players p
+       JOIN match_performances mp ON mp.player_id = p.id AND mp.format IN ('WCPL','WPL','T20','WBBL')
+       WHERE p.gender = 'female'`
+    )
+    .all()) as DbPlayer[];
+}
+
 function matchPlayer(squadName: string, pool: DbPlayer[]): number | null {
   // 1. registry cricsheet_id
   const hit = resolveByName(squadName);
@@ -58,6 +73,36 @@ function matchPlayer(squadName: string, pool: DbPlayer[]): number | null {
   return match !== null ? pool.find((p) => p.name === match)?.id ?? null : null;
 }
 
+// Squad entry -> DB player id, resolved EXACTLY as the builder does. Split out so
+// /api/pool/refresh-meta can push an availability correction into an already-built (or live)
+// pool without rebuilding it — rebuilding is never safe once anything is sold. Returns
+// playerId: null for the uncapped locals that have no DB record yet; the builder creates them,
+// refresh-meta skips them.
+export async function resolveWcplSquads(
+  sqlite: DbHandle,
+  teams: WcplTeam[] = WCPL_2026
+): Promise<Array<{
+  team: WcplTeam;
+  sp: WcplTeam["players"][number];
+  sn: number;
+  playerId: number | null;
+}>> {
+  const pool = await wcplCandidatePool(sqlite);
+  const rows: Array<{
+    team: WcplTeam;
+    sp: WcplTeam["players"][number];
+    sn: number;
+    playerId: number | null;
+  }> = [];
+  for (const team of teams) {
+    let sn = 1;
+    for (const sp of team.players) {
+      rows.push({ team, sp, sn: sn++, playerId: matchPlayer(sp.name, pool) });
+    }
+  }
+  return rows;
+}
+
 export async function buildWCPLPool(
   sqlite: DbHandle,
   opts: {
@@ -68,17 +113,7 @@ export async function buildWCPLPool(
 ): Promise<BuildResult> {
   const teams = opts.teams ?? WCPL_2026;
 
-  // Matching pool: FEMALE players with data in a WCPL-relevant format. WCPL is the league itself;
-  // WPL/WBBL carry the overseas signings (Lanning, Harris, Kapp, Penna) and T20 carries the
-  // internationals — women's T20Is share `format='T20'` with the men's and are separated only by
-  // players.gender, which is exactly what the WHERE clause below is for.
-  const pool = await sqlite
-    .prepare(
-      `SELECT DISTINCT p.id, p.name, p.cricsheet_id AS cricsheetId FROM players p
-       JOIN match_performances mp ON mp.player_id = p.id AND mp.format IN ('WCPL','WPL','T20','WBBL')
-       WHERE p.gender = 'female'`
-    )
-    .all() as DbPlayer[];
+  const pool = await wcplCandidatePool(sqlite);
 
   const result: BuildResult = {
     teams: 0, players: 0, matched: 0, created: 0, unmatched: [], teamBreakdown: [],
@@ -123,12 +158,14 @@ export async function buildWCPLPool(
 
         const efppmRow = (await getEfppm.get(playerId)) as { avg_fantasy_points: number } | undefined;
         const sn = squadNumber++;
-        // WcplSquadPlayer has no `avail` flag — nobody in these squads is flagged out or late,
-        // so everyone is FIT with an empty news note. The seed `note` still rides along in
-        // risk_note (the overseas-cap benchings, the thin-sample warnings) for the player modal.
+        // Availability rides in two columns: the coarse enum the board's Availability Panel reads,
+        // and the reason as a news note. risk_note keeps carrying every seed note regardless
+        // (overseas-cap benchings, thin-sample warnings) for the player modal.
+        const dbAvail = wcplAvailability(sp.name);
+        const newsNote = sp.avail ? (sp.note ?? "") : "";
         await insertPool.run(
           opts.tournamentId, playerId, 0, opts.auctionId,
-          team.short, sn, efppmRow?.avg_fantasy_points || 0, sp.note ?? "", "FIT", ""
+          team.short, sn, efppmRow?.avg_fantasy_points || 0, sp.note ?? "", dbAvail, newsNote
         );
       }
       result.teams++;

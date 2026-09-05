@@ -4,6 +4,8 @@ import { CPL_2026_NAME, cplAvailability } from "@/lib/squads/cpl-2026";
 import { resolveCplSquads } from "@/lib/squads/build-cpl-pool";
 import { ETPL_2026_NAME } from "@/lib/squads/etpl-2026";
 import { resolveEtplSquads } from "@/lib/squads/build-etpl-pool";
+import { WCPL_2026_NAME, wcplAvailability } from "@/lib/squads/wcpl-2026";
+import { resolveWcplSquads } from "@/lib/squads/build-wcpl-pool";
 
 // POST /api/pool/refresh-meta  { auctionId }
 //
@@ -49,7 +51,11 @@ export async function POST(request: NextRequest) {
     // which reshuffled the whole Amsterdam XI). Note this route stays METADATA-ONLY by contract —
     // it will not move squad_number. Use POST /api/pool/reorder for an XI change, which is the
     // purpose-built route and re-values on its own.
-    const supported = [CPL_2026_NAME, ETPL_2026_NAME];
+    // WCPL 2026 needs this most of the three. Its squads were locked days before the first ball
+    // while the ICC Women's Championship was still running, so international withdrawals and late
+    // arrivals land DURING the auction window — and with only 3 league games each, one missed
+    // fixture is a 25% cut to a player's expected matches, which is larger than most form gaps.
+    const supported = [CPL_2026_NAME, ETPL_2026_NAME, WCPL_2026_NAME];
     if (!supported.includes(auction.tournament_name)) {
       return NextResponse.json(
         { error: `refresh-meta supports ${supported.join(" and ")} only` },
@@ -57,6 +63,7 @@ export async function POST(request: NextRequest) {
       );
     }
     const isEtpl = auction.tournament_name === ETPL_2026_NAME;
+    const isWcpl = auction.tournament_name === WCPL_2026_NAME;
     if (!auction.tournament_id) {
       return NextResponse.json({ error: "auction has no pool yet — fetch the pool first" }, { status: 400 });
     }
@@ -64,10 +71,18 @@ export async function POST(request: NextRequest) {
     // squad entry -> player_id, resolved exactly as the matching builder does
     const resolved = isEtpl
       ? await resolveEtplSquads(sqlite)
+      : isWcpl
+      ? await resolveWcplSquads(sqlite)
       : await resolveCplSquads(sqlite);
     const noteByPlayerId = new Map<number, string>();
+    // WCPL resolves availability by PLAYER ID, not by the DB name string cplAvailability takes:
+    // the squad file is keyed on announced names ("Amy Hunter") while the pool row carries the
+    // cricsheet spelling ("A Hunter"), and this map is the only place both are in hand.
+    const availByPlayerId = new Map<number, string>();
     for (const r of resolved) {
-      if (r.playerId !== null) noteByPlayerId.set(r.playerId, r.sp.note ?? "");
+      if (r.playerId === null) continue;
+      noteByPlayerId.set(r.playerId, r.sp.note ?? "");
+      if (isWcpl) availByPlayerId.set(r.playerId, wcplAvailability(r.sp.name));
     }
 
     const poolRows = await sqlite
@@ -100,7 +115,11 @@ export async function POST(request: NextRequest) {
         const wantNote = noteByPlayerId.get(row.player_id) ?? "";
         // ETPL encodes availability in the note text and in etplExpectedMatchesFor, not in an
         // availability tag, so there is nothing to sync for it — leave the column untouched.
-        const wantAvail = isEtpl ? row.availability : cplAvailability(row.name);
+        const wantAvail = isEtpl
+          ? row.availability
+          : isWcpl
+          ? availByPlayerId.get(row.player_id) ?? "FIT"
+          : cplAvailability(row.name);
 
         // risk_note: the squad file is authoritative. Only hold back if asked to.
         const looksMachine =
@@ -142,7 +161,7 @@ export async function POST(request: NextRequest) {
           r.team.short,
           r.sn,
           r.sp.note ?? "",
-          isEtpl ? "FIT" : cplAvailability(r.sp.name)
+          isEtpl ? "FIT" : isWcpl ? wcplAvailability(r.sp.name) : cplAvailability(r.sp.name)
         );
         added.push(`${r.team.short}/${r.sp.name}`);
       }
