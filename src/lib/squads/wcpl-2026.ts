@@ -57,12 +57,14 @@ export interface WcplTeam {
 export const WCPL_2026_NAME = "WCPL 2026";
 export const WCPL_XI_SIZE = 11;
 
-// ⚠️ ASSUMPTION — OVERSEAS CAP IN THE XI = 4. The WCPL playing conditions do not state it in any
-// source found on 4 Sep 2026, but Barbados signed exactly 4 overseas while the other three signed
-// 5, which is what a 4-in-the-XI rule looks like. The XIs below therefore bench one overseas
-// player at GUY (Burns), JAM (Aroob Shah) and TKR (Penna). If the cap turns out to be 5, promote
-// them on the board — the XI edit re-values automatically.
-export const WCPL_MAX_OVERSEAS_XI = 4;
+// OVERSEAS CAP IN THE XI = 5. Corrected 5 Sep 2026 — the first cut assumed 4 (no published source
+// stated it, and Barbados having signed only 4 while the others signed 5 looked like a 4-in-the-XI
+// rule; it is not, Barbados simply signed one fewer). At 5, every overseas signing in the
+// tournament plays: Burns (GUY), Aroob Shah (JAM) and Penna (TKR) move into their XIs and an
+// uncapped local drops out of each. This is a big correction — an XI slot is 4.0 expected matches
+// against a bench slot's 1.2, so Burns in particular (104.2 avg FP over 9 WCPL games) was heavily
+// underpriced while benched.
+export const WCPL_MAX_OVERSEAS_XI = 5;
 
 // Expected matches. 3 league games for everyone; the knockouts add 4 team-slots (playoff 2 +
 // final 2) spread over 4 teams, i.e. ~1 more game for an average team => XI = 4.0.
@@ -133,8 +135,8 @@ export const WCPL_2026: WcplTeam[] = [
       { name: "Sheneta Grimmond", role: "BOWL", overseas: false },
       { name: "Shamilia Connell", role: "BOWL", overseas: false },
       { name: "Shabnim Ismail", role: "BOWL", overseas: true, note: "92.4 avg FP over 9 WCPL games — the highest of any bowler in WCPL history." },
-      { name: "Tilleya Madramootoo", role: "BAT", overseas: false, note: "Uncapped local draft pick — no record in the DB, prices at baseline. Role unverified." },
-      { name: "Erin Burns", role: "BAT", overseas: true, note: "⚠️ 5th overseas: benched under the assumed 4-overseas XI cap DESPITE a 104.2 avg over 9 WCPL games. If the cap is 5, or Nation is dropped, she is the biggest single lineup swing in this auction — promote her on the board and re-value." },
+      { name: "Erin Burns", role: "BAT", overseas: true, note: "5th overseas and she PLAYS — 104.2 avg FP over 9 WCPL games, the highest of any batter in the league's history. Was benched in the first cut under a wrong 4-overseas assumption." },
+      { name: "Tilleya Madramootoo", role: "BAT", overseas: false, note: "Uncapped local draft pick — no record in the DB, prices at baseline. Role unverified. Drops out of the XI now that all 5 overseas play." },
       { name: "Reniece Boyce", role: "WK", overseas: false },
       { name: "Latoya Williams", role: "AR", overseas: false, note: "Uncapped local draft pick — no record in the DB, prices at baseline. Role unverified." },
       { name: "Eboni Brathwaite", role: "BAT", overseas: false },
@@ -153,8 +155,8 @@ export const WCPL_2026: WcplTeam[] = [
       { name: "Rosemary Mair", role: "BOWL", overseas: true },
       { name: "Nonkululeko Mlaba", role: "BOWL", overseas: true },
       { name: "Kate Wilmott", role: "BOWL", overseas: false, note: "Uncapped local draft pick — no record in the DB, prices at baseline. Role unverified." },
-      { name: "Shriya Jairam", role: "BOWL", overseas: false, note: "Uncapped local draft pick — no record in the DB, prices at baseline. Role unverified." },
-      { name: "Syeda Aroob Shah", role: "BOWL", overseas: true, note: "⚠️ 5th overseas — benched under the assumed 4-overseas XI cap." },
+      { name: "Syeda Aroob Shah", role: "BOWL", overseas: true, note: "5th overseas and she PLAYS. Named an Asian Games RESERVE for Pakistan (17-22 Sep) — that can only touch the 16/17 Sep knockouts, never the group games, and no call-up has been reported, so it is not priced in." },
+      { name: "Shriya Jairam", role: "BOWL", overseas: false, note: "Uncapped local draft pick — no record in the DB, prices at baseline. Role unverified. Drops out of the XI now that all 5 overseas play." },
       { name: "Djenaba Joseph", role: "BAT", overseas: false },
       { name: "Celina Whyte", role: "BAT", overseas: false, note: "Uncapped local draft pick — no record in the DB, prices at baseline. Role unverified." },
       { name: "Abigail Bryce", role: "BAT", overseas: false, note: "Uncapped local draft pick — no record in the DB, prices at baseline. Role unverified." },
@@ -173,8 +175,8 @@ export const WCPL_2026: WcplTeam[] = [
       { name: "Shikha Pandey", role: "BOWL", overseas: true },
       { name: "Samara Ramnath", role: "BOWL", overseas: false },
       { name: "Jahzara Claxton", role: "BOWL", overseas: false },
-      { name: "Brianna Harricharan", role: "BAT", overseas: false, note: "Uncapped local draft pick — no record in the DB, prices at baseline. Role unverified." },
-      { name: "Madeline Penna", role: "BOWL", overseas: true, note: "⚠️ 5th overseas — benched under the assumed 4-overseas XI cap." },
+      { name: "Madeline Penna", role: "BOWL", overseas: true, note: "5th overseas and she PLAYS. Leg-spinner, 83 WBBL games. NOT in the Australia A squad touring India this month — that was 2025, a trap the search results conflate." },
+      { name: "Brianna Harricharan", role: "BAT", overseas: false, note: "Uncapped local draft pick — no record in the DB, prices at baseline. Role unverified. Drops out of the XI now that all 5 overseas play." },
       { name: "Earnisha Fontaine", role: "BAT", overseas: false, note: "Uncapped local draft pick — no record in the DB, prices at baseline. Role unverified." },
       { name: "Amelia Khan", role: "BOWL", overseas: false, note: "Uncapped local draft pick — no record in the DB, prices at baseline. Role unverified." },
       { name: "Sainavi Kambapalli", role: "BOWL", overseas: false, note: "Uncapped local draft pick — no record in the DB, prices at baseline. Role unverified." },
