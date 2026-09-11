@@ -32,6 +32,7 @@ import {
   ENG_VS_PAK_TEST_2026_NAME,
   ENG_PAK_TEST_VENUES,
 } from "@/lib/squads/eng-vs-pak-test-2026";
+import { ENG_SL_IND_AFG_T20_2026_NAME } from "@/lib/squads/eng-sl-ind-afg-t20-2026";
 import { canonicalVenue } from "@/lib/registry/venues";
 import {
   CPL_2026_NAME,
@@ -108,6 +109,11 @@ export const VENUE_PROFILES: Record<string, VenueProfile> = {
     style: "pace", pace: 4, swing: 3, turn: 3,
     note: "True surface with pace and bounce — among the better batting decks in the pool; spin gets some grip later in the innings.",
   },
+  // — ENG v SL + IND v AFG twin T20I tour: the three English grounds above are reused; Delhi is new —
+  "Arun Jaitley Stadium, Delhi": {
+    style: "spin", pace: 2, swing: 2, turn: 4,
+    note: "Small, dry Delhi ground with short straight boundaries — high-scoring, but the surface is slow and grips, so wrist spin and change-of-pace do the damage. September heat leaves it drier still.",
+  },
   // — LPL: Sri Lankan grounds (subcontinent — slow, low, spin-dominant; evening dew a factor) —
   "Sinhalese Sports Club Ground, Colombo": {
     style: "spin", pace: 2, swing: 2, turn: 5,
@@ -126,6 +132,28 @@ export const VENUE_PROFILES: Record<string, VenueProfile> = {
     note: "Playoffs venue — two-paced surface with spin assistance; heavy evening dew makes chasing easier under lights.",
   },
 };
+
+// ENG v SL + IND v AFG twin T20I tour, Sep 2026. `variants` matter: cricsheet renamed the English
+// grounds ~2021 by appending the city, so the pre- and post-rename spellings must be merged or a
+// famous ground reads as a 3-match sample. (The shared venue registry already merges these three
+// pairs; they are listed explicitly anyway, because `variants` is what /api/venues queries with.)
+// `type` here is only a seed — withBatIndex DERIVES the real label from the measured index.
+//
+// NOTE: Delhi's pre-2019 history sits under a SEPARATE registry entry, "Feroz Shah Kotla" (80
+// matches) — the same ground before it was renamed, not merged by build_venue_registry.py. It is
+// left out because the Bat Index window is 2-4 years, so those rows would be excluded regardless;
+// worth merging in the generator if a future tour needs Delhi's long history.
+export const TWIN_T20_VENUES: Array<{
+  canonical: string;
+  variants: string[];
+  type: VenueType;
+  country: "ENG" | "IND";
+}> = [
+  { canonical: "The Rose Bowl, Southampton", variants: ["The Rose Bowl", "The Rose Bowl, Southampton"], type: "balanced", country: "ENG" },
+  { canonical: "Sophia Gardens, Cardiff", variants: ["Sophia Gardens", "Sophia Gardens, Cardiff"], type: "balanced", country: "ENG" },
+  { canonical: "Old Trafford, Manchester", variants: ["Old Trafford", "Old Trafford, Manchester"], type: "balanced", country: "ENG" },
+  { canonical: "Arun Jaitley Stadium, Delhi", variants: ["Arun Jaitley Stadium", "Arun Jaitley Stadium, Delhi"], type: "bat_road", country: "IND" },
+];
 
 // ── Tour context ───────────────────────────────────────────────────────────────
 
@@ -223,6 +251,7 @@ export async function getTourVenueContext(tournamentName: string): Promise<TourV
   const isLpl = tournamentName === LPL_2026_NAME;
   const isCpl = tournamentName === CPL_2026_NAME;
   const isEngPakTest = tournamentName === ENG_VS_PAK_TEST_2026_NAME;
+  const isTwinT20 = tournamentName === ENG_SL_IND_AFG_T20_2026_NAME;
 
   if (isHundredMen || isHundredWomen) {
     const teams = isHundredMen ? HUNDRED_MEN_2026 : HUNDRED_WOMEN_2026;
@@ -292,6 +321,57 @@ export async function getTourVenueContext(tournamentName: string): Promise<TourV
       homeOf: CPL_VENUE_BASIS === "tournament"
         ? Object.fromEntries(Object.keys(CPL_TEAM_SCHEDULE).map((t) => [t, null]))
         : homeOf,
+    };
+  }
+
+  if (isTwinT20) {
+    // Four grounds across two series, and the two halves of the pool never share one: ENG and SL
+    // play Southampton -> Cardiff -> Old Trafford, IND and AFG play all three in Delhi. So this is
+    // a real per-team schedule, not a festival — `neutral` is false, but no side has a home ground
+    // in any meaningful sense (England are nominally home in all three English matches, yet the
+    // series is three grounds in five days), so homeOf is null throughout and the header shows the
+    // schedule instead.
+    //
+    // Giving this tour a context at all is not cosmetic. /api/auction/[id] falls back to a full
+    // IPL+T20 venue scan (~151k rows) whenever getTourVenueContext returns null, on every single
+    // board load — that fallback was the largest rows-read consumer on the Turso account. The
+    // single-series bilaterals still take it; this one does not.
+    const engSchedule = TWIN_T20_VENUES.filter((v) => v.country === "ENG").map((v) => ({
+      venue: v.canonical,
+      games: 1,
+    }));
+    const delhiSchedule = [{ venue: "Arun Jaitley Stadium, Delhi", games: 3 }];
+    return {
+      tour: tournamentName,
+      neutral: false,
+      gender: "male",
+      // Men's T20Is alone are thin at these grounds (6-9 at each English one), so the venue read
+      // pools the domestic/franchise 20-over cricket played on the same squares: Blast and Hundred
+      // in England, IPL in Delhi. Same reasoning as the Hundred's ["HUN","T20"].
+      venueFormats: ["T20", "IPL", "BLAST", "HUN"],
+      venueWindowMonths: 30,
+      ...(await (async () => {
+        const d = await withBatIndex(
+          TWIN_T20_VENUES.map((v) => ({
+            canonical: v.canonical,
+            variants: v.variants,
+            type: v.type,
+          })),
+          "male"
+        );
+        return {
+          venues: d.venues,
+          batIndexMedian: d.batIndexMedian,
+          batIndexByGround: d.batIndexByGround,
+        };
+      })()),
+      teamSchedule: {
+        ENG: engSchedule,
+        SL: engSchedule,
+        IND: delhiSchedule,
+        AFG: delhiSchedule,
+      },
+      homeOf: { ENG: null, SL: null, IND: null, AFG: null },
     };
   }
 

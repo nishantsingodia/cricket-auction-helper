@@ -11,6 +11,11 @@ import {
   bilateralExpectedMatches,
 } from "@/lib/squads/ind-vs-eng-t20-2026";
 import {
+  ENG_SL_IND_AFG_T20_2026_NAME,
+  twinT20ExpectedMatches,
+  twinOppositionFactor,
+} from "@/lib/squads/eng-sl-ind-afg-t20-2026";
+import {
   ENG_VS_PAK_TEST_2026_NAME,
   testExpectedMatches,
 } from "../squads/eng-vs-pak-test-2026";
@@ -418,6 +423,22 @@ export async function recalculateValuations(
   // would be the same constant for all 59 players and carries ZERO relative signal. Same call as
   // ETPL, and it is why isWcpl appears in no venue path anywhere in this file.
   const isWcpl = tournamentRow?.name === WCPL_2026_NAME;
+  // ENG v SL + IND v AFG T20I 2026: ONE pool spanning TWO concurrent 3-match bilateral T20I series.
+  // Bilateral in every respect that a single series is — no league season, so the 60/40 recency
+  // weights apply, and expected matches is a flat 3/1 — plus the two things that only a
+  // multi-series pool needs:
+  //   (a) an OPPOSITION FACTOR, because England's runs come against Sri Lanka and Sri Lanka's
+  //       against England, and with one shared purse that difference no longer cancels out. It is
+  //       applied through normMult, the same slot the Hundred and WCPL scale corrections use, so it
+  //       reaches the ceiling premium consistently instead of only the headline EFPPM.
+  //   (b) the ETPL QUALITY SET rather than the bilateral 'MLC','IPL' one. This is NOT a preference:
+  //       cricsheet withholds every Afghanistan men's match as policy, so the whole AFG squad has
+  //       no T20I record here and is carried entirely by franchise-league rows. Under the standard
+  //       gate all 15 sit at baseline 20. The ETPL set also brings BLAST/HUN, which is what the
+  //       England fringe (Banton, Cox, Donald, Coles, Baker) actually plays, and its weak-opposition
+  //       discount + Hundred scale uplift come along with it — both wanted here for the same reasons.
+  // Venue is display-only for every tour now (finalEfppm = normScore1), so no venue path is needed.
+  const isTwinT20 = tournamentRow?.name === ENG_SL_IND_AFG_T20_2026_NAME;
   // ENG v PAK 2026: the first RED-BALL tour. Scored purely on Test form ('TEST'), which is a
   // different points scale entirely (2 innings, +20 a wicket, no rate bonuses) — so nothing
   // white-ball may leak into it, in either direction. No league season, so the bilateral
@@ -477,7 +498,7 @@ export async function recalculateValuations(
     // count, the same call as the Hundred Women, because the women's sample is thin and gating it
     // on opposition would starve it.
     ? "'WCPL','WPL','T20','WBBL'"
-    : isEtpl
+    : isEtpl || isTwinT20
     // The widest set here, and the ONLY one that includes BLAST and unrestricted 'T20'. Listing
     // 'T20' inside the format list means the top-8-opposition gate no longer binds — every T20I
     // counts, associate fixtures included, because for half this pool that IS the entire record.
@@ -537,11 +558,11 @@ export async function recalculateValuations(
     ` WHEN 'BOWL' THEN ${ETPL_HUNDRED_UPLIFT.BOWL}` +
     ` ELSE ${ETPL_HUNDRED_UPLIFT_FALLBACK} END) ELSE 1 END)`;
 
-  const fpExpr = isEtpl
+  const fpExpr = isEtpl || isTwinT20
     ? etplFpExpr("(SELECT role FROM players WHERE id = match_performances.player_id)")
     : "fantasy_points";
   // The discount CASE binds its own copy of the nation list, ahead of the quality clause's copy.
-  const fpParams = isEtpl ? TOP_8_NATIONS : [];
+  const fpParams = isEtpl || isTwinT20 ? TOP_8_NATIONS : [];
 
   // WCPL SCALE UPLIFT — the one genuinely new piece of modelling this tour needs, and the MIRROR
   // IMAGE of the Hundred's HUNDRED_ROLE_NORM. The WCPL is a materially WEAKER competition than the
@@ -563,7 +584,7 @@ export async function recalculateValuations(
   // LPL: no 2025 edition, and its last real seasons (2024/2023) are ~1–2 yrs old, so lean recency —
   // 45% last-15 form, 20% most-recent LPL season (2024), 10% prior season (2023), 25% all-quality.
   const score1Weights =
-    isBilateral || isWomensOdi || isMensOdi || isTest
+    isBilateral || isTwinT20 || isWomensOdi || isMensOdi || isTest
       ? [0.60, 0, 0, 0.40]
       : isLpl
       ? [0.45, 0.20, 0.10, 0.25]
@@ -971,6 +992,22 @@ export async function recalculateValuations(
       // scored entirely on the tougher WPL / WBBL / T20I scale and would be marked down for it.
       const wcplFrac = hunFracMap.get(p.player_id) ?? 0;
       normMult = wcplFrac * 1.0 + (1 - wcplFrac) * WCPL_SCALE_UPLIFT;
+    } else if (isTwinT20) {
+      // OPPOSITION FACTOR — the one piece of modelling a multi-series pool needs that a
+      // single-series one does not. Score 1 measures a player's output against his historical mix
+      // of opponents; what he will actually be paid for is output against ONE specific side. In a
+      // single bilateral that distinction is a constant and cancels out of the relative pricing.
+      // Here it does not: England bat against Sri Lanka while Sri Lanka bat against England, and
+      // both sets of points are bought from the same purse.
+      //
+      // It rides in normMult rather than being multiplied onto finalEfppm directly so that the
+      // ceiling premium below (which scales ceilAvg by normMult) sees the same adjustment — apply
+      // it to only one of the two and a player's ceiling ratio is quietly distorted.
+      //
+      // Measured within-player; ~+4% for ENG and IND, ~-4% for SL and AFG. Afghanistan's own
+      // difficulty is unmeasurable (cricsheet withholds their matches) and is set neutral. See
+      // twinOppositionFactor.
+      normMult = twinOppositionFactor(p.ipl_team);
     }
     const normScore1 = score1 * normMult;
 
@@ -983,6 +1020,11 @@ export async function recalculateValuations(
       ? testExpectedMatches(p.squad_number)
       : isBilateral
       ? bilateralExpectedMatches(p.squad_number)
+      : isTwinT20
+      // Flat 3 / 1: both series are 3 matches, so the XI plays all three either way. No dead
+      // rubber to rotate in (the 5-match archetype's bench of 2 assumes one), and no phased
+      // overseas availability to model, so squad_number is the whole story.
+      ? twinT20ExpectedMatches(p.squad_number)
       : isWomensOdi
       ? odiExpectedMatches(p.squad_number)
       : isMensOdi

@@ -85,6 +85,13 @@ export default function HomePage() {
       note: "5-match bilateral T20I · recent T20I + IPL form, bowl-leaning venues",
     },
     {
+      // The id MUST equal ENG_SL_IND_AFG_T20_2026_NAME — /api/pool/fetch branches on tournament_name.
+      id: "ENG v SL + IND v AFG T20I 2026",
+      label: "ENG v SL + IND v AFG T20I 2026",
+      format: "T20",
+      note: "TWIN bilateral \u00b7 2 concurrent 3-match T20I series, 4 teams, one purse \u00b7 opposition-adjusted, widest quality gate (AFG have no cricsheet T20I data)",
+    },
+    {
       id: "The Hundred Men 2026",
       label: "The Hundred Men 2026",
       format: "T20",

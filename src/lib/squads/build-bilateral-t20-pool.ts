@@ -33,7 +33,22 @@ interface BuildResult {
   teamBreakdown: { team: string; name: string; playerCount: number }[];
 }
 
-function matchPlayer(squadName: string, pool: DbPlayer[]): number | null {
+function matchPlayer(
+  squadName: string,
+  pool: DbPlayer[],
+  opts: { aliases: Record<string, string>; csidBridge?: Record<string, string>; noFuzzy?: boolean }
+): number | null {
+  // 0. Explicit cricsheet_id bridge, keyed on the EXACT announced name. Takes precedence over
+  //    everything, including the registry: it is a hand-verified identity for a squad the
+  //    registry does not cover yet. Used by the twin-bilateral tour, where name matching is
+  //    actively dangerous (three "Rashid Khan" rows, etc. — see ENG_SL_IND_AFG_CSID).
+  const bridged = opts.csidBridge?.[squadName];
+  if (bridged) {
+    const byBridge = pool.find((p) => p.cricsheetId === bridged);
+    if (byBridge) return byBridge.id;
+    // A bridge that resolves to nothing is a DATA error, not a reason to go guessing by name.
+    return null;
+  }
   // 1. Registry-FIRST: deterministic cricsheet_id identity (same identity the points
   //    sheet & draft use), before any fuzzy logic.
   const hit = resolveByName(squadName);
@@ -43,13 +58,14 @@ function matchPlayer(squadName: string, pool: DbPlayer[]): number | null {
   }
   // 2. Exact alias spelling — an alias is the EXACT DB spelling, matched exactly before
   //    any fuzzy logic (so the surname-only fallback can't grab a same-surname player).
-  const alias = IND_ENG_NAME_ALIASES[normName(squadName)];
+  const alias = opts.aliases[normName(squadName)];
   if (alias) {
     const target = normName(alias);
     const exact = pool.find((p) => normName(p.name) === target);
     if (exact) return exact.id;
   }
-  // 3. Fuzzy fallback.
+  // 3. Fuzzy fallback — suppressed for squads where a surname match is a known hazard.
+  if (opts.noFuzzy) return null;
   const resolved = alias ?? squadName;
   const match = fuzzyMatchName(resolved, pool.map((p) => p.name));
   return match !== null ? pool.find((p) => p.name === match)?.id ?? null : null;
@@ -57,19 +73,39 @@ function matchPlayer(squadName: string, pool: DbPlayer[]): number | null {
 
 export async function buildBilateralT20Pool(
   sqlite: DbHandle,
-  opts: { auctionId: number; tournamentId: number; teams?: BilateralTeam[] }
+  opts: {
+    auctionId: number;
+    tournamentId: number;
+    teams?: BilateralTeam[];
+    /** normName-keyed announced -> exact DB spelling. Defaults to the IND v ENG map. */
+    aliases?: Record<string, string>;
+    /** Exact announced name -> cricsheet_id. Hand-verified; beats registry and alias. */
+    csidBridge?: Record<string, string>;
+    /**
+     * Formats the CANDIDATE pool is drawn from. Defaults to IPL + T20I, which is right for a
+     * two-top-8-nation series. A squad whose record lives in other franchise leagues (Afghanistan,
+     * whose T20Is cricsheet withholds) MUST widen this, or those players are absent from the
+     * candidate set and get re-created as statless duplicates despite being in the DB.
+     */
+    matchFormats?: string[];
+    /** Disable the surname fuzzy fallback for squads where it steals a namesake. */
+    noFuzzy?: boolean;
+  }
 ): Promise<BuildResult> {
   const teams = opts.teams ?? IND_VS_ENG_T20_2026;
+  const aliases = opts.aliases ?? IND_ENG_NAME_ALIASES;
+  const matchFormats = opts.matchFormats ?? ["IPL", "T20"];
 
-  // Matching pool: every men's player with IPL/T20I MATCH data (not career_stats — so a
-  // data-rich player is never missed even if their career_stats row is absent).
+  // Matching pool: every men's player with MATCH data in the relevant formats (not career_stats —
+  // so a data-rich player is never missed even if their career_stats row is absent).
+  const fmtPlaceholders = matchFormats.map(() => "?").join(",");
   const pool = await sqlite
     .prepare(
       `SELECT DISTINCT p.id, p.name, p.cricsheet_id AS cricsheetId FROM players p
-       JOIN match_performances mp ON mp.player_id = p.id AND mp.format IN ('IPL','T20')
+       JOIN match_performances mp ON mp.player_id = p.id AND mp.format IN (${fmtPlaceholders})
        WHERE p.gender != 'female' OR p.gender IS NULL`
     )
-    .all() as DbPlayer[];
+    .all(...matchFormats) as DbPlayer[];
 
   const result: BuildResult = {
     teams: 0, players: 0, matched: 0, created: 0, unmatched: [], teamBreakdown: [],
@@ -85,10 +121,29 @@ export async function buildBilateralT20Pool(
       `INSERT INTO players (name, country, role, is_overseas, gender)
      VALUES (?, ?, ?, 0, 'male')`
     );
+    // Before creating a statless newcomer, reuse the one an EARLIER build already created for the
+    // same name. Deliberately narrow: it only ever matches a row with no match data at all, so it
+    // can reuse our own prior insert but can never latch onto a real player who happens to share a
+    // spelling. Two things go wrong without it:
+    //   - re-fetching a pool (or rebuilding one) silently duplicates every unmatched player in
+    //     `players`, which is REFERENCE data — measured: 4 dupes per rebuild on this tour.
+    //   - `players` is local-master but the pool is built cloud-side, so a cloud-created statless
+    //     row is invisible to the laptop and the next turso:sync replaces `players` without it,
+    //     leaving cloud auction_pool rows pointing at nothing. (The sync's orphan guard catches
+    //     that and aborts, which is safe but means a blocked sync instead of a working board.)
+    const findStatless = tx.prepare(
+      `SELECT id FROM players
+        WHERE name = ? AND (gender != 'female' OR gender IS NULL)
+          AND NOT EXISTS (SELECT 1 FROM match_performances m WHERE m.player_id = players.id)
+        ORDER BY id LIMIT 1`
+    );
     // Initial efppm hint (engine recomputes the real blended value on auction/start).
+    // Scoped to the same formats as the candidate pool, so an Afghan player whose record is all
+    // ILT20/SA20 gets a real hint instead of 0 (and a momentary ₹0 on the board before the
+    // valuation pass that /api/pool/fetch runs at the end of this call).
     const getEfppm = tx.prepare(
       `SELECT avg_fantasy_points FROM career_stats
-     WHERE player_id = ? AND format IN ('T20','IPL')
+     WHERE player_id = ? AND format IN (${fmtPlaceholders})
      ORDER BY CASE format WHEN 'T20' THEN 1 WHEN 'IPL' THEN 2 ELSE 3 END
      LIMIT 1`
     );
@@ -97,18 +152,29 @@ export async function buildBilateralT20Pool(
       let squadNumber = 1;
       for (const sp of team.players) {
         result.players++;
-        let playerId = matchPlayer(sp.name, pool);
+        let playerId = matchPlayer(sp.name, pool, {
+          aliases,
+          csidBridge: opts.csidBridge,
+          noFuzzy: opts.noFuzzy,
+        });
         if (playerId) {
           result.matched++;
         } else {
-          const ins = await insertPlayer.run(sp.name, team.country, sp.role);
-          playerId = Number(ins.lastInsertRowid);
+          const existing = (await findStatless.get(sp.name)) as { id: number } | undefined;
+          if (existing) {
+            playerId = existing.id;
+          } else {
+            const ins = await insertPlayer.run(sp.name, team.country, sp.role);
+            playerId = Number(ins.lastInsertRowid);
+          }
           result.created++;
           result.unmatched.push({ team: team.short, name: sp.name });
           pool.push({ id: playerId, name: sp.name, cricsheetId: null }); // avoid re-creating dupes
         }
 
-        const efppmRow = (await getEfppm.get(playerId)) as { avg_fantasy_points: number } | undefined;
+        const efppmRow = (await getEfppm.get(playerId, ...matchFormats)) as
+          | { avg_fantasy_points: number }
+          | undefined;
         const sn = squadNumber++;
         await insertPool.run(
           opts.tournamentId, playerId, 0, opts.auctionId,

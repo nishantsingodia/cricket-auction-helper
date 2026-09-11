@@ -21,6 +21,12 @@ import {
 } from "@/lib/squads/ind-vs-eng-t20-2026";
 import { buildBilateralT20Pool } from "@/lib/squads/build-bilateral-t20-pool";
 import {
+  ENG_SL_IND_AFG_T20_2026,
+  ENG_SL_IND_AFG_T20_2026_NAME,
+  ENG_SL_IND_AFG_CSID,
+  TWIN_MATCH_FORMATS,
+} from "@/lib/squads/eng-sl-ind-afg-t20-2026";
+import {
   IRE_VS_WI_W_ODI_2026,
   IRE_VS_WI_W_ODI_2026_NAME,
 } from "@/lib/squads/ire-wi-w-odi-2026";
@@ -193,6 +199,67 @@ export async function POST(request: NextRequest) {
         : undefined;
 
       const built = await buildBilateralT20Pool(sqlite, { auctionId, tournamentId, teams });
+      if (isFirstBuild)
+        await carryOverPreviousLineups({
+          tournamentName: auctionRow.tournament_name,
+          tournamentId,
+          auctionId,
+        });
+      await initializeValuations(tournamentId);
+
+      return NextResponse.json({
+        success: true,
+        teams: built.teams,
+        players: built.players,
+        matched: built.matched,
+        created: built.created,
+        unmatched: built.unmatched,
+        teamBreakdown: built.teamBreakdown,
+      });
+    }
+
+    // ---- ENG v SL + IND v AFG T20I 2026 (TWIN bilateral: 2 concurrent series, 4 teams) ----
+    if (auctionRow.tournament_name === ENG_SL_IND_AFG_T20_2026_NAME) {
+      let tournamentId = auctionRow.tournament_id;
+      if (!tournamentId) {
+        // max_squad_size 16 = the larger of the four announced squads (ENG and SL are 16, IND and
+        // AFG 15). Same 'BILATERAL' / 'T20' shape as the single-series tour — the fact that there
+        // are two series lives in the engine's opposition factor, not in the tournament row.
+        const t = await sqlite
+          .prepare(
+            `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size)
+             VALUES (?, 'BILATERAL', 'T20', 100, 16)`
+          )
+          .run(ENG_SL_IND_AFG_T20_2026_NAME);
+        tournamentId = Number(t.lastInsertRowid);
+        await sqlite
+          .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
+          .run(tournamentId, auctionId);
+      }
+
+      const teams = Array.isArray(teamsFilter) && teamsFilter.length
+        ? ENG_SL_IND_AFG_T20_2026.filter((t) => teamsFilter.includes(t.short))
+        : ENG_SL_IND_AFG_T20_2026;
+
+      const built = await buildBilateralT20Pool(sqlite, {
+        auctionId,
+        tournamentId,
+        teams,
+        // Identity is anchored on hand-verified cricsheet ids with NO fuzzy fallback: this pool
+        // holds three "Rashid Khan" rows and a set of surnames that fuzzy matching reliably gets
+        // wrong (Abhishek Sharma -> RG Sharma, Eshan Malinga -> Lasith). See ENG_SL_IND_AFG_CSID.
+        csidBridge: ENG_SL_IND_AFG_CSID,
+        noFuzzy: true,
+        // Explicitly EMPTY, not omitted: omitting it falls back to the IND v ENG spelling aliases,
+        // which overlap this pool by ~24 players. They happen to agree today, but that is luck —
+        // the id bridge above is the single source of identity for this tour and nothing should be
+        // able to resolve a player behind its back.
+        aliases: {},
+        // The candidate pool MUST span the franchise leagues, not just IPL + T20I — cricsheet
+        // withholds Afghanistan men's matches, so franchise rows are the only record those
+        // players have.
+        matchFormats: TWIN_MATCH_FORMATS,
+      });
       if (isFirstBuild)
         await carryOverPreviousLineups({
           tournamentName: auctionRow.tournament_name,
