@@ -219,7 +219,12 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const allowed = ["name", "num_friends", "purse_per_friend", "players_per_friend", "num_captains", "num_vice_captains"];
+    // `changes_allowed` belongs here too: the engine reads it (it swaps the fixed C/VC tiers for
+    // the movable-armband premium), and POST /api/auctions accepts it at creation — but leaving it
+    // out of this list meant a house rule agreed AFTER the auction was created could never be
+    // applied without hand-writing SQL against the cloud. Re-run /api/auction/start after changing
+    // it; the premium model only takes effect on a re-value.
+    const allowed = ["name", "num_friends", "purse_per_friend", "players_per_friend", "num_captains", "num_vice_captains", "changes_allowed"];
     const updates: string[] = [];
     const values: (string | number)[] = [];
 
