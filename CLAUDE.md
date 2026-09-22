@@ -381,3 +381,63 @@ venue data is too sparse to trust. Scores here are scoped to `format='ODI'`.
 - **Expected matches:** XI (squad 1–11) plays all **3**; bench (12+) ≈ **1**.
 - **XI order:** curated from the announced squads.
 - **C/VC premium + remaining-money budget normalization:** identical to the other tours.
+
+---
+
+## Valuation model (TWIN bilateral) — quick reference
+ONE auction pool spanning TWO concurrent bilateral series, four teams, one shared purse. Two tours
+use it: **ENG v SL + IND v AFG T20I 2026** and **SA v AUS + ENG v SL ODI 2026**. The archetype is
+the single-series bilateral plus exactly one new idea, and the rest is inherited from whichever
+format the series are played in.
+
+- **The one new idea: an OPPOSITION FACTOR.** In a single series, who you play is a constant and
+  cancels out of the relative pricing. With two series sharing a purse it does not — England's runs
+  are scored against Sri Lanka while Australia's are scored against South Africa, and both are
+  bought with the same money.
+- **MEASURE IT WITHIN-PLAYER.** For each player with >= 3 matches vs an opponent and >= 15 overall,
+  take their mean FP vs that opponent / their own overall mean, then average those ratios. The naive
+  alternative ("mean FP conceded by team X") is worthless: weak teams mostly play weak teams, so the
+  two effects cancel and every side reads ~50.
+- **It rides in `normMult`**, not on `finalEfppm` — that is the slot the Hundred/WCPL scale
+  corrections use, and it is the one that also reaches the ceiling premium. Applying it to only the
+  headline EFPPM quietly distorts every ceiling ratio.
+- **Expected matches: flat XI=3 / bench=1** for a pair of 3-match series. NOT the 5/2 of a 5-match
+  bilateral — there is no dead rubber to rotate in. This 3x/1x split does most of the pricing work,
+  so **the XI seed deserves a manual pass on the board before bidding**; it moves money far more
+  than any modelling dial. Several high-EFPPM players legitimately land at ₹1-9 purely by sitting
+  at squad_number 12+.
+- **Identity: hand-verified `csidBridge` + `noFuzzy: true`.** Both twin pools are hostile to name
+  matching (T20: three "Rashid Khan" rows; ODI: two Jansen brothers, two squad Mendises against
+  three more in the DB, plus Malinga / Rathnayake / Fernando).
+- **⚠️ `matchFormats` (the CANDIDATE pool) is NOT the quality gate, and scoping it tightly is a
+  trap.** It only decides which DB rows the id bridge is allowed to find. Scoped to `['ODI']` the
+  ODI twin re-created Crocombe, Colombage, Edwards and Davies as NEW STATLESS ROWS beside their real
+  ones (122 / 78 / 31 / 15 matches) purely because all four are uncapped in ODIs — and `players`
+  ships local→cloud on `turso:sync`, so duplicates propagate. **Widen it freely when identity is
+  csid-bridged with fuzzy off:** extra candidates cannot cause a namesake error, valuation is
+  unaffected (the engine's own quality clause still gates the form), and the board gets a working
+  "Recent Matches" tab. The T20 twin hit the same bug from the other direction.
+- **Everything else comes from the format**, not from the tour being twinned:
+  - **T20 twin:** the ETPL quality set (forced — cricsheet withholds Afghanistan's matches), its
+    weak-opposition discount and Hundred uplift; 24/30-month windows.
+  - **ODI twin:** the men's-ODI model — `format='ODI'` ONLY, gated to top-8 opposition, 36-month
+    windows, 60/40 recency. Deliberately NOT the ETPL set: all four sides are top-8 nations with
+    full ODI records, so widening the *quality gate* would only import off-format form.
+- **The factor is not equally trustworthy in both tours — check its spread before leaning on it.**
+  T20 (ENG/SL/IND/AFG): ~8% spread, ordering stable under a relaxed cut. ODI (SA/AUS/ENG/SL): ~5%
+  spread and the ordering RESHUFFLES under one of four specifications, because all four sides are
+  top-8. **The signs are also OPPOSITE between the two tours** — Sri Lanka measures the SOFTEST
+  opponent in T20Is and the HARDEST in ODIs (a spin-led attack, much of it sampled at home), so a
+  T20 intuition must never be carried into an ODI pool. To switch the factor off, set all the
+  team difficulties equal: it is centred on its own mean, so equal values collapse it to 1.0.
+- **VERIFY IT WITH AN A/B, ALWAYS** — flatten the difficulties, restart the dev server, re-value,
+  and confirm each team's EFPPM ratio equals the documented factor. Next.js dev caches the module,
+  so an engine constant change can otherwise show ZERO effect and look like a correct no-op.
+  (ODI twin, measured: ENG 0.9679 / SL 1.0174 / SA 1.0103 / AUS 1.0044 — matching the docs exactly.)
+- **Venue:** display-only, as everywhere since 5 Aug. But still give the tour a real
+  `getTourVenueContext`, or `/api/auction/[id]` falls back to a ~151k-row IPL+T20 scan on EVERY
+  board load. **Derive the venue variant lists from the data, never by hand** — the ODI twin's
+  Wanderers has FOUR spellings (missing them loses half the ground's history) and a `%wanderers%`
+  read also swallows "Wanderers Cricket Ground, Windhoek", a different ground in NAMIBIA, which
+  moved the measured bat/bowl ratio from 0.93 to 0.73. Potchefstroom has five spellings across two
+  renames.

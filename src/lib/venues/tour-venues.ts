@@ -21,6 +21,9 @@ import {
   LPL_TEAM_SCHEDULE,
 } from "@/lib/squads/lpl-2026";
 import {
+  SA_AUS_ENG_SL_ODI_2026_NAME,
+} from "@/lib/squads/sa-aus-eng-sl-odi-2026";
+import {
   computeBatIndex,
   describeBatIndex,
   venueTypeFromBatIndex,
@@ -155,6 +158,42 @@ export const TWIN_T20_VENUES: Array<{
   { canonical: "Arun Jaitley Stadium, Delhi", variants: ["Arun Jaitley Stadium", "Arun Jaitley Stadium, Delhi"], type: "bat_road", country: "IND" },
 ];
 
+// SA v AUS + ENG v SL ODI 2026 — six grounds, three per series, one match each.
+//
+// ⚠️ THE VARIANT LISTS HERE ARE LOAD-BEARING, and two of the six are genuine traps that a
+// hand-written list gets wrong (exactly the failure build_venue_registry.py exists to prevent):
+//
+//  - THE WANDERERS, JOHANNESBURG has FOUR spellings in our data — "New Wanderers Stadium" (59
+//    matches), "The Wanderers Stadium, Johannesburg" (45), "The Wanderers Stadium" (21) and
+//    "New Wanderers Stadium, Johannesburg" (6). Taking only the obvious two loses more than half
+//    the ground's history. Worse, a LIKE '%wanderers%' read also swallows "Wanderers Cricket
+//    Ground, Windhoek" (51 matches) — a different ground in NAMIBIA. Folding Windhoek in moved
+//    this ground's measured ODI bat/bowl ratio from 0.93 to 0.73, i.e. from balanced to one of the
+//    most bowler-friendly reads in the pool. Both Windhoek spellings are deliberately absent below,
+//    as is the bare ambiguous "Wanderers" (1 match).
+//  - POTCHEFSTROOM has been renamed twice: JB Marks Oval today, Senwes Park before that, Sedgars
+//    Park before that, and it also appears as "North West Cricket Stadium, Potchefstroom". All five
+//    spellings are the same square; listing only "Senwes Park, Potchefstroom" finds 7 matches
+//    instead of 43.
+//
+// `type` is only a SEED — withBatIndex derives the real label from the measured index. Seeds are
+// the men's ODI read since 2019 with these variants folded: Riverside 1.12, Headingley 0.94,
+// The Oval 0.90, Kingsmead 0.73, Wanderers 0.93, Potchefstroom 1.05. Note the samples are small
+// (3-10 ODIs each), which is one more reason venue is display-only and never priced.
+export const SA_AUS_ENG_SL_ODI_VENUES: Array<{
+  canonical: string;
+  variants: string[];
+  type: VenueType;
+  series: "ENG v SL" | "SA v AUS";
+}> = [
+  { canonical: "Riverside Ground, Chester-le-Street", variants: ["Riverside Ground", "Riverside Ground, Chester-le-Street"], type: "bat_road", series: "ENG v SL" },
+  { canonical: "Headingley, Leeds", variants: ["Headingley", "Headingley, Leeds"], type: "bowl_friendly", series: "ENG v SL" },
+  { canonical: "Kennington Oval, London", variants: ["Kennington Oval", "Kennington Oval, London"], type: "bowl_friendly", series: "ENG v SL" },
+  { canonical: "Kingsmead, Durban", variants: ["Kingsmead", "Kingsmead, Durban"], type: "bowl_friendly", series: "SA v AUS" },
+  { canonical: "The Wanderers Stadium, Johannesburg", variants: ["New Wanderers Stadium", "New Wanderers Stadium, Johannesburg", "The Wanderers Stadium", "The Wanderers Stadium, Johannesburg"], type: "bowl_friendly", series: "SA v AUS" },
+  { canonical: "JB Marks Oval, Potchefstroom", variants: ["Senwes Park", "Senwes Park, Potchefstroom", "Sedgars Park", "Sedgars Park, Potchefstroom", "North West Cricket Stadium, Potchefstroom"], type: "balanced", series: "SA v AUS" },
+];
+
 // ── Tour context ───────────────────────────────────────────────────────────────
 
 export interface TourVenue {
@@ -252,6 +291,7 @@ export async function getTourVenueContext(tournamentName: string): Promise<TourV
   const isCpl = tournamentName === CPL_2026_NAME;
   const isEngPakTest = tournamentName === ENG_VS_PAK_TEST_2026_NAME;
   const isTwinT20 = tournamentName === ENG_SL_IND_AFG_T20_2026_NAME;
+  const isTwinOdi = tournamentName === SA_AUS_ENG_SL_ODI_2026_NAME;
 
   if (isHundredMen || isHundredWomen) {
     const teams = isHundredMen ? HUNDRED_MEN_2026 : HUNDRED_WOMEN_2026;
@@ -372,6 +412,61 @@ export async function getTourVenueContext(tournamentName: string): Promise<TourV
         AFG: delhiSchedule,
       },
       homeOf: { ENG: null, SL: null, IND: null, AFG: null },
+    };
+  }
+
+  if (isTwinOdi) {
+    // Same shape as the T20 twin: two series, no shared grounds, so a real per-team schedule but no
+    // meaningful home ground (England are nominally home for three ODIs in five days across three
+    // counties; South Africa likewise across three provinces). homeOf is null throughout and the
+    // header shows the schedule instead.
+    //
+    // As with the T20 twin, giving this tour a context at all is a performance decision as much as
+    // a display one: /api/auction/[id] falls back to a full IPL+T20 venue scan (~151k rows) on
+    // every board load whenever getTourVenueContext returns null.
+    const engSchedule = SA_AUS_ENG_SL_ODI_VENUES.filter((v) => v.series === "ENG v SL").map((v) => ({
+      venue: v.canonical,
+      games: 1,
+    }));
+    const saSchedule = SA_AUS_ENG_SL_ODI_VENUES.filter((v) => v.series === "SA v AUS").map((v) => ({
+      venue: v.canonical,
+      games: 1,
+    }));
+    return {
+      tour: tournamentName,
+      neutral: false,
+      gender: "male",
+      // ODI ONLY — deliberately NOT the T20 twin's ["T20","IPL","BLAST","HUN"]. That tour pooled
+      // 20-over cricket played on the same squares because men's T20Is alone were too thin there.
+      // Here the question is a 50-over one, and pooling T20 form onto it would import a different
+      // game's scoring rate into the bat/bowl ratio for no gain.
+      venueFormats: ["ODI"],
+      // 60 months, not 30: these six grounds host 3-10 men's ODIs between them in a 30-month
+      // window. A wider window is the only way the Bat Index reads anything at all — and it is why
+      // the numbers are still reported as weak rather than leaned on.
+      venueWindowMonths: 60,
+      ...(await (async () => {
+        const d = await withBatIndex(
+          SA_AUS_ENG_SL_ODI_VENUES.map((v) => ({
+            canonical: v.canonical,
+            variants: v.variants,
+            type: v.type,
+          })),
+          "male"
+        );
+        return {
+          venues: d.venues,
+          batIndexMedian: d.batIndexMedian,
+          batIndexByGround: d.batIndexByGround,
+        };
+      })()),
+      teamSchedule: {
+        ENG: engSchedule,
+        SL: engSchedule,
+        SA: saSchedule,
+        AUS: saSchedule,
+      },
+      homeOf: { ENG: null, SL: null, SA: null, AUS: null },
     };
   }
 

@@ -92,6 +92,13 @@ export default function HomePage() {
       note: "TWIN bilateral \u00b7 2 concurrent 3-match T20I series, 4 teams, one purse \u00b7 opposition-adjusted, widest quality gate (AFG have no cricsheet T20I data)",
     },
     {
+      // The id MUST equal SA_AUS_ENG_SL_ODI_2026_NAME \u2014 /api/pool/fetch branches on tournament_name.
+      id: "SA v AUS + ENG v SL ODI 2026",
+      label: "SA v AUS + ENG v SL ODI 2026",
+      format: "ODI",
+      note: "TWIN bilateral (ODI) \u00b7 2 concurrent 3-match ODI series, 4 teams, one purse \u00b7 ODI-only form vs top-8, 36mo windows, opposition-adjusted",
+    },
+    {
       id: "The Hundred Men 2026",
       label: "The Hundred Men 2026",
       format: "T20",

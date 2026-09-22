@@ -27,6 +27,12 @@ import {
   TWIN_MATCH_FORMATS,
 } from "@/lib/squads/eng-sl-ind-afg-t20-2026";
 import {
+  SA_AUS_ENG_SL_ODI_2026,
+  SA_AUS_ENG_SL_ODI_2026_NAME,
+  SA_AUS_ENG_SL_ODI_CSID,
+  TWIN_ODI_MATCH_FORMATS,
+} from "@/lib/squads/sa-aus-eng-sl-odi-2026";
+import {
   IRE_VS_WI_W_ODI_2026,
   IRE_VS_WI_W_ODI_2026_NAME,
 } from "@/lib/squads/ire-wi-w-odi-2026";
@@ -259,6 +265,65 @@ export async function POST(request: NextRequest) {
         // withholds Afghanistan men's matches, so franchise rows are the only record those
         // players have.
         matchFormats: TWIN_MATCH_FORMATS,
+      });
+      if (isFirstBuild)
+        await carryOverPreviousLineups({
+          tournamentName: auctionRow.tournament_name,
+          tournamentId,
+          auctionId,
+        });
+      await initializeValuations(tournamentId);
+
+      return NextResponse.json({
+        success: true,
+        teams: built.teams,
+        players: built.players,
+        matched: built.matched,
+        created: built.created,
+        unmatched: built.unmatched,
+        teamBreakdown: built.teamBreakdown,
+      });
+    }
+
+    // ---- SA v AUS + ENG v SL ODI 2026 (TWIN bilateral, ODI: 2 concurrent series, 4 teams) ----
+    if (auctionRow.tournament_name === SA_AUS_ENG_SL_ODI_2026_NAME) {
+      let tournamentId = auctionRow.tournament_id;
+      if (!tournamentId) {
+        // match_format 'ODI' is what scopes the engine's form queries and the player modal's
+        // Recent Matches to 50-over cricket — the one field that must not be copied from the T20
+        // twin. All four announced squads are 16, so max_squad_size 16 is exact, not a ceiling.
+        const t = await sqlite
+          .prepare(
+            `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size)
+             VALUES (?, 'BILATERAL', 'ODI', 100, 16)`
+          )
+          .run(SA_AUS_ENG_SL_ODI_2026_NAME);
+        tournamentId = Number(t.lastInsertRowid);
+        await sqlite
+          .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
+          .run(tournamentId, auctionId);
+      }
+
+      const teams = Array.isArray(teamsFilter) && teamsFilter.length
+        ? SA_AUS_ENG_SL_ODI_2026.filter((t) => teamsFilter.includes(t.short))
+        : SA_AUS_ENG_SL_ODI_2026;
+
+      const built = await buildBilateralT20Pool(sqlite, {
+        auctionId,
+        tournamentId,
+        teams,
+        // Identity is anchored on hand-verified cricsheet ids with NO fuzzy fallback. This pool
+        // holds two Jansen brothers, two squad Mendises against three more in the DB, and the
+        // Malinga / Rathnayake / Fernando surnames that SL initials make unresolvable by name.
+        csidBridge: SA_AUS_ENG_SL_ODI_CSID,
+        noFuzzy: true,
+        // Explicitly EMPTY, not omitted: omitting it falls back to the IND v ENG spelling aliases,
+        // which overlap this pool. The id bridge above is the single source of identity here and
+        // nothing should be able to resolve a player behind its back.
+        aliases: {},
+        // ODI only — unlike the T20 twin there is no withheld-data problem to work around, and
+        // every player in this pool is a top-8 international.
+        matchFormats: TWIN_ODI_MATCH_FORMATS,
       });
       if (isFirstBuild)
         await carryOverPreviousLineups({

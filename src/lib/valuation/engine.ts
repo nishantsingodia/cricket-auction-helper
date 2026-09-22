@@ -16,6 +16,11 @@ import {
   twinOppositionFactor,
 } from "@/lib/squads/eng-sl-ind-afg-t20-2026";
 import {
+  SA_AUS_ENG_SL_ODI_2026_NAME,
+  twinOdiExpectedMatches,
+  twinOdiOppositionFactor,
+} from "@/lib/squads/sa-aus-eng-sl-odi-2026";
+import {
   ENG_VS_PAK_TEST_2026_NAME,
   testExpectedMatches,
 } from "../squads/eng-vs-pak-test-2026";
@@ -439,6 +444,18 @@ export async function recalculateValuations(
   //       discount + Hundred scale uplift come along with it — both wanted here for the same reasons.
   // Venue is display-only for every tour now (finalEfppm = normScore1), so no venue path is needed.
   const isTwinT20 = tournamentRow?.name === ENG_SL_IND_AFG_T20_2026_NAME;
+  // SA v AUS + ENG v SL ODI 2026: the TWIN structure above crossed with the MEN'S ODI form model.
+  // Two concurrent 3-match ODI series, one pool, one purse. It takes from isTwinT20 only the
+  // opposition factor (a shared purse across two series), and from isMensOdi everything about how
+  // form is scored: `format='ODI'` alone, gated to top-8 opposition, 36-month windows.
+  //
+  // Deliberately NOT inherited from the T20 twin: the ETPL quality set and its weak-opposition
+  // discount / Hundred uplift. Those exist to rescue a squad whose T20I record cricsheet withholds
+  // (Afghanistan). Here all four sides are top-8 nations with full ODI records, so the standard
+  // men's ODI gate is both sufficient and tighter — widening it would only import namesakes and
+  // off-format form. Expected matches is the flat 3/1 of the T20 twin, NOT the 5/2 of the
+  // five-match NZ v WI ODI series: these series are three matches with no dead rubber.
+  const isTwinOdi = tournamentRow?.name === SA_AUS_ENG_SL_ODI_2026_NAME;
   // ENG v PAK 2026: the first RED-BALL tour. Scored purely on Test form ('TEST'), which is a
   // different points scale entirely (2 innings, +20 a wicket, no rate bonuses) — so nothing
   // white-ball may leak into it, in either direction. No league season, so the bilateral
@@ -584,7 +601,7 @@ export async function recalculateValuations(
   // LPL: no 2025 edition, and its last real seasons (2024/2023) are ~1–2 yrs old, so lean recency —
   // 45% last-15 form, 20% most-recent LPL season (2024), 10% prior season (2023), 25% all-quality.
   const score1Weights =
-    isBilateral || isTwinT20 || isWomensOdi || isMensOdi || isTest
+    isBilateral || isTwinT20 || isTwinOdi || isWomensOdi || isMensOdi || isTest
       ? [0.60, 0, 0, 0.40]
       : isLpl
       ? [0.45, 0.20, 0.10, 0.25]
@@ -640,7 +657,7 @@ export async function recalculateValuations(
     ? `format = 'TEST'`
     : isWomensOdi
     ? `format = 'ODI'`
-    : isMensOdi
+    : isMensOdi || isTwinOdi
     ? `format = 'ODI' AND opposition IN (${top8Placeholders})`
     : `format IN (${qualityList}) OR (format = 'T20' AND opposition IN (${top8Placeholders}))`;
   // women's ODI binds no extra params; men's ODI + T20 both bind the top-8 nation list.
@@ -652,10 +669,11 @@ export async function recalculateValuations(
     ? "-60 months"
     : isWomensOdi
     ? "-48 months"
-    : isMensOdi
+    : isMensOdi || isTwinOdi
     ? "-36 months"
     : "-24 months";
-  const allWindow = isTest ? "-60 months" : isWomensOdi || isMensOdi ? "-36 months" : "-30 months";
+  const allWindow =
+    isTest ? "-60 months" : isWomensOdi || isMensOdi || isTwinOdi ? "-36 months" : "-30 months";
 
   // --- Batch Query: Score 1 sources ---
 
@@ -1008,6 +1026,18 @@ export async function recalculateValuations(
       // difficulty is unmeasurable (cricsheet withholds their matches) and is set neutral. See
       // twinOppositionFactor.
       normMult = twinOppositionFactor(p.ipl_team);
+    } else if (isTwinOdi) {
+      // Same mechanism as the T20 twin above, measured on men's ODI form — but a MUCH smaller and
+      // less stable effect, because all four sides here are top-8 nations rather than a top-8 pool
+      // containing Afghanistan. It runs about +-2% on price and its sign for SL/SA flips under one
+      // of four measurement specifications. Kept because it is the archetype's one required piece
+      // and the pre-registered spec matches the 4-spec average; see twinOdiOppositionFactor for the
+      // sensitivity table and for how to switch it off (set all four difficulties equal).
+      //
+      // NOTE the direction is the REVERSE of the T20 twin: there England gained most, here England
+      // is the only side meaningfully marked DOWN, because Sri Lanka's spin-led ODI attack (much of
+      // it sampled at home) measures as the hardest assignment in this pool.
+      normMult = twinOdiOppositionFactor(p.ipl_team);
     }
     const normScore1 = score1 * normMult;
 
@@ -1025,6 +1055,11 @@ export async function recalculateValuations(
       // rubber to rotate in (the 5-match archetype's bench of 2 assumes one), and no phased
       // overseas availability to model, so squad_number is the whole story.
       ? twinT20ExpectedMatches(p.squad_number)
+      : isTwinOdi
+      // Flat 3 / 1, same as the T20 twin and for the same reason: both series are 3 matches, the
+      // XI plays all three, and there is no dead rubber to rotate in. Explicitly NOT the 5/2 of
+      // mensOdiExpectedMatches — that shape belongs to the five-match NZ v WI series.
+      ? twinOdiExpectedMatches(p.squad_number)
       : isWomensOdi
       ? odiExpectedMatches(p.squad_number)
       : isMensOdi
