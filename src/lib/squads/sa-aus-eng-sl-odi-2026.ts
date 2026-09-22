@@ -5,8 +5,9 @@
 // crossed with the MEN'S ODI form model of NZ v WI 2026 — nothing here is new in kind:
 //   - from the TWIN archetype: one pool over two series, so an OPPOSITION FACTOR is needed
 //     (who you play no longer cancels out when the purse is shared), applied through normMult.
-//   - from the MEN'S ODI archetype: form is scored on `format='ODI'` ONLY, quality-gated to
-//     top-8 opposition, 36-month windows, 60/40 recency weights.
+//   - from the MEN'S ODI archetype: form is scored on `format='ODI'` ONLY, 36-month windows,
+//     60/40 recency weights — but WITHOUT that archetype's top-8 opposition gate. See the
+//     weak-opposition note below; it is the one place this tour departs from NZ v WI.
 //
 // ⚠️ THE OPPOSITION FACTOR IS MUCH WEAKER HERE THAN IN THE T20 TWIN, AND IT IS NOT STABLE.
 // All four sides are top-8 nations, unlike ENG/SL/IND/AFG. See TWIN_ODI_OPPOSITION_DIFFICULTY for
@@ -125,13 +126,44 @@ export function twinOdiExpectedMatches(squadNumber: number): number {
   return squadNumber >= 1 && squadNumber <= TWIN_ODI_XI_SIZE ? 3 : 1;
 }
 
+// ── Weak-opposition handling (why this tour drops the top-8 gate) ───────────────
+// The men's ODI archetype (NZ v WI) gates form to `opposition IN (top-8)`. That is the WRONG tool
+// here and it was caught only after the first board was built: it does not down-weight an ODI
+// against Zimbabwe or Namibia, it DELETES it. Australia had just toured Zimbabwe and South Africa
+// had just toured Namibia, so the gate was discarding the freshest evidence we have for half the
+// pool — Bartlett kept 1 of his 5 ODIs in twelve months (a single game producing a nonsense 119.5
+// EFPPM), Inglis 3 of 7, Zampa and Connolly 4 of 8, Maphaka 0 of 2 — while England and Sri Lanka
+// lost almost nothing. In a pool where two series share one purse, that asymmetry is a pricing bug.
+//
+// The engine therefore counts ALL men's ODIs for this tour and scales non-top-8 opposition by
+// TWIN_ODI_WEAK_OPP_FP_MULT = 0.83, measured within-player (men's ODI 2021+, >= 5 top-8 and >= 3
+// non-top-8 games, n=235): mean FP vs non-top-8 / mean FP vs top-8 = 1.205, and 1/1.205 = 0.83.
+// The discount rides in `fpExpr`, so it reaches the recency bucket, the all-form bucket AND the
+// ceiling query — the same three places ETPL's equivalent does.
+
 // ── Squads ─────────────────────────────────────────────────────────────────────
 // All four announced squads are 16, each verified against two independent sources on 22 Sep 2026
 // (Wikipedia tour pages + cricket.com.au / ICC / ETV squad reports).
 //
-// Order = CURATED probable XI (1-11, batting order) then bench (12-16) -> squad_number -> expected
-// matches. The XIs below are a considered seed, NOT confirmed line-ups (no toss has happened), and
-// the calls worth knowing about are flagged per team.
+// Order = probable XI (1-11, batting order) then bench (12-16) -> squad_number -> expected matches.
+//
+// TEAM NEWS as of 22 Sep 2026, and the ENG/SL XIs are now the REPORTED ODI-1 line-ups rather than
+// my guess — which changed four players and moved real money:
+//   - ENG: **Adil Rashid is OUT of ODI-1** (hand injury fielding in the Old Trafford T20I on 19 Sep,
+//     sent for a scan). **Rehan Ahmed** replaces him and **Josh Tongue** is in; **Liam Dawson**
+//     misses out. Jacob Bethell is injured (not in the squad), so Banton opens with Duckett.
+//     Rashid is the biggest live question in the pool: 159-ODI frontline spinner, priced here at
+//     bench rates on 1 game, and if he is fit for ODI-2/3 he plays both.
+//   - SL: **Chameera and Asitha Fernando take the new ball**, so **Dilshan Madushanka is benched**.
+//     The last bowling slot is an explicit **Theekshana / Wellalage toss-up** — both are flagged.
+//   - AUS: no injury concerns. **Cummins, Starc and Hazlewood all join for this leg** (they skipped
+//     the Zimbabwe ODIs) and Cummins has said he is using these ODIs as a springboard into the Test
+//     series, so the first-choice attack should play. Ellis and Bartlett are the reserve seamers.
+//   - SA: no fresh news. Rabada already misses the ODIs (hamstring, targeting the Tests), on top of
+//     Baartman and Ngidi.
+//
+// The AUS and SA XIs remain a considered seed — their series starts on 24 Sep, so no XI has been
+// reported yet.
 export const SA_AUS_ENG_SL_ODI_2026: BilateralTeam[] = [
   {
     name: "England",
@@ -139,21 +171,23 @@ export const SA_AUS_ENG_SL_ODI_2026: BilateralTeam[] = [
     country: "England",
     color: "#012169",
     players: [
+      // XI is the ANNOUNCED/reported XI for ODI-1 (22 Sep, Riverside), not a guess — see the
+      // team-news note above the squads.
       { name: "Ben Duckett", role: "BAT" },                                          // 1
-      { name: "Tom Banton", role: "BAT" },                                           // 2
+      { name: "Tom Banton", role: "BAT", note: "Opens with Duckett in the absence of the injured Jacob Bethell." }, // 2
       { name: "Joe Root", role: "BAT" },                                             // 3
       { name: "Harry Brook", role: "BAT", note: "Captain (armband only — the C/VC premium is priced separately and is the bidder's choice, not the real captaincy)." }, // 4
       { name: "Jos Buttler", role: "WK" },                                           // 5
       { name: "Will Jacks", role: "AR" },                                            // 6
-      { name: "Jamie Overton", role: "AR" },                                         // 7
-      { name: "Liam Dawson", role: "AR" },                                           // 8
-      { name: "Adil Rashid", role: "BOWL" },                                         // 9
+      { name: "Rehan Ahmed", role: "AR", note: "IN FOR ADIL RASHID for ODI-1 — England's frontline spinner for this match. If Rashid is passed fit for ODI-2/3 Rehan is the one who makes way, so he is priced on 3 games but may only play 1." }, // 7
+      { name: "Jamie Overton", role: "AR" },                                         // 8
+      { name: "Gus Atkinson", role: "BOWL" },                                        // 9
       { name: "Jofra Archer", role: "BOWL" },                                        // 10
-      { name: "Gus Atkinson", role: "BOWL" },                                        // 11
-      { name: "Jordan Cox", role: "WK" },                                            // 12
-      { name: "Rehan Ahmed", role: "AR" },                                           // 13
-      { name: "Josh Tongue", role: "BOWL" },                                         // 14
-      { name: "Sonny Baker", role: "BOWL" },                                         // 15
+      { name: "Josh Tongue", role: "BOWL" },                                         // 11
+      { name: "Adil Rashid", role: "BOWL", note: "⚠️ OUT OF ODI-1 — hand injury picked up fielding in the Old Trafford T20I (19 Sep), sent for a scan; Rehan Ahmed replaces him. England's premier ODI spinner (159 ODIs), so if he is passed fit for ODI-2 and ODI-3 he plays both and is UNDERPRICED here at bench rates. Priced at 1 game; the 2 extra games are the upside you are bidding on." }, // 12
+      { name: "Liam Dawson", role: "AR", note: "Named in the squad but NOT in the ODI-1 XI — Rehan Ahmed got the spin slot." }, // 13
+      { name: "Jordan Cox", role: "WK" },                                            // 14
+      { name: "Sonny Baker", role: "BOWL", note: "One ODI to his name and a low score in it, which with no shrinkage drags his EFPPM below the statless baseline. Prices at ₹1 regardless — do not read the number as a rating." }, // 15
       { name: "Henry Crocombe", role: "BOWL", note: "Uncapped at ODI level — county/Blast form only, so he prices near baseline." }, // 16
     ],
   },
@@ -171,12 +205,12 @@ export const SA_AUS_ENG_SL_ODI_2026: BilateralTeam[] = [
       { name: "Janith Liyanage", role: "BAT" },                                      // 6
       { name: "Dasun Shanaka", role: "AR", note: "Recalled — last ODI was against Zimbabwe in 2024, so the recency bucket is thin and he leans on the 36-month window." }, // 7
       { name: "Wanindu Hasaranga", role: "AR" },                                     // 8
-      { name: "Dunith Wellalage", role: "AR" },                                      // 9
-      { name: "Maheesh Theekshana", role: "BOWL" },                                  // 10
-      { name: "Dilshan Madushanka", role: "BOWL" },                                  // 11
-      { name: "Eshan Malinga", role: "BOWL" },                                       // 12
-      { name: "Dushmantha Chameera", role: "BOWL" },                                 // 13
-      { name: "Asitha Fernando", role: "BOWL" },                                     // 14
+      { name: "Maheesh Theekshana", role: "BOWL", note: "⚠️ SPIN SLOT IS A STRAIGHT TOSS-UP with Dunith Wellalage — every preview lists the ODI-1 XI as 'Theekshana / Wellalage' for this one place. Priced as the starter, but treat it as roughly a coin flip across the three games." }, // 9
+      { name: "Dushmantha Chameera", role: "BOWL", note: "Into the XI for ODI-1 — he and Asitha Fernando lead the seam attack ahead of Madushanka." }, // 10
+      { name: "Asitha Fernando", role: "BOWL", note: "Returns to the XI for ODI-1 ahead of Dilshan Madushanka." }, // 11
+      { name: "Dunith Wellalage", role: "AR", note: "⚠️ THE OTHER HALF OF THE THEEKSHANA COIN FLIP — benched here, but he is the alternative for the same slot and is the better batter of the two. Priced at 1 game; he could easily play 2 or 3." }, // 12
+      { name: "Dilshan Madushanka", role: "BOWL", note: "Out of the ODI-1 XI — Chameera and Asitha Fernando got the new-ball roles." }, // 13
+      { name: "Eshan Malinga", role: "BOWL" },                                       // 14
       { name: "Pavan Rathnayake", role: "BAT" },                                     // 15
       { name: "Sachindu Colombage", role: "AR", note: "Maiden international call-up — no ODI record at all, prices near baseline off domestic form." }, // 16
     ],

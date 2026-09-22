@@ -575,11 +575,38 @@ export async function recalculateValuations(
     ` WHEN 'BOWL' THEN ${ETPL_HUNDRED_UPLIFT.BOWL}` +
     ` ELSE ${ETPL_HUNDRED_UPLIFT_FALLBACK} END) ELSE 1 END)`;
 
+  // TWIN-ODI weak-opposition discount. Same idea as ETPL's, measured rather than judged.
+  //
+  // The problem it fixes: a top-8-ONLY quality gate (what isMensOdi uses, and what this tour used
+  // first) does not merely down-weight an ODI against Zimbabwe or Namibia — it DELETES it. That is
+  // fine for a pool whose players all face the same schedule, and wrong here. Australia had just
+  // toured Zimbabwe and South Africa had just toured Namibia, so the gate was discarding the most
+  // recent evidence we have for half the pool: Bartlett was left with 1 counted ODI of 5 in twelve
+  // months (hence a nonsense 119.5 EFPPM off a single game), Inglis 3 of 7, Zampa and Connolly 4 of
+  // 8, Maphaka 0 of 2. England and Sri Lanka lost almost nothing, so the deletion was also
+  // ASYMMETRIC across the two series sharing one purse.
+  //
+  // MEASURED 22 Sep 2026, within-player (the only estimator that is not confounded by who plays
+  // whom): over men's ODIs since 2021, for each player with >= 5 top-8 and >= 3 non-top-8 games,
+  // mean FP vs non-top-8 / mean FP vs top-8 = **1.205** (median 1.138, n=235 players). So a game
+  // against a weaker side really is worth about 20% more face points, and the corrective is its
+  // reciprocal, 1/1.205 = 0.83.
+  //
+  // Unlike ETPL's 0.85 this is a measured constant, not a judgement call — and note it lands in
+  // almost the same place, which is mild reassurance for both.
+  const TWIN_ODI_WEAK_OPP_FP_MULT = 0.83;
+  const twinOdiFpExpr =
+    `fantasy_points` +
+    ` * (CASE WHEN opposition NOT IN (${TOP_8_NATIONS.map(() => "?").join(",")})` +
+    ` THEN ${TWIN_ODI_WEAK_OPP_FP_MULT} ELSE 1 END)`;
+
   const fpExpr = isEtpl || isTwinT20
     ? etplFpExpr("(SELECT role FROM players WHERE id = match_performances.player_id)")
+    : isTwinOdi
+    ? twinOdiFpExpr
     : "fantasy_points";
   // The discount CASE binds its own copy of the nation list, ahead of the quality clause's copy.
-  const fpParams = isEtpl || isTwinT20 ? TOP_8_NATIONS : [];
+  const fpParams = isEtpl || isTwinT20 || isTwinOdi ? TOP_8_NATIONS : [];
 
   // WCPL SCALE UPLIFT — the one genuinely new piece of modelling this tour needs, and the MIRROR
   // IMAGE of the Hundred's HUNDRED_ROLE_NORM. The WCPL is a materially WEAKER competition than the
@@ -657,11 +684,16 @@ export async function recalculateValuations(
     ? `format = 'TEST'`
     : isWomensOdi
     ? `format = 'ODI'`
-    : isMensOdi || isTwinOdi
+    : isTwinOdi
+    // ALL men's ODIs count, with weak opposition DISCOUNTED rather than deleted — see
+    // TWIN_ODI_WEAK_OPP_FP_MULT above for why the top-8 gate was the wrong tool for this pool.
+    ? `format = 'ODI'`
+    : isMensOdi
     ? `format = 'ODI' AND opposition IN (${top8Placeholders})`
     : `format IN (${qualityList}) OR (format = 'T20' AND opposition IN (${top8Placeholders}))`;
-  // women's ODI binds no extra params; men's ODI + T20 both bind the top-8 nation list.
-  const qualityParams = isWomensOdi || isTest ? [] : TOP_8_NATIONS;
+  // women's ODI, Test and the ODI twin bind no extra params in the quality clause (the twin's
+  // nation list is bound by fpExpr instead); men's ODI + T20 bind the top-8 nation list.
+  const qualityParams = isWomensOdi || isTest || isTwinOdi ? [] : TOP_8_NATIONS;
   // Test windows are much wider than the white-ball ones. England play ~12 Tests a year and
   // Pakistan fewer, so a 24-month window would leave half this squad on 3-6 matches and turn the
   // recency bucket into noise. 60 months of Tests is roughly 24 months of T20I density.
