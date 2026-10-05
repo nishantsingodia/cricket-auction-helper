@@ -21,6 +21,12 @@ import {
 } from "@/lib/squads/ind-vs-eng-t20-2026";
 import { buildBilateralT20Pool } from "@/lib/squads/build-bilateral-t20-pool";
 import {
+  IND_VS_WI_T20_2026,
+  IND_VS_WI_T20_2026_NAME,
+  IND_WI_CSID,
+  IND_WI_MATCH_FORMATS,
+} from "@/lib/squads/ind-vs-wi-t20-2026";
+import {
   ENG_SL_IND_AFG_T20_2026,
   ENG_SL_IND_AFG_T20_2026_NAME,
   ENG_SL_IND_AFG_CSID,
@@ -205,6 +211,56 @@ export async function POST(request: NextRequest) {
         : undefined;
 
       const built = await buildBilateralT20Pool(sqlite, { auctionId, tournamentId, teams });
+      if (isFirstBuild)
+        await carryOverPreviousLineups({
+          tournamentName: auctionRow.tournament_name,
+          tournamentId,
+          auctionId,
+        });
+      await initializeValuations(tournamentId);
+
+      return NextResponse.json({
+        success: true,
+        teams: built.teams,
+        players: built.players,
+        matched: built.matched,
+        created: built.created,
+        unmatched: built.unmatched,
+        teamBreakdown: built.teamBreakdown,
+      });
+    }
+
+    // ---- India vs West Indies Men's T20I 2026 (single bilateral series) ----
+    if (auctionRow.tournament_name === IND_VS_WI_T20_2026_NAME) {
+      let tournamentId = auctionRow.tournament_id;
+      if (!tournamentId) {
+        const t = await sqlite
+          .prepare(
+            `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size)
+             VALUES (?, 'BILATERAL', 'T20', 100, 18)`
+          )
+          .run(IND_VS_WI_T20_2026_NAME);
+        tournamentId = Number(t.lastInsertRowid);
+        await sqlite
+          .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
+          .run(tournamentId, auctionId);
+      }
+
+      const teams = Array.isArray(teamsFilter) && teamsFilter.length
+        ? IND_VS_WI_T20_2026.filter((t) => teamsFilter.includes(t.short))
+        : IND_VS_WI_T20_2026;
+
+      const built = await buildBilateralT20Pool(sqlite, {
+        auctionId,
+        tournamentId,
+        teams,
+        aliases: {},
+        // India ids reused from the hand-verified twin-T20 map; WI ids verified the same way.
+        csidBridge: IND_WI_CSID,
+        // WI players' T20 record is mostly CPL — keep it in the candidate set or they are
+        // re-created as statless duplicates.
+        matchFormats: IND_WI_MATCH_FORMATS,
+      });
       if (isFirstBuild)
         await carryOverPreviousLineups({
           tournamentName: auctionRow.tournament_name,

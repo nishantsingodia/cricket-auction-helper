@@ -85,6 +85,13 @@ export default function HomePage() {
       note: "5-match bilateral T20I · recent T20I + IPL form, bowl-leaning venues",
     },
     {
+      // The id MUST equal IND_VS_WI_T20_2026_NAME — /api/pool/fetch branches on tournament_name.
+      id: "India vs West Indies Men's T20I 2026",
+      label: "India vs West Indies Men's T20I 2026",
+      format: "T20",
+      note: "Bilateral T20I · recent T20I (top-8) + IPL/CPL form, 60/40 recency",
+    },
+    {
       // The id MUST equal ENG_SL_IND_AFG_T20_2026_NAME — /api/pool/fetch branches on tournament_name.
       id: "ENG v SL + IND v AFG T20I 2026",
       label: "ENG v SL + IND v AFG T20I 2026",

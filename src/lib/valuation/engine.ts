@@ -11,6 +11,10 @@ import {
   bilateralExpectedMatches,
 } from "@/lib/squads/ind-vs-eng-t20-2026";
 import {
+  IND_VS_WI_T20_2026_NAME,
+  indWiExpectedMatches,
+} from "@/lib/squads/ind-vs-wi-t20-2026";
+import {
   ENG_SL_IND_AFG_T20_2026_NAME,
   twinT20ExpectedMatches,
   twinOppositionFactor,
@@ -369,7 +373,11 @@ export async function recalculateValuations(
     .get(tournamentId) as { name: string } | undefined;
   const isWomensWC = tournamentRow?.name === WOMENS_T20_WC_2026_NAME;
   const isMLC = tournamentRow?.name === MLC_2026_NAME;
-  const isBilateral = tournamentRow?.name === IND_VS_ENG_T20_2026_NAME;
+  // IND v WI T20I rides the plain bilateral archetype (60/40 recency, MLC+IPL + top-8 T20Is) with
+  // ONE widening: CPL joins the quality set, because a West Indian's franchise record lives in the
+  // CPL, not the IPL — without it the fringe of the WI squad is valued on a handful of T20Is.
+  const isIndWi = tournamentRow?.name === IND_VS_WI_T20_2026_NAME;
+  const isBilateral = tournamentRow?.name === IND_VS_ENG_T20_2026_NAME || isIndWi;
   const isHundredMen = tournamentRow?.name === THE_HUNDRED_MEN_2026_NAME;
   const isHundredWomen = tournamentRow?.name === THE_HUNDRED_WOMEN_2026_NAME;
   const isHundred = isHundredMen || isHundredWomen;
@@ -523,6 +531,8 @@ export async function recalculateValuations(
     // England-county players actually play. The quality trade-off is handled by discounting weak
     // opposition (ETPL_ASSOCIATE_FP_MULT), not by excluding it.
     ? "'T20','BLAST','HUN','IPL','BBL','PSL','SA20','ILT20','CPL','LPL','MLC'"
+    : isIndWi
+    ? "'MLC','IPL','CPL'"
     : isMLC || isBilateral
     ? "'MLC','IPL'"
     : "'IPL','WPL'";
@@ -1080,6 +1090,8 @@ export async function recalculateValuations(
       ? hundredExpectedMatches(p.ipl_team, p.squad_number, isHundredWomen)
       : isTest
       ? testExpectedMatches(p.squad_number)
+      : isIndWi
+      ? indWiExpectedMatches(p.squad_number)
       : isBilateral
       ? bilateralExpectedMatches(p.squad_number)
       : isTwinT20
