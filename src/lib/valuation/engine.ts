@@ -20,6 +20,11 @@ import {
   twinOppositionFactor,
 } from "@/lib/squads/eng-sl-ind-afg-t20-2026";
 import {
+  PAK_SL_IND_WI_T20_2026_NAME,
+  pakSlIndWiExpectedMatches,
+  pakSlIndWiOppositionFactor,
+} from "@/lib/squads/pak-sl-ind-wi-t20-2026";
+import {
   SA_AUS_ENG_SL_ODI_2026_NAME,
   twinOdiExpectedMatches,
   twinOdiOppositionFactor,
@@ -455,7 +460,11 @@ export async function recalculateValuations(
   //       England fringe (Banton, Cox, Donald, Coles, Baker) actually plays, and its weak-opposition
   //       discount + Hundred scale uplift come along with it — both wanted here for the same reasons.
   // Venue is display-only for every tour now (finalEfppm = normScore1), so no venue path is needed.
-  const isTwinT20 = tournamentRow?.name === ENG_SL_IND_AFG_T20_2026_NAME;
+  // PAK v SL + IND v WI T20I 2026 is the SECOND tour on this archetype and takes ALL of it (ETPL
+  // quality set — PSL/CPL/LPL are where Pakistan's post-World-Cup form lives; 60/40 recency; flat
+  // 3/1). The only thing that differs is its own measured opposition table, dispatched below.
+  const isPakSlIndWi = tournamentRow?.name === PAK_SL_IND_WI_T20_2026_NAME;
+  const isTwinT20 = tournamentRow?.name === ENG_SL_IND_AFG_T20_2026_NAME || isPakSlIndWi;
   // SA v AUS + ENG v SL ODI 2026: the TWIN structure above crossed with the MEN'S ODI form model.
   // Two concurrent 3-match ODI series, one pool, one purse. It takes from isTwinT20 only the
   // opposition factor (a shared purse across two series), and from isMensOdi everything about how
@@ -1097,7 +1106,10 @@ export async function recalculateValuations(
       // Measured within-player; ~+4% for ENG and IND, ~-4% for SL and AFG. Afghanistan's own
       // difficulty is unmeasurable (cricsheet withholds their matches) and is set neutral. See
       // twinOppositionFactor.
-      normMult = twinOppositionFactor(p.ipl_team);
+      // PAK v SL + IND v WI: IND +3.2% / PAK +2.5% / SL +0.1% / WI -5.9% (all four measured).
+      normMult = isPakSlIndWi
+        ? pakSlIndWiOppositionFactor(p.ipl_team)
+        : twinOppositionFactor(p.ipl_team);
     } else if (isTwinOdi) {
       // Same mechanism as the T20 twin above, measured on men's ODI form — but a MUCH smaller and
       // less stable effect, because all four sides here are top-8 nations rather than a top-8 pool
@@ -1128,7 +1140,9 @@ export async function recalculateValuations(
       // Flat 3 / 1: both series are 3 matches, so the XI plays all three either way. No dead
       // rubber to rotate in (the 5-match archetype's bench of 2 assumes one), and no phased
       // overseas availability to model, so squad_number is the whole story.
-      ? twinT20ExpectedMatches(p.squad_number)
+      ? (isPakSlIndWi
+          ? pakSlIndWiExpectedMatches(p.squad_number)
+          : twinT20ExpectedMatches(p.squad_number))
       : isTwinOdi
       // Flat 3 / 1, same as the T20 twin and for the same reason: both series are 3 matches, the
       // XI plays all three, and there is no dead rubber to rotate in. Explicitly NOT the 5/2 of

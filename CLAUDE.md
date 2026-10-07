@@ -402,8 +402,10 @@ venue data is too sparse to trust. Scores here are scoped to `format='ODI'`.
 ---
 
 ## Valuation model (TWIN bilateral) — quick reference
-ONE auction pool spanning TWO concurrent bilateral series, four teams, one shared purse. Two tours
-use it: **ENG v SL + IND v AFG T20I 2026** and **SA v AUS + ENG v SL ODI 2026**. The archetype is
+ONE auction pool spanning TWO concurrent bilateral series, four teams, one shared purse. Three tours
+use it: **ENG v SL + IND v AFG T20I 2026**, **SA v AUS + ENG v SL ODI 2026** and **PAK v SL + IND v WI
+T20I 2026** (the last takes a 3-match SLICE of a 5-match series — IND v WI games 2–4 — so both halves
+are 3 games; all four difficulties measured, WI -5.9% is the one big mover). The archetype is
 the single-series bilateral plus exactly one new idea, and the rest is inherited from whichever
 format the series are played in.
 

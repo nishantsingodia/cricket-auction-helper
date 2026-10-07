@@ -33,6 +33,12 @@ import {
   TWIN_MATCH_FORMATS,
 } from "@/lib/squads/eng-sl-ind-afg-t20-2026";
 import {
+  PAK_SL_IND_WI_T20_2026,
+  PAK_SL_IND_WI_T20_2026_NAME,
+  PAK_SL_IND_WI_CSID,
+  PAK_SL_IND_WI_MATCH_FORMATS,
+} from "@/lib/squads/pak-sl-ind-wi-t20-2026";
+import {
   SA_AUS_ENG_SL_ODI_2026,
   SA_AUS_ENG_SL_ODI_2026_NAME,
   SA_AUS_ENG_SL_ODI_CSID,
@@ -318,6 +324,57 @@ export async function POST(request: NextRequest) {
         // withholds Afghanistan men's matches, so franchise rows are the only record those
         // players have.
         matchFormats: TWIN_MATCH_FORMATS,
+      });
+      if (isFirstBuild)
+        await carryOverPreviousLineups({
+          tournamentName: auctionRow.tournament_name,
+          tournamentId,
+          auctionId,
+        });
+      await initializeValuations(tournamentId);
+
+      return NextResponse.json({
+        success: true,
+        teams: built.teams,
+        players: built.players,
+        matched: built.matched,
+        created: built.created,
+        unmatched: built.unmatched,
+        teamBreakdown: built.teamBreakdown,
+      });
+    }
+
+    // ---- PAK v SL + IND v WI T20I 2026 (TWIN bilateral #2: 2 concurrent series, 4 teams) ----
+    if (auctionRow.tournament_name === PAK_SL_IND_WI_T20_2026_NAME) {
+      let tournamentId = auctionRow.tournament_id;
+      if (!tournamentId) {
+        // max_squad_size 16 = West Indies (PAK, SL and IND are 15).
+        const t = await sqlite
+          .prepare(
+            `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size)
+             VALUES (?, 'BILATERAL', 'T20', 100, 16)`
+          )
+          .run(PAK_SL_IND_WI_T20_2026_NAME);
+        tournamentId = Number(t.lastInsertRowid);
+        await sqlite
+          .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
+          .run(tournamentId, auctionId);
+      }
+
+      const teams = Array.isArray(teamsFilter) && teamsFilter.length
+        ? PAK_SL_IND_WI_T20_2026.filter((t) => teamsFilter.includes(t.short))
+        : PAK_SL_IND_WI_T20_2026;
+
+      const built = await buildBilateralT20Pool(sqlite, {
+        auctionId,
+        tournamentId,
+        teams,
+        // Same identity discipline as the first twin: hand-verified ids, no fuzzy, no aliases.
+        // Three "Abdul Samad" rows (the Indian one has the most games), six SL Mendises/Fernandos.
+        csidBridge: PAK_SL_IND_WI_CSID,
+        noFuzzy: true,
+        aliases: {},
+        matchFormats: PAK_SL_IND_WI_MATCH_FORMATS,
       });
       if (isFirstBuild)
         await carryOverPreviousLineups({

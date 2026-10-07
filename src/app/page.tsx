@@ -99,6 +99,13 @@ export default function HomePage() {
       note: "TWIN bilateral \u00b7 2 concurrent 3-match T20I series, 4 teams, one purse \u00b7 opposition-adjusted, widest quality gate (AFG have no cricsheet T20I data)",
     },
     {
+      // The id MUST equal PAK_SL_IND_WI_T20_2026_NAME — /api/pool/fetch branches on tournament_name.
+      id: "PAK v SL + IND v WI T20I 2026",
+      label: "PAK v SL + IND v WI T20I 2026",
+      format: "T20",
+      note: "TWIN bilateral \u00b7 PAK v SL (3) + IND v WI T20Is 2\u20134, 4 teams, one purse \u00b7 opposition-adjusted (WI \u22126%)",
+    },
+    {
       // The id MUST equal SA_AUS_ENG_SL_ODI_2026_NAME \u2014 /api/pool/fetch branches on tournament_name.
       id: "SA v AUS + ENG v SL ODI 2026",
       label: "SA v AUS + ENG v SL ODI 2026",

@@ -8,6 +8,7 @@ import { WOMENS_T20_WC_2026_NAME } from "@/lib/squads/womens-t20-wc-2026";
 import { IND_VS_ENG_T20_2026_NAME } from "@/lib/squads/ind-vs-eng-t20-2026";
 import { ENG_SL_IND_AFG_T20_2026_NAME } from "@/lib/squads/eng-sl-ind-afg-t20-2026";
 import { IND_VS_WI_T20_2026_NAME } from "@/lib/squads/ind-vs-wi-t20-2026";
+import { PAK_SL_IND_WI_T20_2026_NAME } from "@/lib/squads/pak-sl-ind-wi-t20-2026";
 import { IRE_VS_WI_W_ODI_2026_NAME } from "@/lib/squads/ire-wi-w-odi-2026";
 import { NZ_VS_WI_MEN_ODI_2026_NAME } from "@/lib/squads/nz-wi-men-odi-2026";
 import { SA_AUS_ENG_SL_ODI_2026_NAME } from "@/lib/squads/sa-aus-eng-sl-odi-2026";
@@ -37,6 +38,7 @@ export function getTourStatScope(name: string): TourStatScope | null {
     case IND_VS_ENG_T20_2026_NAME: return { formats: ["T20"], gender: "male" };
     case ENG_SL_IND_AFG_T20_2026_NAME: return { formats: ["T20"], gender: "male" };
     case IND_VS_WI_T20_2026_NAME: return { formats: ["T20"], gender: "male" };
+    case PAK_SL_IND_WI_T20_2026_NAME: return { formats: ["T20"], gender: "male" };
     case IRE_VS_WI_W_ODI_2026_NAME: return { formats: ["ODI"], gender: "female" };
     case NZ_VS_WI_MEN_ODI_2026_NAME: return { formats: ["ODI"], gender: "male" };
     case SA_AUS_ENG_SL_ODI_2026_NAME: return { formats: ["ODI"], gender: "male" };

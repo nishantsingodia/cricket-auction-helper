@@ -33,6 +33,7 @@ import {
 } from "./bat-index";
 import { getTestTour } from "@/lib/squads/test-tours";
 import { ENG_SL_IND_AFG_T20_2026_NAME } from "@/lib/squads/eng-sl-ind-afg-t20-2026";
+import { PAK_SL_IND_WI_T20_2026_NAME } from "@/lib/squads/pak-sl-ind-wi-t20-2026";
 import { canonicalVenue } from "@/lib/registry/venues";
 import {
   CPL_2026_NAME,
@@ -153,6 +154,22 @@ export const TWIN_T20_VENUES: Array<{
   { canonical: "Sophia Gardens, Cardiff", variants: ["Sophia Gardens", "Sophia Gardens, Cardiff"], type: "balanced", country: "ENG" },
   { canonical: "Old Trafford, Manchester", variants: ["Old Trafford", "Old Trafford, Manchester"], type: "balanced", country: "ENG" },
   { canonical: "Arun Jaitley Stadium, Delhi", variants: ["Arun Jaitley Stadium", "Arun Jaitley Stadium, Delhi"], type: "bat_road", country: "IND" },
+];
+
+// PAK v SL + IND v WI T20I 2026 — four grounds. Variant lists derived from the data (7 Oct 2026),
+// not written by hand. Deliberately EXCLUDED: "Lal Bahadur Shastri Stadium, Hyderabad, Deccan" and
+// "Niaz Stadium, Hyderabad" (the latter is in PAKISTAN) — a '%Hyderabad%' read would fold both in.
+export const PAK_SL_IND_WI_T20_VENUES: Array<{
+  canonical: string;
+  variants: string[];
+  type: VenueType;
+  series: "PAK v SL" | "IND v WI";
+  games: number;
+}> = [
+  { canonical: "Rawalpindi Cricket Stadium", variants: ["Rawalpindi Cricket Stadium"], type: "bat_road", series: "PAK v SL", games: 3 },
+  { canonical: "JSCA International Stadium Complex, Ranchi", variants: ["JSCA International Stadium Complex", "JSCA International Stadium Complex, Ranchi"], type: "balanced", series: "IND v WI", games: 1 },
+  { canonical: "Holkar Cricket Stadium, Indore", variants: ["Holkar Cricket Stadium", "Holkar Cricket Stadium, Indore"], type: "bat_road", series: "IND v WI", games: 1 },
+  { canonical: "Rajiv Gandhi International Stadium, Uppal, Hyderabad", variants: ["Rajiv Gandhi International Stadium", "Rajiv Gandhi International Stadium, Uppal", "Rajiv Gandhi International Stadium, Uppal, Hyderabad"], type: "bat_road", series: "IND v WI", games: 1 },
 ];
 
 // SA v AUS + ENG v SL ODI 2026 — six grounds, three per series, one match each.
@@ -288,6 +305,7 @@ export async function getTourVenueContext(tournamentName: string): Promise<TourV
   const isCpl = tournamentName === CPL_2026_NAME;
   const testTour = getTestTour(tournamentName);
   const isTwinT20 = tournamentName === ENG_SL_IND_AFG_T20_2026_NAME;
+  const isPakSlIndWi = tournamentName === PAK_SL_IND_WI_T20_2026_NAME;
   const isTwinOdi = tournamentName === SA_AUS_ENG_SL_ODI_2026_NAME;
 
   if (isHundredMen || isHundredWomen) {
@@ -358,6 +376,38 @@ export async function getTourVenueContext(tournamentName: string): Promise<TourV
       homeOf: CPL_VENUE_BASIS === "tournament"
         ? Object.fromEntries(Object.keys(CPL_TEAM_SCHEDULE).map((t) => [t, null]))
         : homeOf,
+    };
+  }
+
+  if (isPakSlIndWi) {
+    // Same shape as the first twin: two series, no shared ground, so a real per-team schedule.
+    // PAK v SL is all Rawalpindi (Pakistan genuinely at home); IND v WI moves Ranchi -> Indore ->
+    // Hyderabad. homeOf stays null for India (three grounds in six days) for consistency with the
+    // other twins. The context exists mainly so /api/auction/[id] skips the ~151k-row fallback scan.
+    const sched = (series: "PAK v SL" | "IND v WI") =>
+      PAK_SL_IND_WI_T20_VENUES.filter((v) => v.series === series).map((v) => ({
+        venue: v.canonical,
+        games: v.games,
+      }));
+    const pakSched = sched("PAK v SL");
+    const indSched = sched("IND v WI");
+    const d = await withBatIndex(
+      PAK_SL_IND_WI_T20_VENUES.map((v) => ({ canonical: v.canonical, variants: v.variants, type: v.type })),
+      "male"
+    );
+    return {
+      tour: tournamentName,
+      neutral: false,
+      gender: "male",
+      // T20Is alone are thin at these grounds; pool the franchise 20-over cricket on the same
+      // squares (PSL at Rawalpindi, IPL at the Indian grounds).
+      venueFormats: ["T20", "IPL", "PSL"],
+      venueWindowMonths: 30,
+      venues: d.venues,
+      batIndexMedian: d.batIndexMedian,
+      batIndexByGround: d.batIndexByGround,
+      teamSchedule: { PAK: pakSched, SL: pakSched, IND: indSched, WI: indSched },
+      homeOf: { PAK: "Rawalpindi Cricket Stadium", SL: null, IND: null, WI: null },
     };
   }
 
