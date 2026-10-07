@@ -1,10 +1,7 @@
 import { withTransaction, type DbHandle } from "@/db";
-import {
-  ENG_VS_PAK_TEST_2026,
-  type TestTeam,
-} from "./eng-vs-pak-test-2026";
+import type { TestTeam } from "./eng-vs-pak-test-2026";
 
-// Builds the auction pool for the ENG v PAK Test series from the announced squads.
+// Builds the auction pool for a Test series (see test-tours.ts) from the announced squads.
 //
 // DELIBERATELY DIFFERENT from every other builder here: resolution is by cricsheet identifier ONLY.
 // There is no registry-name pass and no fuzzy fallback, and a name that does not resolve is a hard
@@ -38,9 +35,9 @@ interface BuildResult {
 
 export async function buildTestPool(
   sqlite: DbHandle,
-  opts: { auctionId: number; tournamentId: number; teams?: TestTeam[] }
+  opts: { auctionId: number; tournamentId: number; teams: TestTeam[] }
 ): Promise<BuildResult> {
-  const teams = opts.teams ?? ENG_VS_PAK_TEST_2026;
+  const teams = opts.teams;
 
   const wanted = new Set(teams.flatMap((t) => t.players.map((p) => p.csid)));
   const placeholders = [...wanted].map(() => "?").join(",");

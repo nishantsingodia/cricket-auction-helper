@@ -36,6 +36,8 @@ export interface TestSquadPlayer {
   csid: string;
   role: Role;
   note?: string;
+  /** Expected Tests, overriding XI=3 / bench=1. Only for CONFIRMED availability (see test-tours.ts). */
+  matches?: number;
 }
 
 export interface TestTeam {

@@ -364,6 +364,23 @@ end to end — no archive, no scorer, no engine branch, zero rows.
   picks wrong; "Emilio Gay" reaches for CH Gayle (548 appearances); "Awais Zafar" sits beside Ayesha
   Zafar, a woman.
 - **Venue:** informational only (removed from pricing 5 Aug 2026). Headingley / Lord's / Edgbaston.
+- **Adding a Test series = registry, not branches.** Every Test code path (`/api/pool/fetch`, the
+  engine, `getTourVenueContext`) resolves the tour via `getTestTour(name)` in
+  `src/lib/squads/test-tours.ts`. New tour: write the squad file, add one `TEST_TOURS` entry, add the
+  home-page option (its id MUST equal the tour name). Second tour: **SA v AUS 2026**
+  (`sa-vs-aus-test-2026.ts`, `scripts/create-sa-aus-test-auction.sh`).
+- **Per-player `matches`** in a squad file overrides XI=3 / bench=1, keyed on csid (so it survives
+  a board reorder). Use it for CONFIRMED availability only (Green out of one Test = 2); an unconfirmed
+  doubt is a `note` with no value effect, unless the user asks to discount it (Rabada 2.5 on SA v AUS).
+- **`fcPrior` (opt-in per tour, SA v AUS on, ENG v PAK off):** a thin-Test player shrinks toward his
+  OWN FC form instead of the role prior — `prior = (nFC·FC·0.97 + 3·rolePrior)/(nFC+3)`, ≥5 FC
+  matches. FC uses the same per-innings Test FPS, and within-player Test/FC runs **0.97×** (≥5 Tests &
+  ≥10 FC, 60mo, n=62; AUS 1.01 / SA 1.01 / ENG 1.00), so it is a near-unit translation. It is still a
+  PRIOR, so established players don't move; it only lifts/lowers Shield/County players with few Tests
+  (Neser 145→153, Connolly 68→74, Harper 114→104). CSA 4-day is NOT on cricsheet, so uncapped South
+  Africans (Ackerman) stay on the role prior — asymmetric by data, bounded because it is a prior.
+- **Venue lists for SA grounds:** St George's Park has THREE spellings (incl. "…, Port Elizabeth"),
+  and a loose `%St George's%` also matches the National Cricket Stadium, St George's, GRENADA.
 
 ---
 

@@ -136,6 +136,13 @@ export default function HomePage() {
       format: "TEST",
       note: "3-Test bilateral · D11 Test FPS scored per innings · red-ball form only (60mo), FC display-only",
     },
+    {
+      // The id MUST equal SA_VS_AUS_TEST_2026_NAME — registered in src/lib/squads/test-tours.ts.
+      id: "South Africa vs Australia Men's Test 2026",
+      label: "South Africa vs Australia Men's Test 2026",
+      format: "TEST",
+      note: "3-Test bilateral · D11 Test FPS scored per innings · red-ball form only (60mo), FC display-only",
+    },
   ];
 
   // Create form state

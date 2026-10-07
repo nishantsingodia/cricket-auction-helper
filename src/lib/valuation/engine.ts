@@ -24,10 +24,7 @@ import {
   twinOdiExpectedMatches,
   twinOdiOppositionFactor,
 } from "@/lib/squads/sa-aus-eng-sl-odi-2026";
-import {
-  ENG_VS_PAK_TEST_2026_NAME,
-  testExpectedMatches,
-} from "../squads/eng-vs-pak-test-2026";
+import { getTestTour, testExpectedMatchesFor } from "../squads/test-tours";
 import {
   IRE_VS_WI_W_ODI_2026_NAME,
   odiExpectedMatches,
@@ -108,6 +105,8 @@ interface PoolPlayer {
   status: string;
   role: string;
   name: string;
+  /** cricsheet id — keys the Test `matches` availability override. */
+  csid: string | null;
   squad_number: number;
   ipl_team: string;
   price_manual: number;
@@ -196,6 +195,11 @@ function computeScore1(
 const TEST_PRIOR_MONTHS = 60;
 const TEST_PRIOR_MIN_TESTS = 5;   // per player, to contribute to the prior
 const TEST_PRIOR_MIN_PLAYERS = 10; // per role, else fall back to the pooled all-role prior
+// FC-informed Test prior (see fcPriorMap): within-player Test/FC FP ratio, measured 7 Oct 2026
+// (mean of player ratios, >=5 Tests & >=10 FC in 60mo, n=62 — AUS 1.01 / SA 1.01 / ENG 1.00).
+const TEST_FC_TO_TEST = 0.97;
+const TEST_FC_PRIOR_K = 3;
+const TEST_FC_PRIOR_MIN_MATCHES = 5;
 const TEST_PRIOR_FALLBACK: Record<string, number> = {
   BAT: 99.2, WK: 112.0, AR: 124.6, BOWL: 102.4,
 };
@@ -470,7 +474,9 @@ export async function recalculateValuations(
   // recency weights apply. First-class ('FC') is ingested but deliberately absent from the
   // quality clause: it is display-only form, because Pakistan's domestic red-ball competition
   // is not published by cricsheet and counting FC would tilt the pool toward England's fringe.
-  const isTest = tournamentRow?.name === ENG_VS_PAK_TEST_2026_NAME;
+  // Every red-ball tour shares this archetype; the registry (test-tours.ts) holds the squads.
+  const testTour = getTestTour(tournamentRow?.name);
+  const isTest = testTour != null;
   // For MLC, the "primary league season" buckets are MLC (not IPL), and the quality pool is
   // MLC + IPL + T20I (vs WPL for the women's path). A bilateral T20I series has NO league
   // season: Score 1 drops the season buckets, weights Last-10 60% + all-quality-30mo 40%.
@@ -668,7 +674,7 @@ export async function recalculateValuations(
   // --- Pool ---
   const pool = await sqlite
     .prepare(
-      `SELECT ap.id, ap.player_id, ap.status, ap.squad_number, ap.ipl_team, p.role, p.name AS name, COALESCE(ap.price_manual, 0) as price_manual, COALESCE(ap.efppm, 0) as efppm, COALESCE(ap.sold_price, 0) as sold_price
+      `SELECT ap.id, ap.player_id, ap.status, ap.squad_number, ap.ipl_team, p.role, p.name AS name, p.cricsheet_id AS csid, COALESCE(ap.price_manual, 0) as price_manual, COALESCE(ap.efppm, 0) as efppm, COALESCE(ap.sold_price, 0) as sold_price
        FROM auction_pool ap
        JOIN players p ON ap.player_id = p.id
        WHERE ap.tournament_id = ?`
@@ -831,6 +837,26 @@ export async function recalculateValuations(
       testInnsMap.set(r.player_id, (testInnsMap.get(r.player_id) ?? 0) + n);
     }
   }
+  // FC-informed prior (opt-in per tour, `fcPrior` in test-tours.ts). A thin-Test player shrinks
+  // toward HIS OWN first-class form rather than the generic role average. FC is scored with the
+  // same per-innings Test FPS, and measured within-player (>=5 Tests & >=10 FC, 60mo, n=62) a
+  // player's Test FP runs 0.97x his FC FP — so it is a near-unit translation, not a rescale.
+  // The FC mean is itself shrunk toward the role prior (k=3 matches) so 5 Shield games cannot
+  // overrule it. Still a PRIOR: a player with a real Test sample is barely moved by it.
+  // Asymmetric by data availability: Shield + County are on cricsheet, CSA 4-day is not, so a
+  // South African without Test caps falls back to the role prior exactly as before.
+  const fcPriorMap = new Map<number, { mean: number; n: number }>();
+  if (isTest && testTour?.fcPrior) {
+    const fcRows = (await sqlite
+      .prepare(
+        `SELECT player_id, AVG(fantasy_points) AS mean, COUNT(*) AS n FROM match_performances
+          WHERE player_id IN (${placeholders}) AND format = 'FC'
+            AND match_date >= date('now', '${allWindow}')
+          GROUP BY player_id HAVING COUNT(*) >= ${TEST_FC_PRIOR_MIN_MATCHES}`
+      )
+      .all(...playerIds)) as Array<{ player_id: number; mean: number; n: number }>;
+    for (const r of fcRows) fcPriorMap.set(r.player_id, { mean: r.mean, n: r.n });
+  }
   if (isEtpl) {
     // Total quality games in the 30-month window, the n for ETPL's total-N shrinkage.
     const nRows = (await sqlite
@@ -981,8 +1007,12 @@ export async function recalculateValuations(
       // more about one dismissal than about him.
       const TEST_SHRINK_K = 3;
       const TEST_MIN_INNINGS = 3;
-      const prior =
+      const rolePrior =
         testRolePrior?.[p.role] ?? TEST_PRIOR_FALLBACK[p.role] ?? TEST_PRIOR_FALLBACK.BAT;
+      const fc = fcPriorMap.get(p.player_id);
+      const prior = fc
+        ? (fc.n * fc.mean * TEST_FC_TO_TEST + TEST_FC_PRIOR_K * rolePrior) / (fc.n + TEST_FC_PRIOR_K)
+        : rolePrior;
       const n = testInnsMap.get(p.player_id) ?? 0;
       score1 =
         n < TEST_MIN_INNINGS
@@ -1089,7 +1119,7 @@ export async function recalculateValuations(
     const expectedMatches = isHundred
       ? hundredExpectedMatches(p.ipl_team, p.squad_number, isHundredWomen)
       : isTest
-      ? testExpectedMatches(p.squad_number)
+      ? testExpectedMatchesFor(testTour!, p.csid, p.squad_number)
       : isIndWi
       ? indWiExpectedMatches(p.squad_number)
       : isBilateral

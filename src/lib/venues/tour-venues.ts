@@ -31,10 +31,7 @@ import {
   type BatIndexBasis,
   type BatIndexSource,
 } from "./bat-index";
-import {
-  ENG_VS_PAK_TEST_2026_NAME,
-  ENG_PAK_TEST_VENUES,
-} from "@/lib/squads/eng-vs-pak-test-2026";
+import { getTestTour } from "@/lib/squads/test-tours";
 import { ENG_SL_IND_AFG_T20_2026_NAME } from "@/lib/squads/eng-sl-ind-afg-t20-2026";
 import { canonicalVenue } from "@/lib/registry/venues";
 import {
@@ -289,7 +286,7 @@ export async function getTourVenueContext(tournamentName: string): Promise<TourV
   const isHundredWomen = tournamentName === THE_HUNDRED_WOMEN_2026_NAME;
   const isLpl = tournamentName === LPL_2026_NAME;
   const isCpl = tournamentName === CPL_2026_NAME;
-  const isEngPakTest = tournamentName === ENG_VS_PAK_TEST_2026_NAME;
+  const testTour = getTestTour(tournamentName);
   const isTwinT20 = tournamentName === ENG_SL_IND_AFG_T20_2026_NAME;
   const isTwinOdi = tournamentName === SA_AUS_ENG_SL_ODI_2026_NAME;
 
@@ -470,11 +467,11 @@ export async function getTourVenueContext(tournamentName: string): Promise<TourV
     };
   }
 
-  if (isEngPakTest) {
-    // Every ground is an England ground, so `neutral` is false — but no ONE ground is a "home" for
+  if (testTour) {
+    // Every ground is in the HOST country, so `neutral` is false — but no ONE ground is a "home" for
     // either side across a 3-Test series, so homeOf is null for both and the header shows the
     // schedule rather than a single home venue. Each ground hosts exactly one Test.
-    const schedule = ENG_PAK_TEST_VENUES.map((v) => ({ venue: v.canonical, games: 1 }));
+    const schedule = testTour.venues.map((v) => ({ venue: v.canonical, games: 1 }));
     return {
       tour: tournamentName,
       neutral: false,
@@ -487,7 +484,7 @@ export async function getTourVenueContext(tournamentName: string): Promise<TourV
         const d = await withBatIndex(
           // `type` is a required field but is DERIVED inside withBatIndex from the measured index —
           // the seed value here is only the fallback for a ground with no usable Test sample.
-          ENG_PAK_TEST_VENUES.map((v) => ({
+          testTour.venues.map((v) => ({
             canonical: v.canonical,
             variants: v.variants,
             type: "balanced" as VenueType,

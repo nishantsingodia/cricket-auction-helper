@@ -60,10 +60,7 @@ import { buildLPLPool } from "@/lib/squads/build-lpl-pool";
 import { CPL_2026, CPL_2026_NAME } from "@/lib/squads/cpl-2026";
 import { WCPL_2026, WCPL_2026_NAME } from "@/lib/squads/wcpl-2026";
 import { ETPL_2026, ETPL_2026_NAME } from "@/lib/squads/etpl-2026";
-import {
-  ENG_VS_PAK_TEST_2026,
-  ENG_VS_PAK_TEST_2026_NAME,
-} from "@/lib/squads/eng-vs-pak-test-2026";
+import { getTestTour } from "@/lib/squads/test-tours";
 import { buildTestPool } from "@/lib/squads/build-test-pool";
 import { buildCPLPool } from "@/lib/squads/build-cpl-pool";
 import { buildWCPLPool } from "@/lib/squads/build-wcpl-pool";
@@ -400,18 +397,19 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // ---- England vs Pakistan Men's Test 2026 (RED-BALL bilateral, 3 Tests) ----
-    if (auctionRow.tournament_name === ENG_VS_PAK_TEST_2026_NAME) {
+    // ---- Test series (RED-BALL bilateral) — every tour registered in test-tours.ts ----
+    const testTour = getTestTour(auctionRow.tournament_name);
+    if (testTour) {
       let tournamentId = auctionRow.tournament_id;
       if (!tournamentId) {
         // match_format 'TEST' is what scopes the engine's form queries and the player modal to
-        // red ball; max_squad_size 17 = Pakistan's squad, the larger of the two.
+        // red ball; max_squad_size = the larger of the two announced squads.
         const t = await sqlite
           .prepare(
             `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size)
-             VALUES (?, 'BILATERAL', 'TEST', 100, 17)`
+             VALUES (?, 'BILATERAL', 'TEST', 100, ?)`
           )
-          .run(ENG_VS_PAK_TEST_2026_NAME);
+          .run(testTour.name, Math.max(...testTour.teams.map((tm) => tm.players.length)));
         tournamentId = Number(t.lastInsertRowid);
         await sqlite
           .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
@@ -419,8 +417,8 @@ export async function POST(request: NextRequest) {
       }
 
       const teams = Array.isArray(teamsFilter) && teamsFilter.length
-        ? ENG_VS_PAK_TEST_2026.filter((t) => teamsFilter.includes(t.short))
-        : undefined;
+        ? testTour.teams.filter((t) => teamsFilter.includes(t.short))
+        : testTour.teams;
 
       const built = await buildTestPool(sqlite, { auctionId, tournamentId, teams });
       if (isFirstBuild)
