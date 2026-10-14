@@ -22,7 +22,7 @@
 // ZIM 0.50 (sums to 2.0 — two finalists). Bench 0.5 (four-game event, little rotation).
 // XI seed = each side's most recent ODI XIs (BAN v AUS Jun 2026, ZIM v AUS Sep 2026 from cricsheet;
 // AFG in Ireland Aug 2026), with absent/unpicked players replaced: BAN Nahid Rana (injured) -> Shoriful;
-// ZIM Kaia/Madhevere (not picked) -> Marumani/Burl; AFG Nabi back for Ikram, Yamin (4/71 v IRE) as 3rd seamer.
+// ZIM Kaia (not picked) -> Marumani, Burl benched; AFG Nabi back for Ikram, Yamin (4/71 v IRE) as 3rd seamer.
 
 import type { BilateralTeam, Role } from "./ind-vs-eng-t20-2026";
 
@@ -120,14 +120,15 @@ export const AFG_BAN_ZIM_ODI_TRI_2026: BilateralTeam[] = [
       { name: "Brendan Taylor", role: "WK" }, // 4
       { name: "Craig Ervine", role: "BAT" }, // 5
       { name: "Sikandar Raza", role: "AR" }, // 6
-      { name: "Ryan Burl", role: "AR" }, // 7
+      { name: "Wessly Madhevere", role: "AR" }, // 7
       { name: "Brad Evans", role: "AR" }, // 8
       { name: "Wellington Masakadza", role: "AR" }, // 9
       { name: "Newman Nyamhuri", role: "BOWL" }, // 10
       { name: "Blessing Muzarabani", role: "BOWL" }, // 11
-      { name: "Ernest Masuku", role: "BOWL" }, // 12
-      { name: "Tafadzwa Tsiga", role: "WK" }, // 13
-      { name: "Vincent Masekesa", role: "AR" }, // 14
+      { name: "Ryan Burl", role: "AR" }, // 12
+      { name: "Ernest Masuku", role: "BOWL" }, // 13
+      { name: "Tafadzwa Tsiga", role: "WK" }, // 14
+      { name: "Vincent Masekesa", role: "AR" }, // 15
     ],
   },
 ];
@@ -180,6 +181,7 @@ export const AFG_BAN_ZIM_ODI_CSID: Record<string, string> = {
   "Ernest Masuku": "7e6e7274",
   "Tafadzwa Tsiga": "a1dcb5b9",
   "Vincent Masekesa": "42b34cb1",
+  "Wessly Madhevere": "a879b92c",
 };
 
 // Wide candidate pool — see TWIN_ODI_MATCH_FORMATS for why (identity is csid-bridged, so widening
