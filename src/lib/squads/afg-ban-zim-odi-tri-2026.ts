@@ -20,7 +20,9 @@
 //
 // Expected matches: XI = 2 league games + P(reaching the final). P(final) AFG 0.80 / BAN 0.70 /
 // ZIM 0.50 (sums to 2.0 — two finalists). Bench 0.5 (four-game event, little rotation).
-// The XI seed below is a curated guess — worth a manual pass on the board before bidding.
+// XI seed = each side's most recent ODI XIs (BAN v AUS Jun 2026, ZIM v AUS Sep 2026 from cricsheet;
+// AFG in Ireland Aug 2026), with absent/unpicked players replaced: BAN Nahid Rana (injured) -> Shoriful;
+// ZIM Kaia/Madhevere (not picked) -> Marumani/Burl; AFG Nabi back for Ikram, Yamin (4/71 v IRE) as 3rd seamer.
 
 import type { BilateralTeam, Role } from "./ind-vs-eng-t20-2026";
 
@@ -70,62 +72,62 @@ export const AFG_BAN_ZIM_ODI_TRI_2026: BilateralTeam[] = [
   {
     name: "Afghanistan", short: "AFG", country: "Afghanistan", color: "#0066B3",
     players: [
-      { name: "Rahmanullah Gurbaz", role: "WK" },     // 1 (vc)
-      { name: "Ibrahim Zadran", role: "BAT" },         // 2
-      { name: "Sediqullah Atal", role: "BAT" },        // 3
-      { name: "Rahmat Shah", role: "BAT" },            // 4 (c)
-      { name: "Hashmatullah Shahidi", role: "BAT" },   // 5
-      { name: "Azmatullah Omarzai", role: "AR" },      // 6
-      { name: "Mohammad Nabi", role: "AR" },           // 7
-      { name: "Rashid Khan", role: "BOWL" },           // 8
-      { name: "AM Ghazanfar", role: "BOWL" },          // 9
-      { name: "Fazalhaq Farooqi", role: "BOWL" },      // 10
-      { name: "Bilal Sami", role: "BOWL" },            // 11
-      { name: "Ikram Alikhil", role: "WK" },           // 12
-      { name: "Nangyalai Khan", role: "BOWL" },        // 13
-      { name: "Zia Ur Rahman Sharifi", role: "BOWL" }, // 14
-      { name: "Yamin Ahmadzai", role: "BOWL" },        // 15
+      { name: "Rahmanullah Gurbaz", role: "WK" }, // 1
+      { name: "Ibrahim Zadran", role: "BAT" }, // 2
+      { name: "Sediqullah Atal", role: "BAT" }, // 3
+      { name: "Rahmat Shah", role: "BAT" }, // 4
+      { name: "Hashmatullah Shahidi", role: "BAT" }, // 5
+      { name: "Azmatullah Omarzai", role: "AR" }, // 6
+      { name: "Mohammad Nabi", role: "AR" }, // 7
+      { name: "Rashid Khan", role: "BOWL" }, // 8
+      { name: "AM Ghazanfar", role: "BOWL" }, // 9
+      { name: "Fazalhaq Farooqi", role: "BOWL" }, // 10
+      { name: "Yamin Ahmadzai", role: "BOWL" }, // 11
+      { name: "Bilal Sami", role: "BOWL" }, // 12
+      { name: "Ikram Alikhil", role: "WK" }, // 13
+      { name: "Nangyalai Khan", role: "BOWL" }, // 14
+      { name: "Zia Ur Rahman Sharifi", role: "BOWL" }, // 15
       { name: "Qais Ahmad", role: "BOWL", note: "Travelling reserve." }, // 16
     ],
   },
   {
     name: "Bangladesh", short: "BAN", country: "Bangladesh", color: "#006A4E",
     players: [
-      { name: "Tanzid Hasan Tamim", role: "BAT" },     // 1
-      { name: "Soumya Sarkar", role: "BAT" },          // 2
-      { name: "Najmul Hossain Shanto", role: "BAT" },  // 3
-      { name: "Tawhid Hridoy", role: "BAT" },          // 4
-      { name: "Litton Das", role: "WK" },              // 5 (c)
-      { name: "Quazi Nurul Hasan Sohan", role: "WK" }, // 6
-      { name: "Mehidy Hasan Miraz", role: "AR" },      // 7
-      { name: "Rishad Hossain", role: "BOWL" },        // 8
-      { name: "Tanvir Islam", role: "BOWL" },          // 9
-      { name: "Taskin Ahmed", role: "BOWL" },          // 10
-      { name: "Mustafizur Rahman", role: "BOWL" },     // 11
-      { name: "Saif Hassan", role: "BAT" },            // 12
-      { name: "Musaddek Hossain Saikat", role: "AR" }, // 13
-      { name: "Shoriful Islam", role: "BOWL" },        // 14
-      { name: "Hasan Mahmud", role: "BOWL" },          // 15
+      { name: "Tanzid Hasan Tamim", role: "BAT" }, // 1
+      { name: "Soumya Sarkar", role: "BAT" }, // 2
+      { name: "Najmul Hossain Shanto", role: "BAT" }, // 3
+      { name: "Litton Das", role: "WK" }, // 4
+      { name: "Tawhid Hridoy", role: "BAT" }, // 5
+      { name: "Musaddek Hossain Saikat", role: "AR" }, // 6
+      { name: "Mehidy Hasan Miraz", role: "AR" }, // 7
+      { name: "Tanvir Islam", role: "BOWL" }, // 8
+      { name: "Taskin Ahmed", role: "BOWL" }, // 9
+      { name: "Mustafizur Rahman", role: "BOWL" }, // 10
+      { name: "Shoriful Islam", role: "BOWL" }, // 11
+      { name: "Saif Hassan", role: "BAT" }, // 12
+      { name: "Rishad Hossain", role: "BOWL" }, // 13
+      { name: "Quazi Nurul Hasan Sohan", role: "WK" }, // 14
+      { name: "Hasan Mahmud", role: "BOWL" }, // 15
       { name: "Aliss Al Islam", role: "BOWL", note: "Uncapped in ODIs (maiden call-up)." }, // 16
     ],
   },
   {
     name: "Zimbabwe", short: "ZIM", country: "Zimbabwe", color: "#D40000",
     players: [
-      { name: "Brian Bennett", role: "BAT" },          // 1
-      { name: "Ben Curran", role: "BAT" },             // 2
-      { name: "Craig Ervine", role: "BAT" },           // 3
-      { name: "Sikandar Raza", role: "AR" },           // 4 (c)
-      { name: "Brendan Taylor", role: "WK" },          // 5
-      { name: "Tadiwanashe Marumani", role: "WK" },    // 6
-      { name: "Ryan Burl", role: "AR" },               // 7
-      { name: "Brad Evans", role: "AR" },              // 8
-      { name: "Wellington Masakadza", role: "AR" },    // 9
-      { name: "Newman Nyamhuri", role: "BOWL" },       // 10
-      { name: "Blessing Muzarabani", role: "BOWL" },   // 11
-      { name: "Ernest Masuku", role: "BOWL" },         // 12
-      { name: "Tafadzwa Tsiga", role: "WK" },          // 13
-      { name: "Vincent Masekesa", role: "AR" },        // 14
+      { name: "Brian Bennett", role: "BAT" }, // 1
+      { name: "Ben Curran", role: "BAT" }, // 2
+      { name: "Tadiwanashe Marumani", role: "WK" }, // 3
+      { name: "Brendan Taylor", role: "WK" }, // 4
+      { name: "Craig Ervine", role: "BAT" }, // 5
+      { name: "Sikandar Raza", role: "AR" }, // 6
+      { name: "Ryan Burl", role: "AR" }, // 7
+      { name: "Brad Evans", role: "AR" }, // 8
+      { name: "Wellington Masakadza", role: "AR" }, // 9
+      { name: "Newman Nyamhuri", role: "BOWL" }, // 10
+      { name: "Blessing Muzarabani", role: "BOWL" }, // 11
+      { name: "Ernest Masuku", role: "BOWL" }, // 12
+      { name: "Tafadzwa Tsiga", role: "WK" }, // 13
+      { name: "Vincent Masekesa", role: "AR" }, // 14
     ],
   },
 ];
