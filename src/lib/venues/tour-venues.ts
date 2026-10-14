@@ -24,6 +24,10 @@ import {
   SA_AUS_ENG_SL_ODI_2026_NAME,
 } from "@/lib/squads/sa-aus-eng-sl-odi-2026";
 import {
+  AFG_BAN_ZIM_ODI_TRI_2026_NAME,
+  TRI_ODI_VENUES,
+} from "@/lib/squads/afg-ban-zim-odi-tri-2026";
+import {
   computeBatIndex,
   describeBatIndex,
   venueTypeFromBatIndex,
@@ -307,6 +311,29 @@ export async function getTourVenueContext(tournamentName: string): Promise<TourV
   const isTwinT20 = tournamentName === ENG_SL_IND_AFG_T20_2026_NAME;
   const isPakSlIndWi = tournamentName === PAK_SL_IND_WI_T20_2026_NAME;
   const isTwinOdi = tournamentName === SA_AUS_ENG_SL_ODI_2026_NAME;
+  const isTriOdi = tournamentName === AFG_BAN_ZIM_ODI_TRI_2026_NAME;
+
+  if (isTriOdi) {
+    // Every game at one neutral ground. A context is still required — without one the board falls
+    // back to a ~151k-row IPL+T20 venue scan on every load.
+    const d = await withBatIndex(
+      TRI_ODI_VENUES.map((v) => ({ canonical: v.canonical, variants: v.variants, type: v.type })),
+      "male"
+    );
+    const sched = [{ venue: TRI_ODI_VENUES[0].canonical, games: 3 }];
+    return {
+      tour: tournamentName,
+      neutral: true,
+      gender: "male",
+      venueFormats: ["ODI"],
+      venueWindowMonths: 60,
+      venues: d.venues,
+      batIndexMedian: d.batIndexMedian,
+      batIndexByGround: d.batIndexByGround,
+      teamSchedule: { AFG: sched, BAN: sched, ZIM: sched },
+      homeOf: { AFG: null, BAN: null, ZIM: null },
+    };
+  }
 
   if (isHundredMen || isHundredWomen) {
     const teams = isHundredMen ? HUNDRED_MEN_2026 : HUNDRED_WOMEN_2026;

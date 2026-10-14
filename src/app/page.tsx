@@ -106,6 +106,13 @@ export default function HomePage() {
       note: "TWIN bilateral \u00b7 PAK v SL (3) + IND v WI T20Is 2\u20134, 4 teams, one purse \u00b7 opposition-adjusted (WI \u22126%)",
     },
     {
+      // The id MUST equal AFG_BAN_ZIM_ODI_TRI_2026_NAME \u2014 /api/pool/fetch branches on tournament_name.
+      id: "AFG v BAN v ZIM ODI Tri-Series 2026",
+      label: "AFG v BAN v ZIM ODI Tri-Series 2026",
+      format: "ODI",
+      note: "ODI tri-series (UAE) \u00b7 3 league games + final \u00b7 ODI form, AFG via franchise-T20 proxy (cricsheet withholds AFG)",
+    },
+    {
       // The id MUST equal SA_AUS_ENG_SL_ODI_2026_NAME \u2014 /api/pool/fetch branches on tournament_name.
       id: "SA v AUS + ENG v SL ODI 2026",
       label: "SA v AUS + ENG v SL ODI 2026",

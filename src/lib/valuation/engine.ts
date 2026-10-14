@@ -29,6 +29,11 @@ import {
   twinOdiExpectedMatches,
   twinOdiOppositionFactor,
 } from "@/lib/squads/sa-aus-eng-sl-odi-2026";
+import {
+  AFG_BAN_ZIM_ODI_TRI_2026_NAME,
+  TRI_ODI_AFG_EFPPM,
+  triOdiExpectedMatches,
+} from "@/lib/squads/afg-ban-zim-odi-tri-2026";
 import { getTestTour, testExpectedMatchesFor } from "../squads/test-tours";
 import {
   IRE_VS_WI_W_ODI_2026_NAME,
@@ -476,7 +481,11 @@ export async function recalculateValuations(
   // men's ODI gate is both sufficient and tighter — widening it would only import namesakes and
   // off-format form. Expected matches is the flat 3/1 of the T20 twin, NOT the 5/2 of the
   // five-match NZ v WI ODI series: these series are three matches with no dead rubber.
-  const isTwinOdi = tournamentRow?.name === SA_AUS_ENG_SL_ODI_2026_NAME;
+  // AFG/BAN/ZIM ODI tri-series rides the twin-ODI form model wholesale (ODI-only, 36mo, weak-opp
+  // x0.83) and differs only in: Afghan EFPPM from TRI_ODI_AFG_EFPPM (cricsheet withholds AFG), no
+  // opposition factor, and 2 + P(final) expected matches. See afg-ban-zim-odi-tri-2026.ts.
+  const isTriOdi = tournamentRow?.name === AFG_BAN_ZIM_ODI_TRI_2026_NAME;
+  const isTwinOdi = tournamentRow?.name === SA_AUS_ENG_SL_ODI_2026_NAME || isTriOdi;
   // ENG v PAK 2026: the first RED-BALL tour. Scored purely on Test form ('TEST'), which is a
   // different points scale entirely (2 innings, +20 a wicket, no rate bonuses) — so nothing
   // white-ball may leak into it, in either direction. No league season, so the bilateral
@@ -1067,6 +1076,9 @@ export async function recalculateValuations(
     } else {
       score1 = rawScore1;
     }
+    if (isTriOdi && p.ipl_team === "AFG" && TRI_ODI_AFG_EFPPM[p.name] != null) {
+      score1 = TRI_ODI_AFG_EFPPM[p.name];
+    }
 
     // Format-scale normalization, blended by how much of the player's recent quality history is
     // already in the tour's own format. Hundred: convert the (mostly non-Hundred) proxy form DOWN
@@ -1110,7 +1122,7 @@ export async function recalculateValuations(
       normMult = isPakSlIndWi
         ? pakSlIndWiOppositionFactor(p.ipl_team)
         : twinOppositionFactor(p.ipl_team);
-    } else if (isTwinOdi) {
+    } else if (isTwinOdi && !isTriOdi) {
       // Same mechanism as the T20 twin above, measured on men's ODI form — but a MUCH smaller and
       // less stable effect, because all four sides here are top-8 nations rather than a top-8 pool
       // containing Afghanistan. It runs about +-2% on price and its sign for SL/SA flips under one
@@ -1143,6 +1155,8 @@ export async function recalculateValuations(
       ? (isPakSlIndWi
           ? pakSlIndWiExpectedMatches(p.squad_number)
           : twinT20ExpectedMatches(p.squad_number))
+      : isTriOdi
+      ? triOdiExpectedMatches(p.ipl_team, p.squad_number)
       : isTwinOdi
       // Flat 3 / 1, same as the T20 twin and for the same reason: both series are 3 matches, the
       // XI plays all three, and there is no dead rubber to rotate in. Explicitly NOT the 5/2 of

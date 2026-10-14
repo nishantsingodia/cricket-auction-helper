@@ -45,6 +45,12 @@ import {
   TWIN_ODI_MATCH_FORMATS,
 } from "@/lib/squads/sa-aus-eng-sl-odi-2026";
 import {
+  AFG_BAN_ZIM_ODI_TRI_2026,
+  AFG_BAN_ZIM_ODI_TRI_2026_NAME,
+  AFG_BAN_ZIM_ODI_CSID,
+  TRI_ODI_MATCH_FORMATS,
+} from "@/lib/squads/afg-ban-zim-odi-tri-2026";
+import {
   IRE_VS_WI_W_ODI_2026,
   IRE_VS_WI_W_ODI_2026_NAME,
 } from "@/lib/squads/ire-wi-w-odi-2026";
@@ -392,6 +398,47 @@ export async function POST(request: NextRequest) {
         created: built.created,
         unmatched: built.unmatched,
         teamBreakdown: built.teamBreakdown,
+      });
+    }
+
+    // ---- AFG v BAN v ZIM ODI Tri-Series 2026 (3 teams, 3 league games + final) ----
+    if (auctionRow.tournament_name === AFG_BAN_ZIM_ODI_TRI_2026_NAME) {
+      let tournamentId = auctionRow.tournament_id;
+      if (!tournamentId) {
+        const t = await sqlite
+          .prepare(
+            `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size)
+             VALUES (?, 'BILATERAL', 'ODI', 100, 16)`
+          )
+          .run(AFG_BAN_ZIM_ODI_TRI_2026_NAME);
+        tournamentId = Number(t.lastInsertRowid);
+        await sqlite
+          .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
+          .run(tournamentId, auctionId);
+      }
+
+      const teams = Array.isArray(teamsFilter) && teamsFilter.length
+        ? AFG_BAN_ZIM_ODI_TRI_2026.filter((t) => teamsFilter.includes(t.short))
+        : AFG_BAN_ZIM_ODI_TRI_2026;
+
+      const built = await buildBilateralT20Pool(sqlite, {
+        auctionId,
+        tournamentId,
+        teams,
+        csidBridge: AFG_BAN_ZIM_ODI_CSID,
+        noFuzzy: true,
+        aliases: {},
+        matchFormats: TRI_ODI_MATCH_FORMATS,
+      });
+      await initializeValuations(tournamentId);
+
+      return NextResponse.json({
+        success: true,
+        teams: built.teams,
+        players: built.players,
+        matched: built.matched,
+        created: built.created,
+        unmatched: built.unmatched,
       });
     }
 

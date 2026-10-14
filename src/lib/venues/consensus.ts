@@ -12,6 +12,7 @@ import { PAK_SL_IND_WI_T20_2026_NAME } from "@/lib/squads/pak-sl-ind-wi-t20-2026
 import { IRE_VS_WI_W_ODI_2026_NAME } from "@/lib/squads/ire-wi-w-odi-2026";
 import { NZ_VS_WI_MEN_ODI_2026_NAME } from "@/lib/squads/nz-wi-men-odi-2026";
 import { SA_AUS_ENG_SL_ODI_2026_NAME } from "@/lib/squads/sa-aus-eng-sl-odi-2026";
+import { AFG_BAN_ZIM_ODI_TRI_2026_NAME } from "@/lib/squads/afg-ban-zim-odi-tri-2026";
 import {
   THE_HUNDRED_MEN_2026_NAME,
   THE_HUNDRED_WOMEN_2026_NAME,
@@ -42,6 +43,7 @@ export function getTourStatScope(name: string): TourStatScope | null {
     case IRE_VS_WI_W_ODI_2026_NAME: return { formats: ["ODI"], gender: "female" };
     case NZ_VS_WI_MEN_ODI_2026_NAME: return { formats: ["ODI"], gender: "male" };
     case SA_AUS_ENG_SL_ODI_2026_NAME: return { formats: ["ODI"], gender: "male" };
+    case AFG_BAN_ZIM_ODI_TRI_2026_NAME: return { formats: ["ODI"], gender: "male" };
     default:
       // IPL (default tour) + any IPL-named auction
       return name.toLowerCase().includes("ipl") ? { formats: ["IPL"], gender: "male" } : null;
