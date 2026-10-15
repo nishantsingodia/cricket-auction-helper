@@ -118,6 +118,9 @@ echo ""
 
 python "$SCRIPT_DIR/etl_cricsheet.py"
 
+# The ETL never writes bat_position; ODI boards need it to seed batting orders.
+python "$SCRIPT_DIR/backfill_odi_bat_position.py"
+
 echo ""
 
 # ------------------------------------------------------------------
