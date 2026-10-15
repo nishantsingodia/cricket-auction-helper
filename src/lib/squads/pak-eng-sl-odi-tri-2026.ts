@@ -10,14 +10,16 @@
 // Expected matches: XI = 4 league + P(final). P(final) PAK 0.75 (home) / ENG 0.65 / SL 0.60 —
 // sums to 2.0. Bench 1.0 (a five-game event with two dead-ish rubbers leaves room to rotate).
 //
-// XI seed = each side's most recent ODI XIs from cricsheet, restricted to this squad:
-//  - ENG (v SL, Sep 2026): Buttler and Archer are not in this squad. Cox keeps (as in ODI 3), Sam
-//    Curran and Rashid (both back) come in; Dawson / Baker drop to the bench.
-//  - PAK (v AUS, Jun 2026): Sahibzada Farhan, Maaz Sadaqat and Abdul Samad are not in this squad.
-//    Saim Ayub and Fakhar Zaman open; Hasan Nawaz bats in the middle order.
-//  - SL (v ENG, Sep 2026): Asalanka is not in this squad -> Avishka Fernando (Shanaka has played
-//    2 ODIs since 2024, none of SL's last five, so he sits on the bench). Theekshana / Chameera on the
-//    bench behind the Wellalage / Malinga / Asitha / Madushanka attack that played all three.
+// XI seed (15 Oct, from reported team news — NOT a recency guess; the first seed was rejected):
+//  - PAK: coach Hesson back to Fakhar + Saim as openers; Ghori keeps and bats 4; Salman 5, Hasan
+//    Nawaz 6; Minhas and Shadab both in (as v AUS in June); Shaheen, Rauf, Abrar. Naseem / Faheem /
+//    Razaullah on the bench (Nukta preview).
+//  - ENG: Duckett, Banton, Root, Brook, Cox (wk), Curran, Jacks — top seven fixed for the series —
+//    then Overton, Dawson + Rashid (two spinners in Pakistan), Atkinson. Bowlers rotate, so the pace
+//    slot may go to Baker / Tongue in later games.
+//  - SL: Avishka recalled as a top-order hitter alongside Nissanka (hamstring, subject to clearance),
+//    Kusal (c, wk); Theekshana + Wellalage spin on subcontinent pitches; Chameera, Asitha,
+//    Madushanka pace. Malinga / Colombage (both played in England) to the bench.
 
 import type { BilateralTeam } from "./ind-vs-eng-t20-2026";
 
@@ -27,64 +29,64 @@ export const PAK_ENG_SL_ODI_TRI_2026: BilateralTeam[] = [
   {
     name: "Pakistan", short: "PAK", country: "Pakistan", color: "#01411C",
     players: [
-      { name: "Saim Ayub", role: "BAT" },            // 1
-      { name: "Fakhar Zaman", role: "BAT" },         // 2
-      { name: "Babar Azam", role: "BAT" },           // 3
-      { name: "Ghazi Ghori", role: "WK" },           // 4
-      { name: "Salman Ali Agha", role: "AR" },       // 5
-      { name: "Hasan Nawaz", role: "BAT" },          // 6
-      { name: "Arafat Minhas", role: "AR" },         // 7
-      { name: "Shadab Khan", role: "AR" },           // 8
-      { name: "Shaheen Shah Afridi", role: "BOWL" }, // 9 (c)
-      { name: "Haris Rauf", role: "BOWL" },          // 10
-      { name: "Abrar Ahmed", role: "BOWL" },         // 11
-      { name: "Naseem Shah", role: "BOWL" },         // 12
-      { name: "Faheem Ashraf", role: "AR" },         // 13
-      { name: "Saad Baig", role: "WK" },             // 14
-      { name: "Sufyan Moqim", role: "BOWL" },        // 15
-      { name: "Razaullah Mashwani", role: "AR" },    // 16
+      { name: "Fakhar Zaman", role: "BAT" }, // 1
+      { name: "Saim Ayub", role: "BAT" }, // 2
+      { name: "Babar Azam", role: "BAT" }, // 3
+      { name: "Ghazi Ghori", role: "WK" }, // 4
+      { name: "Salman Ali Agha", role: "AR" }, // 5
+      { name: "Hasan Nawaz", role: "BAT" }, // 6
+      { name: "Arafat Minhas", role: "AR" }, // 7
+      { name: "Shadab Khan", role: "AR" }, // 8
+      { name: "Shaheen Shah Afridi", role: "BOWL" }, // 9
+      { name: "Haris Rauf", role: "BOWL" }, // 10
+      { name: "Abrar Ahmed", role: "BOWL" }, // 11
+      { name: "Naseem Shah", role: "BOWL" }, // 12
+      { name: "Faheem Ashraf", role: "AR" }, // 13
+      { name: "Razaullah Mashwani", role: "AR" }, // 14
+      { name: "Sufyan Moqim", role: "BOWL" }, // 15
+      { name: "Saad Baig", role: "WK" }, // 16
     ],
   },
   {
     name: "England", short: "ENG", country: "England", color: "#CF142B",
     players: [
-      { name: "Tom Banton", role: "BAT" },     // 1
-      { name: "Ben Duckett", role: "BAT" },    // 2
-      { name: "Joe Root", role: "BAT" },       // 3
-      { name: "Harry Brook", role: "BAT" },    // 4 (c)
-      { name: "Jordan Cox", role: "WK" },      // 5
-      { name: "Will Jacks", role: "AR" },      // 6
-      { name: "Sam Curran", role: "AR" },      // 7
-      { name: "Jamie Overton", role: "AR" },   // 8
-      { name: "Gus Atkinson", role: "BOWL" },  // 9
-      { name: "Adil Rashid", role: "BOWL" },   // 10
-      { name: "Josh Tongue", role: "BOWL" },   // 11
-      { name: "Liam Dawson", role: "AR" },     // 12
-      { name: "Sonny Baker", role: "BOWL" },   // 13
-      { name: "James Coles", role: "AR" },     // 14
-      { name: "Mason Crane", role: "BOWL" },   // 15
+      { name: "Ben Duckett", role: "BAT" }, // 1
+      { name: "Tom Banton", role: "BAT" }, // 2
+      { name: "Joe Root", role: "BAT" }, // 3
+      { name: "Harry Brook", role: "BAT" }, // 4
+      { name: "Jordan Cox", role: "WK" }, // 5
+      { name: "Sam Curran", role: "AR" }, // 6
+      { name: "Will Jacks", role: "AR" }, // 7
+      { name: "Jamie Overton", role: "AR" }, // 8
+      { name: "Liam Dawson", role: "AR" }, // 9
+      { name: "Adil Rashid", role: "BOWL" }, // 10
+      { name: "Gus Atkinson", role: "BOWL" }, // 11
+      { name: "Sonny Baker", role: "BOWL" }, // 12
+      { name: "Josh Tongue", role: "BOWL" }, // 13
+      { name: "James Coles", role: "AR" }, // 14
+      { name: "Mason Crane", role: "BOWL" }, // 15
       { name: "Henry Crocombe", role: "BOWL" }, // 16
     ],
   },
   {
     name: "Sri Lanka", short: "SL", country: "Sri Lanka", color: "#0B2A6F",
     players: [
-      { name: "Pathum Nissanka", role: "BAT" },     // 1
-      { name: "Kamindu Mendis", role: "AR" },       // 2
-      { name: "Kusal Mendis", role: "WK" },         // 3 (c)
-      { name: "Pavan Rathnayake", role: "BAT" },    // 4
-      { name: "Janith Liyanage", role: "AR" },      // 5
-      { name: "Avishka Fernando", role: "BAT" },    // 6
-      { name: "Dunith Wellalage", role: "AR" },     // 7
-      { name: "Sachindu Colombage", role: "AR" },   // 8
-      { name: "Eshan Malinga", role: "BOWL" },      // 9
-      { name: "Asitha Fernando", role: "BOWL" },    // 10
+      { name: "Pathum Nissanka", role: "BAT" }, // 1
+      { name: "Avishka Fernando", role: "BAT" }, // 2
+      { name: "Kusal Mendis", role: "WK" }, // 3
+      { name: "Kamindu Mendis", role: "AR" }, // 4
+      { name: "Pavan Rathnayake", role: "BAT" }, // 5
+      { name: "Janith Liyanage", role: "AR" }, // 6
+      { name: "Dunith Wellalage", role: "AR" }, // 7
+      { name: "Maheesh Theekshana", role: "BOWL" }, // 8
+      { name: "Dushmantha Chameera", role: "BOWL" }, // 9
+      { name: "Asitha Fernando", role: "BOWL" }, // 10
       { name: "Dilshan Madushanka", role: "BOWL" }, // 11
-      { name: "Maheesh Theekshana", role: "BOWL" }, // 12
-      { name: "Dushmantha Chameera", role: "BOWL" }, // 13
-      { name: "Dasun Shanaka", role: "AR" },        // 14
-      { name: "Kamil Mishara", role: "WK" },        // 15
-      { name: "Sahan Arachchige", role: "BAT" },    // 16
+      { name: "Eshan Malinga", role: "BOWL" }, // 12
+      { name: "Sachindu Colombage", role: "AR" }, // 13
+      { name: "Dasun Shanaka", role: "AR" }, // 14
+      { name: "Kamil Mishara", role: "WK" }, // 15
+      { name: "Sahan Arachchige", role: "BAT" }, // 16
     ],
   },
 ];
