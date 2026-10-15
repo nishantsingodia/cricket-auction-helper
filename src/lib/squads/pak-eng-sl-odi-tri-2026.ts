@@ -19,7 +19,9 @@
 //    slot may go to Baker / Tongue in later games.
 //  - SL: Avishka recalled as a top-order hitter alongside Nissanka (hamstring, subject to clearance),
 //    Kusal (c, wk); Theekshana + Wellalage spin on subcontinent pitches; Chameera, Asitha,
-//    Madushanka pace. Malinga / Colombage (both played in England) to the bench.
+//    Madushanka pace; Shanaka (in form: 3/4 v PAK 13 Oct) at 7 as third seamer, Chameera first
+//    reserve. Malinga / Colombage (both played in England) to the bench.
+// Batting ORDER within each XI = each player's usual ODI position (bat_position, backfilled 15 Oct).
 
 import type { BilateralTeam } from "./ind-vs-eng-t20-2026";
 
@@ -34,8 +36,8 @@ export const PAK_ENG_SL_ODI_TRI_2026: BilateralTeam[] = [
       { name: "Babar Azam", role: "BAT" }, // 3
       { name: "Ghazi Ghori", role: "WK" }, // 4
       { name: "Salman Ali Agha", role: "AR" }, // 5
-      { name: "Hasan Nawaz", role: "BAT" }, // 6
-      { name: "Arafat Minhas", role: "AR" }, // 7
+      { name: "Arafat Minhas", role: "AR" }, // 6
+      { name: "Hasan Nawaz", role: "BAT" }, // 7
       { name: "Shadab Khan", role: "AR" }, // 8
       { name: "Shaheen Shah Afridi", role: "BOWL" }, // 9
       { name: "Haris Rauf", role: "BOWL" }, // 10
@@ -50,17 +52,17 @@ export const PAK_ENG_SL_ODI_TRI_2026: BilateralTeam[] = [
   {
     name: "England", short: "ENG", country: "England", color: "#CF142B",
     players: [
-      { name: "Ben Duckett", role: "BAT" }, // 1
-      { name: "Tom Banton", role: "BAT" }, // 2
+      { name: "Tom Banton", role: "BAT" }, // 1
+      { name: "Ben Duckett", role: "BAT" }, // 2
       { name: "Joe Root", role: "BAT" }, // 3
       { name: "Harry Brook", role: "BAT" }, // 4
       { name: "Jordan Cox", role: "WK" }, // 5
-      { name: "Sam Curran", role: "AR" }, // 6
-      { name: "Will Jacks", role: "AR" }, // 7
+      { name: "Will Jacks", role: "AR" }, // 6
+      { name: "Sam Curran", role: "AR" }, // 7
       { name: "Jamie Overton", role: "AR" }, // 8
       { name: "Liam Dawson", role: "AR" }, // 9
-      { name: "Adil Rashid", role: "BOWL" }, // 10
-      { name: "Gus Atkinson", role: "BOWL" }, // 11
+      { name: "Gus Atkinson", role: "BOWL" }, // 10
+      { name: "Adil Rashid", role: "BOWL" }, // 11
       { name: "Sonny Baker", role: "BOWL" }, // 12
       { name: "Josh Tongue", role: "BOWL" }, // 13
       { name: "James Coles", role: "AR" }, // 14
@@ -74,17 +76,17 @@ export const PAK_ENG_SL_ODI_TRI_2026: BilateralTeam[] = [
       { name: "Pathum Nissanka", role: "BAT" }, // 1
       { name: "Avishka Fernando", role: "BAT" }, // 2
       { name: "Kusal Mendis", role: "WK" }, // 3
-      { name: "Kamindu Mendis", role: "AR" }, // 4
-      { name: "Pavan Rathnayake", role: "BAT" }, // 5
+      { name: "Pavan Rathnayake", role: "BAT" }, // 4
+      { name: "Kamindu Mendis", role: "AR" }, // 5
       { name: "Janith Liyanage", role: "AR" }, // 6
-      { name: "Dunith Wellalage", role: "AR" }, // 7
-      { name: "Maheesh Theekshana", role: "BOWL" }, // 8
-      { name: "Dushmantha Chameera", role: "BOWL" }, // 9
+      { name: "Dasun Shanaka", role: "AR" }, // 7
+      { name: "Dunith Wellalage", role: "AR" }, // 8
+      { name: "Maheesh Theekshana", role: "BOWL" }, // 9
       { name: "Asitha Fernando", role: "BOWL" }, // 10
       { name: "Dilshan Madushanka", role: "BOWL" }, // 11
-      { name: "Eshan Malinga", role: "BOWL" }, // 12
-      { name: "Sachindu Colombage", role: "AR" }, // 13
-      { name: "Dasun Shanaka", role: "AR" }, // 14
+      { name: "Dushmantha Chameera", role: "BOWL" }, // 12
+      { name: "Eshan Malinga", role: "BOWL" }, // 13
+      { name: "Sachindu Colombage", role: "AR" }, // 14
       { name: "Kamil Mishara", role: "WK" }, // 15
       { name: "Sahan Arachchige", role: "BAT" }, // 16
     ],
