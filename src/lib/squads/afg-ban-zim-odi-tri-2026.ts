@@ -19,7 +19,7 @@
 //    and Afghanistan's difficulty is unmeasurable anyway. Factor = 1.0 for all.
 //
 // Expected matches: XI = 2 league games + P(reaching the final). P(final) AFG 0.80 / BAN 0.70 /
-// ZIM 0.50 (sums to 2.0 — two finalists). Bench 0.5 (four-game event, little rotation).
+// ZIM 0.50 (sums to 2.0 — two finalists). Bench 0.5. These live in tri-odi-tours.ts.
 // XI seed = each side's most recent ODI XIs (BAN v AUS Jun 2026, ZIM v AUS Sep 2026 from cricsheet;
 // AFG in Ireland Aug 2026), with absent/unpicked players replaced: BAN Nahid Rana (injured) -> Shoriful;
 // ZIM Kaia (not picked) -> Marumani, Burl benched; AFG Nabi back for Ikram, Yamin (4/71 v IRE) as 3rd seamer.
@@ -27,7 +27,6 @@
 import type { BilateralTeam, Role } from "./ind-vs-eng-t20-2026";
 
 export const AFG_BAN_ZIM_ODI_TRI_2026_NAME = "AFG v BAN v ZIM ODI Tri-Series 2026";
-export const TRI_ODI_XI_SIZE = 11;
 
 export type { BilateralTeam, Role };
 
@@ -39,12 +38,6 @@ export const TRI_ODI_FIXTURES = [
   { match: 4, date: "2026-10-23", teams: "Final", venue: "Sheikh Zayed Stadium, Abu Dhabi" },
 ] as const;
 
-const P_FINAL: Record<string, number> = { AFG: 0.8, BAN: 0.7, ZIM: 0.5 };
-
-export function triOdiExpectedMatches(teamShort: string, squadNumber: number): number {
-  if (squadNumber >= 1 && squadNumber <= TRI_ODI_XI_SIZE) return 2 + (P_FINAL[teamShort] ?? 0.67);
-  return 0.5;
-}
 
 // ODI-scale EFPPM for every Afghan, keyed on the name the pool row will carry (DB name for the nine
 // with a franchise record — identical to the squad spelling here — squad name for statless rows).
@@ -183,13 +176,6 @@ export const AFG_BAN_ZIM_ODI_CSID: Record<string, string> = {
   "Vincent Masekesa": "42b34cb1",
   "Wessly Madhevere": "a879b92c",
 };
-
-// Wide candidate pool — see TWIN_ODI_MATCH_FORMATS for why (identity is csid-bridged, so widening
-// cannot cause a namesake error; it only lets the bridge find T20-only rows like the Afghans').
-export const TRI_ODI_MATCH_FORMATS = [
-  "ODI", "T20", "IPL", "BBL", "BLAST", "HUN", "PSL", "SA20", "ILT20", "CPL", "LPL", "MLC",
-  "TEST", "FC",
-];
 
 export const TRI_ODI_VENUES = [
   {

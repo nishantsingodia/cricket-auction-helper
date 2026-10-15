@@ -29,11 +29,7 @@ import {
   twinOdiExpectedMatches,
   twinOdiOppositionFactor,
 } from "@/lib/squads/sa-aus-eng-sl-odi-2026";
-import {
-  AFG_BAN_ZIM_ODI_TRI_2026_NAME,
-  TRI_ODI_AFG_EFPPM,
-  triOdiExpectedMatches,
-} from "@/lib/squads/afg-ban-zim-odi-tri-2026";
+import { getTriOdiTour, triOdiExpectedMatches } from "@/lib/squads/tri-odi-tours";
 import { getTestTour, testExpectedMatchesFor } from "../squads/test-tours";
 import {
   IRE_VS_WI_W_ODI_2026_NAME,
@@ -481,10 +477,11 @@ export async function recalculateValuations(
   // men's ODI gate is both sufficient and tighter — widening it would only import namesakes and
   // off-format form. Expected matches is the flat 3/1 of the T20 twin, NOT the 5/2 of the
   // five-match NZ v WI ODI series: these series are three matches with no dead rubber.
-  // AFG/BAN/ZIM ODI tri-series rides the twin-ODI form model wholesale (ODI-only, 36mo, weak-opp
-  // x0.83) and differs only in: Afghan EFPPM from TRI_ODI_AFG_EFPPM (cricsheet withholds AFG), no
-  // opposition factor, and 2 + P(final) expected matches. See afg-ban-zim-odi-tri-2026.ts.
-  const isTriOdi = tournamentRow?.name === AFG_BAN_ZIM_ODI_TRI_2026_NAME;
+  // ODI TRI-SERIES (tri-odi-tours.ts registry) rides the twin-ODI form model wholesale (ODI-only,
+  // 36mo, weak-opp x0.83) and differs only in: optional per-team EFPPM overrides (AFG — cricsheet
+  // withholds their matches), no opposition factor, and league games + P(final) expected matches.
+  const triTour = getTriOdiTour(tournamentRow?.name);
+  const isTriOdi = triTour != null;
   const isTwinOdi = tournamentRow?.name === SA_AUS_ENG_SL_ODI_2026_NAME || isTriOdi;
   // ENG v PAK 2026: the first RED-BALL tour. Scored purely on Test form ('TEST'), which is a
   // different points scale entirely (2 innings, +20 a wicket, no rate bonuses) — so nothing
@@ -1076,8 +1073,9 @@ export async function recalculateValuations(
     } else {
       score1 = rawScore1;
     }
-    if (isTriOdi && p.ipl_team === "AFG" && TRI_ODI_AFG_EFPPM[p.name] != null) {
-      score1 = TRI_ODI_AFG_EFPPM[p.name];
+    const triOverride = triTour?.efppmOverride;
+    if (triOverride?.teams.includes(p.ipl_team) && triOverride.byName[p.name] != null) {
+      score1 = triOverride.byName[p.name];
     }
 
     // Format-scale normalization, blended by how much of the player's recent quality history is
@@ -1156,7 +1154,7 @@ export async function recalculateValuations(
           ? pakSlIndWiExpectedMatches(p.squad_number)
           : twinT20ExpectedMatches(p.squad_number))
       : isTriOdi
-      ? triOdiExpectedMatches(p.ipl_team, p.squad_number)
+      ? triOdiExpectedMatches(triTour!, p.ipl_team, p.squad_number)
       : isTwinOdi
       // Flat 3 / 1, same as the T20 twin and for the same reason: both series are 3 matches, the
       // XI plays all three, and there is no dead rubber to rotate in. Explicitly NOT the 5/2 of

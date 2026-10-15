@@ -44,12 +44,7 @@ import {
   SA_AUS_ENG_SL_ODI_CSID,
   TWIN_ODI_MATCH_FORMATS,
 } from "@/lib/squads/sa-aus-eng-sl-odi-2026";
-import {
-  AFG_BAN_ZIM_ODI_TRI_2026,
-  AFG_BAN_ZIM_ODI_TRI_2026_NAME,
-  AFG_BAN_ZIM_ODI_CSID,
-  TRI_ODI_MATCH_FORMATS,
-} from "@/lib/squads/afg-ban-zim-odi-tri-2026";
+import { getTriOdiTour, TRI_ODI_MATCH_FORMATS } from "@/lib/squads/tri-odi-tours";
 import {
   IRE_VS_WI_W_ODI_2026,
   IRE_VS_WI_W_ODI_2026_NAME,
@@ -401,8 +396,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // ---- AFG v BAN v ZIM ODI Tri-Series 2026 (3 teams, 3 league games + final) ----
-    if (auctionRow.tournament_name === AFG_BAN_ZIM_ODI_TRI_2026_NAME) {
+    // ---- ODI tri-series (tri-odi-tours.ts registry: AFG/BAN/ZIM, PAK/ENG/SL, ...) ----
+    const triTour = getTriOdiTour(auctionRow.tournament_name);
+    if (triTour) {
       let tournamentId = auctionRow.tournament_id;
       if (!tournamentId) {
         const t = await sqlite
@@ -410,7 +406,7 @@ export async function POST(request: NextRequest) {
             `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size)
              VALUES (?, 'BILATERAL', 'ODI', 100, 16)`
           )
-          .run(AFG_BAN_ZIM_ODI_TRI_2026_NAME);
+          .run(triTour.name);
         tournamentId = Number(t.lastInsertRowid);
         await sqlite
           .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
@@ -418,14 +414,14 @@ export async function POST(request: NextRequest) {
       }
 
       const teams = Array.isArray(teamsFilter) && teamsFilter.length
-        ? AFG_BAN_ZIM_ODI_TRI_2026.filter((t) => teamsFilter.includes(t.short))
-        : AFG_BAN_ZIM_ODI_TRI_2026;
+        ? triTour.teams.filter((t) => teamsFilter.includes(t.short))
+        : triTour.teams;
 
       const built = await buildBilateralT20Pool(sqlite, {
         auctionId,
         tournamentId,
         teams,
-        csidBridge: AFG_BAN_ZIM_ODI_CSID,
+        csidBridge: triTour.csid,
         noFuzzy: true,
         aliases: {},
         matchFormats: TRI_ODI_MATCH_FORMATS,

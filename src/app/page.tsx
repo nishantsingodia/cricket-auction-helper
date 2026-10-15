@@ -106,6 +106,13 @@ export default function HomePage() {
       note: "TWIN bilateral \u00b7 PAK v SL (3) + IND v WI T20Is 2\u20134, 4 teams, one purse \u00b7 opposition-adjusted (WI \u22126%)",
     },
     {
+      // The id MUST equal PAK_ENG_SL_ODI_TRI_2026_NAME \u2014 /api/pool/fetch reads the tri-odi-tours registry.
+      id: "PAK v ENG v SL ODI Tri-Series 2026",
+      label: "PAK v ENG v SL ODI Tri-Series 2026",
+      format: "ODI",
+      note: "ODI tri-series (Pakistan) \u00b7 double round robin + final \u00b7 ODI form, 36mo, weak-opp discounted",
+    },
+    {
       // The id MUST equal AFG_BAN_ZIM_ODI_TRI_2026_NAME \u2014 /api/pool/fetch branches on tournament_name.
       id: "AFG v BAN v ZIM ODI Tri-Series 2026",
       label: "AFG v BAN v ZIM ODI Tri-Series 2026",
