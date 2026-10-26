@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sqlite, withTransaction } from "@/db";
 import { SEARCH_ALIASES } from "@/lib/squads/womens-t20-wc-2026";
+import { WBBL_NAME_ALIASES } from "@/lib/squads/wbbl-2026";
 
 /**
  * POST /api/auction/quick-sell
@@ -13,6 +14,12 @@ import { SEARCH_ALIASES } from "@/lib/squads/womens-t20-wc-2026";
  *   Single:  "Nishant | Virat Kohli & 25"
  *   Bulk:    "Pradeep | Abhishek Sharma 45 Travis Head 36 Arshdeep Singh 18"
  *   Bulk:    "Pradeep | Abhishek Sharma 45, Travis Head 36, Arshdeep Singh 18"
+ *   Table:   a pasted sheet — friend on the first line, then one "Sr. No  Player  Price" row per
+ *            player (header row + serial numbers are ignored):
+ *              Mihir
+ *              Sr. No	Player	Price
+ *              1	Alice Capsey	16
+ *              2	Tahlia Wilson	8
  *
  * Logic: after the "|", split into (playerName, price) pairs by finding
  * numbers. Each number ends a player entry. Text before that number is the name.
@@ -33,10 +40,20 @@ interface PoolPlayer {
 
 // Lowercased searchable text for a player: their name plus any alias terms
 // (e.g. "ac jayangani" -> also matches "chamari athapaththu").
+// WBBL pool rows carry cricsheet initials ("LCN Smith", "M Hinkley"); index each one under its
+// announced name too. Without this, "Linsey Smith" matched LG Smith (Lauren) — the surname pass
+// lets an initial stand in for the first name, and "LG" starts with L.
+const WBBL_SEARCH: Record<string, string> = Object.fromEntries(
+  Object.entries(WBBL_NAME_ALIASES).map(([announced, db]) => [db.toLowerCase(), announced])
+);
+
 function searchTextFor(name: string): string {
   const lower = name.toLowerCase();
-  const alias = SEARCH_ALIASES[lower.replace(/[^a-z\s]/g, "").replace(/\s+/g, " ").trim()];
-  return alias ? `${lower} ${alias}` : lower;
+  const extra = [
+    SEARCH_ALIASES[lower.replace(/[^a-z\s]/g, "").replace(/\s+/g, " ").trim()],
+    WBBL_SEARCH[lower],
+  ].filter(Boolean);
+  return extra.length ? `${lower} ${extra.join(" ")}` : lower;
 }
 
 interface Participant {
@@ -183,6 +200,26 @@ function parsePlayerEntries(
   return entries;
 }
 
+/**
+ * Table format (no "|"): first non-empty line is the friend, then one row per player, each ending in
+ * its price. A leading serial number ("1", "1.", "1)") is dropped; any row that does not end in a
+ * number (the "Sr. No / Player / Price" header) is skipped. Row-by-row, so a serial number can never
+ * be mistaken for a price the way the free-text parser would.
+ */
+function parseTable(message: string): { friend: string; entries: { name: string; price: number }[] } | null {
+  const lines = message.split(/\r?\n/).map((l) => l.replace(/\t/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
+  if (lines.length < 2) return null;
+  const friend = lines[0];
+  const entries: { name: string; price: number }[] = [];
+  for (const line of lines.slice(1)) {
+    const m = line.match(/^(?:\d+[.)]?\s+)?(.+?)\s+(\d+(?:\.\d+)?)$/);
+    if (!m) continue; // header / blank-ish row
+    const price = parseFloat(m[2]);
+    if (price > 0) entries.push({ name: m[1].trim(), price });
+  }
+  return { friend, entries };
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { auctionId, message } = await req.json();
@@ -194,20 +231,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Parse: "Friend | entries..."
+    // Parse: "Friend | entries..." — or, with no "|", a pasted table (friend on line 1).
     const pipeIndex = message.indexOf("|");
-    if (pipeIndex === -1) {
+    const table = pipeIndex === -1 ? parseTable(message) : null;
+    if (pipeIndex === -1 && !table) {
       return NextResponse.json(
-        { error: 'Use: Friend | Player Price Player Price ...' },
+        { error: 'Use: Friend | Player Price Player Price ...  (or paste a table: friend on line 1, then "Player Price" rows)' },
         { status: 400 }
       );
     }
 
-    const friendPart = message.substring(0, pipeIndex).trim();
-    const rest = message.substring(pipeIndex + 1).trim();
+    const friendPart = table ? table.friend : message.substring(0, pipeIndex).trim();
+    const rest = table ? "" : message.substring(pipeIndex + 1).trim();
 
     // Parse entries
-    const entries = parsePlayerEntries(rest);
+    const entries = table ? table.entries : parsePlayerEntries(rest);
     if (entries.length === 0) {
       return NextResponse.json(
         {
