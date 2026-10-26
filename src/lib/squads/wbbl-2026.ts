@@ -125,7 +125,7 @@ export const WBBL_2026: WbblTeam[] = [
     players: [
       { name: "Grace Harris", role: "AR", overseas: false },
       { name: "Annie O'Neil", role: "BAT", overseas: false },
-      { name: "Jess Jonassen", role: "AR", overseas: false, note: "Stepped down as captain in March. Played WNCL round 1 but missed the Spring Challenge (reason unverified)." },
+      { name: "Jess Jonassen", role: "AR", overseas: false, avail: "OUT", note: "🚫 OUT FOR WBBL|12 — hip complaint (Heat + cricket.com.au, 27 Oct). Aiming to train again in December. The Heat are negotiating an INTERNATIONAL replacement, to be announced before the 30 Oct opener." },
       { name: "Charli Knott", role: "AR", overseas: false, note: "Opened in all 9 of her 2025 games — the preview has her at 4; top order unsettled." },
       { name: "Georgia Redmayne", role: "WK", overseas: false, captain: true },
       { name: "Orla Prendergast", role: "AR", overseas: true, note: "New signing." },
