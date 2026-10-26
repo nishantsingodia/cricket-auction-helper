@@ -2324,7 +2324,7 @@ function QuickSellChat({
     {
       id: 0,
       type: "success",
-      text: 'Friend | Player Price Player Price ...\nSingle: "Nishant | Kohli 25"\nBulk: "Pradeep | Abhishek 45 Head 36 Bumrah 21"\nAuto-overwrites if already sold.',
+      text: 'Friend | Player Price Player Price ...\nSingle: "Nishant | Kohli 25"\nBulk: "Pradeep | Abhishek 45 Head 36 Bumrah 21"\nSheet: paste it as-is — friend name, then Sr. No / Player / Price rows.\nAuto-overwrites if already sold.',
     },
   ]);
   const [input, setInput] = useState("");

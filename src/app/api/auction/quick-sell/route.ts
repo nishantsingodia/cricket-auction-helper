@@ -200,24 +200,65 @@ function parsePlayerEntries(
   return entries;
 }
 
+// Column-header words in a pasted sheet. Matched as whole tokens, case-insensitive.
+const HEADER_WORDS = new Set([
+  "sr", "sr.", "s.no", "s.no.", "sno", "no", "no.", "#", "player", "players", "name",
+  "price", "points", "pts", "amount", "cost", "bid",
+]);
+const isNum = (t: string) => /^\d+(?:\.\d+)?[.)]?$/.test(t);
+
 /**
- * Table format (no "|"): first non-empty line is the friend, then one row per player, each ending in
- * its price. A leading serial number ("1", "1.", "1)") is dropped; any row that does not end in a
- * number (the "Sr. No / Player / Price" header) is skipped. Row-by-row, so a serial number can never
- * be mistaken for a price the way the free-text parser would.
+ * Table format (no "|") — a pasted sheet:
+ *     Mihir
+ *     Sr. No  Player  Price  Points
+ *     1  Alice Capsey  16
+ * The app's input is ONE line, so a paste arrives with its line breaks flattened into spaces —
+ * the parser therefore never relies on line structure. Tokens are read left to right:
+ *   - the friend is everything before the header row (or the first line / first word if no header)
+ *   - header words are dropped
+ *   - after each player name, the FIRST number is the price; any further numbers before the next
+ *     name (a Points value, the next row's serial) are ignored. A serial BEFORE a name is ignored
+ *     too, so a serial can never be read as a price.
  */
 function parseTable(message: string): { friend: string; entries: { name: string; price: number }[] } | null {
-  const lines = message.split(/\r?\n/).map((l) => l.replace(/\t/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
-  if (lines.length < 2) return null;
-  const friend = lines[0];
-  const entries: { name: string; price: number }[] = [];
-  for (const line of lines.slice(1)) {
-    const m = line.match(/^(?:\d+[.)]?\s+)?(.+?)\s+(\d+(?:\.\d+)?)$/);
-    if (!m) continue; // header / blank-ish row
-    const price = parseFloat(m[2]);
-    if (price > 0) entries.push({ name: m[1].trim(), price });
+  const raw = message.replace(/\r/g, "");
+  const flat = raw.replace(/\s+/g, " ").trim();
+  const tokens = flat.split(" ");
+  const firstHeader = tokens.findIndex((t) => HEADER_WORDS.has(t.toLowerCase()));
+
+  let friend: string;
+  let body: string[];
+  if (firstHeader > 0) {
+    friend = tokens.slice(0, firstHeader).join(" ");
+    body = tokens.slice(firstHeader);
+  } else if (raw.includes("\n")) {
+    const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+    friend = lines[0].replace(/\s+/g, " ");
+    body = lines.slice(1).join(" ").replace(/\s+/g, " ").trim().split(" ");
+  } else {
+    friend = tokens[0];
+    body = tokens.slice(1);
   }
-  return { friend, entries };
+  body = body.filter((t) => t && !HEADER_WORDS.has(t.toLowerCase()));
+
+  const entries: { name: string; price: number }[] = [];
+  let name: string[] = [];
+  let priced = true; // true until a name has been read and is waiting for its price
+  for (const t of body) {
+    if (isNum(t)) {
+      if (!priced && name.length) {
+        const price = parseFloat(t);
+        if (price > 0) entries.push({ name: name.join(" "), price });
+        priced = true;
+        name = [];
+      }
+      // else: a serial number or a Points value — ignore
+    } else {
+      if (priced) { name = []; priced = false; }
+      name.push(t);
+    }
+  }
+  return friend && entries.length ? { friend, entries } : null;
 }
 
 export async function POST(req: NextRequest) {
@@ -236,7 +277,7 @@ export async function POST(req: NextRequest) {
     const table = pipeIndex === -1 ? parseTable(message) : null;
     if (pipeIndex === -1 && !table) {
       return NextResponse.json(
-        { error: 'Use: Friend | Player Price Player Price ...  (or paste a table: friend on line 1, then "Player Price" rows)' },
+        { error: 'Use: Friend | Player Price Player Price ...  (or paste a sheet: friend name, then Sr. No / Player / Price rows)' },
         { status: 400 }
       );
     }
