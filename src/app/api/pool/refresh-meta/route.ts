@@ -6,6 +6,8 @@ import { ETPL_2026_NAME } from "@/lib/squads/etpl-2026";
 import { resolveEtplSquads } from "@/lib/squads/build-etpl-pool";
 import { WCPL_2026_NAME, wcplAvailability } from "@/lib/squads/wcpl-2026";
 import { resolveWcplSquads } from "@/lib/squads/build-wcpl-pool";
+import { WBBL_2026_NAME, wbblAvailability } from "@/lib/squads/wbbl-2026";
+import { resolveWbblSquads } from "@/lib/squads/build-wbbl-pool";
 
 // POST /api/pool/refresh-meta  { auctionId }
 //
@@ -55,7 +57,9 @@ export async function POST(request: NextRequest) {
     // while the ICC Women's Championship was still running, so international withdrawals and late
     // arrivals land DURING the auction window — and with only 3 league games each, one missed
     // fixture is a 25% cut to a player's expected matches, which is larger than most form gaps.
-    const supported = [CPL_2026_NAME, ETPL_2026_NAME, WCPL_2026_NAME];
+    // WBBL|12: squads were still moving the week before the first ball (Wyatt-Hodge -> Athapaththu,
+    // Darke -> Lyons, both 25-26 Oct), so late swaps must reach a live pool the same way.
+    const supported = [CPL_2026_NAME, ETPL_2026_NAME, WCPL_2026_NAME, WBBL_2026_NAME];
     if (!supported.includes(auction.tournament_name)) {
       return NextResponse.json(
         { error: `refresh-meta supports ${supported.join(" and ")} only` },
@@ -64,6 +68,10 @@ export async function POST(request: NextRequest) {
     }
     const isEtpl = auction.tournament_name === ETPL_2026_NAME;
     const isWcpl = auction.tournament_name === WCPL_2026_NAME;
+    const isWbbl = auction.tournament_name === WBBL_2026_NAME;
+    // WCPL and WBBL both resolve availability by player id (see availByPlayerId below).
+    const availFor = isWbbl ? wbblAvailability : wcplAvailability;
+    const byPid = isWcpl || isWbbl;
     if (!auction.tournament_id) {
       return NextResponse.json({ error: "auction has no pool yet — fetch the pool first" }, { status: 400 });
     }
@@ -73,6 +81,8 @@ export async function POST(request: NextRequest) {
       ? await resolveEtplSquads(sqlite)
       : isWcpl
       ? await resolveWcplSquads(sqlite)
+      : isWbbl
+      ? await resolveWbblSquads(sqlite)
       : await resolveCplSquads(sqlite);
     const noteByPlayerId = new Map<number, string>();
     // WCPL resolves availability by PLAYER ID, not by the DB name string cplAvailability takes:
@@ -82,7 +92,7 @@ export async function POST(request: NextRequest) {
     for (const r of resolved) {
       if (r.playerId === null) continue;
       noteByPlayerId.set(r.playerId, r.sp.note ?? "");
-      if (isWcpl) availByPlayerId.set(r.playerId, wcplAvailability(r.sp.name));
+      if (byPid) availByPlayerId.set(r.playerId, availFor(r.sp.name));
     }
 
     const poolRows = await sqlite
@@ -117,7 +127,7 @@ export async function POST(request: NextRequest) {
         // availability tag, so there is nothing to sync for it — leave the column untouched.
         const wantAvail = isEtpl
           ? row.availability
-          : isWcpl
+          : byPid
           ? availByPlayerId.get(row.player_id) ?? "FIT"
           : cplAvailability(row.name);
 
@@ -161,7 +171,7 @@ export async function POST(request: NextRequest) {
           r.team.short,
           r.sn,
           r.sp.note ?? "",
-          isEtpl ? "FIT" : isWcpl ? wcplAvailability(r.sp.name) : cplAvailability(r.sp.name)
+          isEtpl ? "FIT" : byPid ? availFor(r.sp.name) : cplAvailability(r.sp.name)
         );
         added.push(`${r.team.short}/${r.sp.name}`);
       }

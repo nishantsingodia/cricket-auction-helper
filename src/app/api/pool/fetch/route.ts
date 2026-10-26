@@ -71,6 +71,8 @@ import { getTestTour } from "@/lib/squads/test-tours";
 import { buildTestPool } from "@/lib/squads/build-test-pool";
 import { buildCPLPool } from "@/lib/squads/build-cpl-pool";
 import { buildWCPLPool } from "@/lib/squads/build-wcpl-pool";
+import { WBBL_2026, WBBL_2026_NAME } from "@/lib/squads/wbbl-2026";
+import { buildWBBLPool } from "@/lib/squads/build-wbbl-pool";
 import { buildETPLPool } from "@/lib/squads/build-etpl-pool";
 import { eq } from "drizzle-orm";
 
@@ -774,6 +776,48 @@ export async function POST(request: NextRequest) {
         : undefined;
 
       const built = await buildWCPLPool(sqlite, { auctionId, tournamentId, teams });
+      if (isFirstBuild)
+        await carryOverPreviousLineups({
+          tournamentName: auctionRow.tournament_name,
+          tournamentId,
+          auctionId,
+        });
+      await initializeValuations(tournamentId);
+
+      return NextResponse.json({
+        success: true,
+        teams: built.teams,
+        players: built.players,
+        matched: built.matched,
+        created: built.created,
+        unmatched: built.unmatched,
+        teamBreakdown: built.teamBreakdown,
+      });
+    }
+
+    // ---- WBBL|12 2026 (Women's Big Bash League) — women's franchise T20 ----
+    // 8 franchises, 10 league games each + 3 finals. Squads of 13–15, max 3 overseas on the list
+    // (so the XI overseas cap never binds). See wbbl-2026.ts.
+    if (auctionRow.tournament_name === WBBL_2026_NAME) {
+      let tournamentId = auctionRow.tournament_id;
+      if (!tournamentId) {
+        const t = await sqlite
+          .prepare(
+            `INSERT INTO tournaments (name, format, match_format, purse_per_team, max_squad_size, max_overseas)
+             VALUES (?, 'CUSTOM', 'T20', 100, 15, 3)`
+          )
+          .run(WBBL_2026_NAME);
+        tournamentId = Number(t.lastInsertRowid);
+        await sqlite
+          .prepare("UPDATE auctions SET tournament_id = ? WHERE id = ?")
+          .run(tournamentId, auctionId);
+      }
+
+      const teams = Array.isArray(teamsFilter) && teamsFilter.length
+        ? WBBL_2026.filter((t) => teamsFilter.includes(t.short))
+        : undefined;
+
+      const built = await buildWBBLPool(sqlite, { auctionId, tournamentId, teams });
       if (isFirstBuild)
         await carryOverPreviousLineups({
           tournamentName: auctionRow.tournament_name,

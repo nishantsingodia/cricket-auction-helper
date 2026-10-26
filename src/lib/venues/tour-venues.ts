@@ -43,6 +43,12 @@ import {
   CPL_TOURNAMENT_SCHEDULE,
   CPL_VENUE_BASIS,
 } from "@/lib/squads/cpl-2026";
+import {
+  WBBL_2026_NAME,
+  WBBL_VENUES,
+  WBBL_HOME,
+  WBBL_TEAM_SCHEDULE,
+} from "@/lib/squads/wbbl-2026";
 
 export type VenueType = "bat_road" | "balanced" | "bowl_friendly";
 
@@ -370,6 +376,27 @@ export async function getTourVenueContext(tournamentName: string): Promise<TourV
       ...(await (async () => { const d = await withBatIndex(LPL_VENUES.map((v) => ({ canonical: v.canonical, variants: v.variants, type: v.type })), "male"); return { venues: d.venues, batIndexMedian: d.batIndexMedian, batIndexByGround: d.batIndexByGround }; })()),
       teamSchedule: LPL_TEAM_SCHEDULE,
       homeOf,
+    };
+  }
+
+  if (tournamentName === WBBL_2026_NAME) {
+    // Eight home grounds, real home legs (REN/STA 6 of 10 at Junction, HEA/HUR/SCO/SIX/THU 4).
+    // Read on WOMEN'S white-ball data — never the men's BBL read of the same ground.
+    const d = await withBatIndex(
+      WBBL_VENUES.map((v) => ({ canonical: v.canonical, variants: v.variants, type: v.type })),
+      "female"
+    );
+    return {
+      tour: tournamentName,
+      neutral: false,
+      gender: "female",
+      venueFormats: ["WBBL", "T20"],
+      venueWindowMonths: 36,
+      venues: d.venues,
+      batIndexMedian: d.batIndexMedian,
+      batIndexByGround: d.batIndexByGround,
+      teamSchedule: WBBL_TEAM_SCHEDULE,
+      homeOf: WBBL_HOME,
     };
   }
 

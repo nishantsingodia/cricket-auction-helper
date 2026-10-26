@@ -32,8 +32,11 @@
 import { sqlite } from "@/db";
 import { canonicalVenue } from "@/lib/registry/venues";
 
+// The women's leagues (WBBL / WPL / WCPL) are women-only codes, so listing them changes nothing for
+// a men's read. Before 26 Oct 2026 they were missing, and women's grounds were read on T20Is + the
+// Hundred alone — Junction Oval / WACA / Karen Rolton / Drummoyne had NO usable sample at all.
 export const BAT_INDEX_FORMATS = [
-  "CPL", "IPL", "BBL", "PSL", "LPL", "SA20", "ILT20", "MLC", "HUN", "T20",
+  "CPL", "IPL", "BBL", "PSL", "LPL", "SA20", "ILT20", "MLC", "HUN", "T20", "WBBL", "WPL", "WCPL",
 ] as const;
 
 // Red ball reads TEST ONLY. First-class ('FC') is excluded for the same reason Vitality Blast is
@@ -251,7 +254,8 @@ async function writePersisted(gender: string, res: BatIndexResult): Promise<void
 // migration.
 const cacheKeyFor = (gender: "male" | "female", basis: BatIndexBasis) => {
   const c = BASIS[basis];
-  return `${gender}:${basis}:${c.recentMonths}-${c.recentMin}-${c.wideMonths}-${c.wideMin}`;
+  // formats are part of the rule too — adding a league must not keep serving the old index.
+  return `${gender}:${basis}:${c.recentMonths}-${c.recentMin}-${c.wideMonths}-${c.wideMin}:${c.formats.join(",")}`;
 };
 
 export async function computeBatIndex(

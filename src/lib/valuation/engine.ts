@@ -63,6 +63,7 @@ import {
   WCPL_2026_NAME,
   wcplExpectedMatches,
 } from "@/lib/squads/wcpl-2026";
+import { WBBL_2026_NAME, WBBL_COUNTING_PICKS, wbblExpectedMatches } from "@/lib/squads/wbbl-2026";
 
 /**
  * IPL Auction Valuation Engine — 2-Score Model
@@ -446,6 +447,12 @@ export async function recalculateValuations(
   // would be the same constant for all 59 players and carries ZERO relative signal. Same call as
   // ETPL, and it is why isWcpl appears in no venue path anywhere in this file.
   const isWcpl = tournamentRow?.name === WCPL_2026_NAME;
+  // WBBL|12 2026: women's franchise T20 at full size — 8 teams, 10 league games each + 3 finals.
+  // The WCPL archetype minus its scale uplift: own 'WBBL' league bucket (2025/2024 seasons are
+  // real, so DEFAULT 40/30/10/20 weights, no slide-back), per-bucket k=5 shrinkage toward 40.
+  // NO scale correction — measured 26 Oct 2026, WBBL FP = 1.05x the same players' WPL+T20I FP
+  // (70 players), i.e. noise; WBBL is the target scale AND roughly the quality-set scale.
+  const isWbbl = tournamentRow?.name === WBBL_2026_NAME;
   // ENG v SL + IND v AFG T20I 2026: ONE pool spanning TWO concurrent 3-match bilateral T20I series.
   // Bilateral in every respect that a single series is — no league season, so the 60/40 recency
   // weights apply, and expected matches is a flat 3/1 — plus the two things that only a
@@ -507,7 +514,7 @@ export async function recalculateValuations(
   // DEFAULT calendar season buckets and they must NOT slide back the way LPL's do: WCPL ran a real
   // 2025 season (Sep 2025) and a 2024 one, so buckets B and C are genuinely populated and the
   // default 40/30/10/20 weights apply — identical reasoning to CPL, hence no score1Weights entry.
-  const leagueFmt = isHundred ? "HUN" : isMLC ? "MLC" : isLpl ? "LPL" : isCpl ? "CPL" : isWcpl ? "WCPL" : isEtpl ? "ETPL" : "IPL";
+  const leagueFmt = isHundred ? "HUN" : isMLC ? "MLC" : isLpl ? "LPL" : isCpl ? "CPL" : isWcpl ? "WCPL" : isWbbl ? "WBBL" : isEtpl ? "ETPL" : "IPL";
   const qualityList = isHundredMen
     // Marquee franchise leagues only — Vitality Blast ('BLAST') is EXCLUDED: it's domestic
     // county T20 (a tier below), and at 1,557 matches it's the largest bucket, so counting it
@@ -544,6 +551,16 @@ export async function recalculateValuations(
     // count, the same call as the Hundred Women, because the women's sample is thin and gating it
     // on opposition would starve it.
     ? "'WCPL','WPL','T20','WBBL'"
+    : isWbbl
+    // Women's franchise set on the 20-over scale. 'HUN' OUT (100-ball, lower FP scale — same call
+    // as WCPL) and 'WCPL' OUT (a weaker league that inflates FP ~1.18x, see WCPL_SCALE_UPLIFT);
+    // both stay display-only form in the player modal.
+    // 'T20' is deliberately NOT listed, so the default top-8-opposition gate in qualityClause binds
+    // — unlike WCPL / Hundred Women, which count every women's T20I. Tested both on 26 Oct 2026:
+    // ungated, Athapaththu priced #3 (EFPPM 86.7) off 17 T20Is v non-top-8 sides averaging 151.5 FP
+    // vs 72 in the WBBL; gated she is 70.6. WBBL squads are deep enough in WBBL/WPL/top-8 T20I
+    // form that the gate costs nobody a real sample (it also drops Australia A games).
+    ? "'WBBL','WPL'"
     : isEtpl || isTwinT20
     // The widest set here, and the ONLY one that includes BLAST and unrestricted 'T20'. Listing
     // 'T20' inside the format list means the top-8-opposition gate no longer binds — every T20I
@@ -1046,7 +1063,7 @@ export async function recalculateValuations(
         etplRolePrior?.[p.role] ?? ETPL_PRIOR_FALLBACK[p.role] ?? ETPL_PRIOR_FALLBACK.BAT;
       const n = qualNMap.get(p.player_id) ?? 0;
       score1 = (n * rawScore1 + SHRINK_K * prior) / (n + SHRINK_K);
-    } else if (isLpl || isCpl || isWcpl) {
+    } else if (isLpl || isCpl || isWcpl || isWbbl) {
       // CPL uses the same PER-BUCKET shrinkage as LPL. The trigger differs slightly: CPL's season
       // buckets are populated, but a squad of 122 is full of players with a 1–3 game CPL season
       // (uncapped domestics, breakout picks, overseas cameos), and a single big score in a 1-game
@@ -1180,6 +1197,10 @@ export async function recalculateValuations(
       // model here — everyone is available for the whole 13-day window, and the ceiling is 3
       // league games plus at most 2 knockouts. See wcplExpectedMatches (XI 4.0 / 12th 1.2 / 0.6).
       ? wcplExpectedMatches(p.ipl_team, p.squad_number)
+      : isWbbl
+      // Squad-number-keyed with an avail CAP (Fatima Sana: first 8 games only).
+      // XI 10.75 (10 league + 0.75 finals share) / 12th 2.0 / 13th 1.0 / 14+ 0.5.
+      ? wbblExpectedMatches(p.ipl_team, p.squad_number)
       : isWomensWC
       ? getWomensExpectedMatches(p.squad_number, WC_TEAM_TIERS[p.ipl_team] ?? "C")
       : getExpectedMatches(p.squad_number);
@@ -1272,8 +1293,14 @@ export async function recalculateValuations(
   const topPlayers = sorted.slice(0, remainingSlots);
   const topPlayerIds = new Set(topPlayers.map((p) => p.id));
 
-  // Split remaining slots: bottom 10% get base price (1 Cr), rest get real prices
-  const baseSlots = Math.min(Math.ceil(remainingSlots * 0.1), topPlayers.length);
+  // Split remaining slots: bottom 10% get base price (1 Cr), rest get real prices.
+  // BEST-N-OF-M house rule (WBBL: best 16 of 20): the non-counting share of every roster is
+  // insurance, not points, so that share of the board goes at the floor instead of 10%.
+  const benchShare =
+    isWbbl && playersPerFriend > WBBL_COUNTING_PICKS
+      ? Math.max(0.1, 1 - WBBL_COUNTING_PICKS / playersPerFriend)
+      : 0.1;
+  const baseSlots = Math.min(Math.ceil(remainingSlots * benchShare), topPlayers.length);
   const realPlayers = topPlayers.slice(0, topPlayers.length - baseSlots);
   const basePlayers = topPlayers.slice(topPlayers.length - baseSlots);
 

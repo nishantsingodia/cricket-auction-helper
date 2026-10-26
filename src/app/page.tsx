@@ -73,6 +73,12 @@ export default function HomePage() {
       note: "4 Caribbean franchises · 8 matches, all at Kensington Oval · valued on WCPL 2025/24 + WPL/WBBL/T20I form, venue-neutral",
     },
     {
+      id: "WBBL 2026",
+      label: "WBBL|12 2026",
+      format: "T20",
+      note: "8 Australian franchises · 10 league games + 3 finals · valued on WBBL 2025/24 + WPL/T20I form",
+    },
+    {
       id: "ETPL 2026",
       label: "ETPL 2026",
       format: "T20",
